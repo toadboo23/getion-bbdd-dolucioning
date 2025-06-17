@@ -180,7 +180,7 @@ export class MemStorage implements IStorage {
       firstName: userData.firstName || null,
       lastName: userData.lastName || null,
       profileImageUrl: userData.profileImageUrl || null,
-      role: userData.role || "normal",
+      role: userData.role || "super_admin",
       createdAt: userData.createdAt || new Date(),
       updatedAt: new Date()
     };

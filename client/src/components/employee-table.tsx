@@ -56,20 +56,11 @@ export default function EmployeeTable({
               {employees.map((employee) => (
                 <TableRow key={employee.id} className="table-row">
                   <TableCell>
-                    <div className="flex items-center space-x-3">
-                      <div className="flex-shrink-0">
-                        <img
-                          src={employee.profileImageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face"}
-                          alt="Employee"
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {employee.firstName} {employee.lastName}
                       </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {employee.firstName} {employee.lastName}
-                        </div>
-                        <div className="text-sm text-gray-500">{employee.position}</div>
-                      </div>
+                      <div className="text-sm text-gray-500">{employee.position}</div>
                     </div>
                   </TableCell>
                   <TableCell>

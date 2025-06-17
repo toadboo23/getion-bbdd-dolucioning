@@ -71,11 +71,6 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
                   {user?.role && getRoleBadge(user.role)}
                 </div>
               </div>
-              <img
-                src={user?.profileImageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face"}
-                alt="User Profile"
-                className="w-10 h-10 rounded-full object-cover"
-              />
             </div>
           </div>
         </div>

@@ -30,7 +30,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role", { enum: ["super_admin", "admin", "normal"] }).notNull().default("admin"),
+  role: varchar("role", { enum: ["super_admin", "admin", "normal"] }).notNull().default("super_admin"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
