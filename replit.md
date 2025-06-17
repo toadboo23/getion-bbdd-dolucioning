@@ -123,6 +123,13 @@ Changelog:
   * Added responsive mobile sidebar with overlay
   * Fixed TypeScript authentication errors
   * Improved user experience with proper spacing and navigation
+- June 17, 2025. Updated employee database schema with comprehensive fields:
+  * Added 16 specific employee fields: Apellidos, Telefono, Correo, CIUDAD, 
+    DNI_NIE, Fecha_de_Nacimiento, Nacionalidad, NAF, DIRECCIÓN, Iban, 
+    Vehiculo, Contrato(Horas), TIPO_CONTRATO, ESTADO_SS, FECHA_ALTA, EDAD
+  * Removed employee images from interface for cleaner design
+  * Updated storage and schema to handle all new required fields
+  * Enhanced authentication to default super_admin role for full access
 ```
 
 ## User Preferences
