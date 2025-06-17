@@ -55,6 +55,10 @@ export interface IStorage {
     pendingActions: number;
     employeesByCity: { city: string; count: number }[];
   }>;
+  
+  // Bulk operations
+  clearAllEmployees(): Promise<void>;
+  bulkCreateEmployees(employees: InsertEmployee[]): Promise<Employee[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -412,6 +416,26 @@ export class MemStorage implements IStorage {
       pendingActions: pendingNotifications.length,
       employeesByCity
     };
+  }
+
+  // Bulk operations for replacing entire employee database
+  async clearAllEmployees(): Promise<void> {
+    console.log("Clearing all employees from database");
+    this.employees.clear();
+    this.currentEmployeeId = 1;
+  }
+
+  async bulkCreateEmployees(employeeDataList: InsertEmployee[]): Promise<Employee[]> {
+    console.log("Bulk creating employees:", employeeDataList.length);
+    const createdEmployees: Employee[] = [];
+    
+    for (const employeeData of employeeDataList) {
+      const employee = await this.createEmployee(employeeData);
+      createdEmployees.push(employee);
+    }
+    
+    console.log("Bulk operation completed. Total employees:", this.employees.size);
+    return createdEmployees;
   }
 }
 

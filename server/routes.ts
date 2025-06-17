@@ -343,28 +343,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid employee data" });
       }
 
-      const results = [];
-      for (const empData of employeeData) {
+      console.log(`Starting bulk upload: Replacing entire database with ${employeeData.length} employees`);
+
+      // Step 1: Clear all existing employees
+      await storage.clearAllEmployees();
+      console.log("All existing employees cleared");
+
+      // Step 2: Validate and prepare new employee data
+      const validatedEmployees = [];
+      const errors = [];
+
+      for (let i = 0; i < employeeData.length; i++) {
         try {
-          const validatedData = insertEmployeeSchema.parse(empData);
-          const employee = await storage.createEmployee(validatedData);
-          results.push({ success: true, employee });
+          const validatedData = insertEmployeeSchema.parse(employeeData[i]);
+          validatedEmployees.push(validatedData);
         } catch (error) {
-          results.push({ success: false, error: error.message, data: empData });
+          errors.push({ 
+            row: i + 1, 
+            error: error instanceof Error ? error.message : "Validation error",
+            data: employeeData[i]
+          });
         }
       }
 
-      // Create notification for bulk upload
+      // Step 3: Create all validated employees
+      let createdEmployees = [];
+      if (validatedEmployees.length > 0) {
+        createdEmployees = await storage.bulkCreateEmployees(validatedEmployees);
+      }
+
+      console.log(`Bulk upload completed: ${createdEmployees.length} employees created, ${errors.length} errors`);
+
+      // Step 4: Create notification
       await storage.createNotification({
         type: "bulk_upload",
-        title: "Carga masiva completada",
-        message: `${results.filter(r => r.success).length} empleados procesados correctamente`,
+        title: "Base de Datos Reemplazada",
+        message: `Se reemplazó completamente la base de datos con ${createdEmployees.length} empleados. ${errors.length} errores encontrados`,
         requestedBy: `${user.firstName} ${user.lastName}`,
         status: "processed",
-        metadata: { totalProcessed: results.length, successful: results.filter(r => r.success).length }
+        metadata: { 
+          totalProcessed: employeeData.length,
+          successful: createdEmployees.length,
+          errors: errors.length,
+          replaceMode: true
+        }
       });
 
-      res.json({ results, summary: { total: results.length, successful: results.filter(r => r.success).length } });
+      res.json({ 
+        results: createdEmployees.map(emp => ({ success: true, employee: emp })),
+        errors,
+        summary: {
+          total: employeeData.length,
+          successful: createdEmployees.length,
+          failed: errors.length,
+          replaceMode: true
+        }
+      });
     } catch (error) {
       console.error("Error processing bulk upload:", error);
       res.status(500).json({ message: "Failed to process bulk upload" });
