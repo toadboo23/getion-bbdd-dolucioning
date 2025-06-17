@@ -37,6 +37,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Company leaves routes (Baja Empresa)
+  app.get("/api/company-leaves", isAuthenticated, async (req, res) => {
+    try {
+      const leaves = await storage.getAllCompanyLeaves();
+      res.json(leaves);
+    } catch (error) {
+      console.error("Error fetching company leaves:", error);
+      res.status(500).json({ message: "Failed to fetch company leaves" });
+    }
+  });
+
   // Employee routes
   app.get("/api/employees", isAuthenticated, async (req, res) => {
     try {
@@ -255,8 +266,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const metadata = notification.metadata as any;
         const employee = await storage.getEmployee(notification.employeeId!);
         
+        console.log("Processing company leave approval:", {
+          notificationId: notification.id,
+          employeeId: notification.employeeId,
+          employee: employee ? "found" : "not found",
+          metadata
+        });
+        
         if (employee) {
-          await storage.createCompanyLeave({
+          const companyLeave = await storage.createCompanyLeave({
             employeeId: employee.id,
             firstName: employee.firstName,
             lastName: employee.lastName,
@@ -281,6 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             leaveRequestedBy: notification.requestedBy,
             approvedBy: `${user.firstName} ${user.lastName}`
           });
+          console.log("Company leave created:", companyLeave.id);
         }
       }
       

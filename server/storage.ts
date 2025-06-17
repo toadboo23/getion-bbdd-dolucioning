@@ -305,6 +305,8 @@ export class MemStorage implements IStorage {
 
   async createCompanyLeave(leaveData: InsertCompanyLeave): Promise<CompanyLeave> {
     const id = this.currentCompanyLeaveId++;
+    console.log("Creating company leave with data:", leaveData);
+    
     const leave: CompanyLeave = {
       id,
       ...leaveData,
@@ -313,10 +315,13 @@ export class MemStorage implements IStorage {
       vehicle: leaveData.vehicle || null,
       approvedAt: new Date()
     };
+    
     this.companyLeaves.set(id, leave);
+    console.log("Company leave saved to memory, total leaves:", this.companyLeaves.size);
     
     // Remove employee from active employees when baja is approved
-    this.employees.delete(leaveData.employeeId);
+    const employeeDeleted = this.employees.delete(leaveData.employeeId);
+    console.log("Employee deleted from active list:", employeeDeleted, "Remaining employees:", this.employees.size);
     
     return leave;
   }
