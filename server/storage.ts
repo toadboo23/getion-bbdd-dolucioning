@@ -168,6 +168,7 @@ export class MemStorage implements IStorage {
         naf: emp.naf || null,
         iban: emp.iban || null,
         vehicle: emp.vehicle || null,
+        status: emp.status || "active",
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -202,8 +203,12 @@ export class MemStorage implements IStorage {
     ];
 
     sampleNotifications.forEach(notif => {
-      const notification = {
+      const notification: Notification = {
         ...notif,
+        status: notif.status || "pending",
+        employeeId: notif.employeeId || null,
+        employeeName: notif.employeeName || null,
+        metadata: notif.metadata || {},
         createdAt: new Date()
       };
       this.notifications.set(notif.id, notification);
@@ -248,6 +253,7 @@ export class MemStorage implements IStorage {
       naf: employeeData.naf || null,
       iban: employeeData.iban || null,
       vehicle: employeeData.vehicle || null,
+      status: employeeData.status || "active",
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -302,6 +308,9 @@ export class MemStorage implements IStorage {
     const leave: CompanyLeave = {
       id,
       ...leaveData,
+      naf: leaveData.naf || null,
+      iban: leaveData.iban || null,
+      vehicle: leaveData.vehicle || null,
       approvedAt: new Date()
     };
     this.companyLeaves.set(id, leave);
@@ -347,6 +356,10 @@ export class MemStorage implements IStorage {
     const notification: Notification = {
       id,
       ...notificationData,
+      status: notificationData.status || "pending",
+      employeeId: notificationData.employeeId || null,
+      employeeName: notificationData.employeeName || null,
+      metadata: notificationData.metadata || {},
       createdAt: new Date()
     };
     this.notifications.set(id, notification);
