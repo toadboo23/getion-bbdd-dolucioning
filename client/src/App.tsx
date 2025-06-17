@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -15,6 +16,7 @@ import Header from "@/components/layout/header";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -27,9 +29,12 @@ function Router() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+      <Sidebar 
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileClose={() => setIsMobileSidebarOpen(false)}
+      />
       <div className="flex-1 flex flex-col lg:ml-64">
-        <Header />
+        <Header onMobileMenuToggle={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} />
         <main className="flex-1 overflow-y-auto pt-16">
           <Switch>
             <Route path="/" component={Dashboard} />

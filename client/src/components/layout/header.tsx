@@ -1,12 +1,14 @@
-import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Menu, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function Header() {
+interface HeaderProps {
+  onMobileMenuToggle?: () => void;
+}
+
+export default function Header({ onMobileMenuToggle }: HeaderProps) {
   const { user } = useAuth();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const getRoleBadge = (role: string) => {
     const roleColors = {
@@ -37,7 +39,7 @@ export default function Header() {
               variant="ghost"
               size="sm"
               className="lg:hidden"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              onClick={onMobileMenuToggle}
             >
               <Menu className="w-5 h-5" />
             </Button>
