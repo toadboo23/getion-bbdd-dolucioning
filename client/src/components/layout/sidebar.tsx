@@ -6,12 +6,14 @@ import {
   Users, 
   Bell, 
   FileSpreadsheet, 
-  LogOut 
+  LogOut,
+  UserX
 } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Empleados", href: "/employees", icon: Users },
+  { name: "Baja Empresa", href: "/company-leaves", icon: UserX },
   { name: "Notificaciones", href: "/notifications", icon: Bell, superAdminOnly: true },
   { name: "Carga Masiva", href: "/bulk-upload", icon: FileSpreadsheet, superAdminOnly: true },
 ];

@@ -60,10 +60,11 @@ export const employees = pgTable("employees", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Company leaves table (employees with approved company leaves)
+// Company leaves table (employees with approved company leaves) - BAJA EMPRESA
 export const companyLeaves = pgTable("company_leaves", {
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id").notNull(),
+  // Datos completos del empleado
   firstName: varchar("first_name").notNull(),
   lastName: varchar("last_name").notNull(),
   phone: varchar("phone").notNull(),
@@ -81,10 +82,13 @@ export const companyLeaves = pgTable("company_leaves", {
   ssStatus: varchar("ss_status").notNull(),
   startDate: timestamp("start_date").notNull(),
   age: integer("age").notNull(),
+  // Información de la baja
   leaveType: varchar("leave_type", { enum: ["despido", "voluntaria", "nspp", "anulacion"] }).notNull(),
   leaveDate: timestamp("leave_date").notNull(),
-  approvedAt: timestamp("approved_at").defaultNow(),
-  approvedBy: varchar("approved_by").notNull(),
+  leaveRequestedAt: timestamp("leave_requested_at").notNull(), // Cuándo se solicitó
+  leaveRequestedBy: varchar("leave_requested_by").notNull(), // Quién solicitó
+  approvedAt: timestamp("approved_at").notNull(), // Cuándo se aprobó
+  approvedBy: varchar("approved_by").notNull(), // Quién aprobó
 });
 
 // IT leaves table
