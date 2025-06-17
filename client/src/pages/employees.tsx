@@ -39,33 +39,9 @@ export default function Employees() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: employees, isLoading: employeesLoading } = useQuery({
+  const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { search: searchTerm, city: cityFilter, status: statusFilter }],
-    queryFn: () => {
-      const params = new URLSearchParams();
-      if (searchTerm) params.set("search", searchTerm);
-      if (cityFilter) params.set("city", cityFilter);
-      if (statusFilter) params.set("status", statusFilter);
-      
-      const url = `/api/employees${params.toString() ? `?${params.toString()}` : ""}`;
-      return fetch(url, { credentials: "include" }).then(res => {
-        if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
-        return res.json();
-      });
-    },
     retry: false,
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-      }
-    },
   });
 
   const createEmployeeMutation = useMutation({
@@ -244,7 +220,7 @@ export default function Employees() {
 
       {/* Employee Table */}
       <EmployeeTable
-        employees={employees || []}
+        employees={employees ?? []}
         onEditEmployee={handleEditEmployee}
         onManageLeave={handleManageLeave}
         canEdit={canEditEmployees}

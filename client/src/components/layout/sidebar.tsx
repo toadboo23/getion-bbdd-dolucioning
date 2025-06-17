@@ -28,7 +28,7 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:bg-white lg:border-r lg:border-gray-200">
+    <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:bg-white lg:border-r lg:border-gray-200 z-30">
       <div className="flex-1 flex flex-col min-h-0 pt-16">
         <nav className="flex-1 px-2 py-4 space-y-1">
           {navigation.map((item) => {
@@ -39,7 +39,7 @@ export default function Sidebar() {
             
             return (
               <Link key={item.name} href={item.href}>
-                <a
+                <div
                   className={cn(
                     "sidebar-link",
                     isActive && "active"
@@ -52,7 +52,7 @@ export default function Sidebar() {
                       3
                     </span>
                   )}
-                </a>
+                </div>
               </Link>
             );
           })}
