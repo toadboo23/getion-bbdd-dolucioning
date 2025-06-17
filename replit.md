@@ -117,6 +117,12 @@ This is a full-stack employee management system built with React, Express.js, an
 ```
 Changelog:
 - June 17, 2025. Initial setup
+- June 17, 2025. Fixed employee page issues and improved UX:
+  * Corrected Select component values to prevent empty string errors
+  * Enhanced sidebar layout to prevent content overlap
+  * Added responsive mobile sidebar with overlay
+  * Fixed TypeScript authentication errors
+  * Improved user experience with proper spacing and navigation
 ```
 
 ## User Preferences

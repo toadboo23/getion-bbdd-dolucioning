@@ -18,8 +18,8 @@ export default function Employees() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [cityFilter, setCityFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [cityFilter, setCityFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
@@ -40,7 +40,11 @@ export default function Employees() {
   }, [isAuthenticated, isLoading, toast]);
 
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
-    queryKey: ["/api/employees", { search: searchTerm, city: cityFilter, status: statusFilter }],
+    queryKey: ["/api/employees", { 
+      search: searchTerm, 
+      city: cityFilter === "all" ? "" : cityFilter, 
+      status: statusFilter === "all" ? "" : statusFilter 
+    }],
     retry: false,
   });
 
@@ -189,7 +193,7 @@ export default function Employees() {
                   <SelectValue placeholder="Todas las ciudades" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas las ciudades</SelectItem>
+                  <SelectItem value="all">Todas las ciudades</SelectItem>
                   <SelectItem value="madrid">Madrid</SelectItem>
                   <SelectItem value="barcelona">Barcelona</SelectItem>
                   <SelectItem value="valencia">Valencia</SelectItem>
@@ -207,7 +211,7 @@ export default function Employees() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="active">Activo</SelectItem>
                   <SelectItem value="it_leave">Baja IT</SelectItem>
                   <SelectItem value="company_leave">Baja Empresa</SelectItem>
