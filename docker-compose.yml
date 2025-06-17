@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16
+    container_name: employee_management_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: employee_management
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - employee_network
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: employee_management_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:password123@postgres:5432/employee_management
+      SESSION_SECRET: your-super-secret-session-key-change-this-in-production
+      REPL_ID: local-development
+      ISSUER_URL: http://localhost:5173/oidc
+      REPLIT_DOMAINS: localhost:5173
+    ports:
+      - "5173:5173"
+    depends_on:
+      - postgres
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - employee_network
+    command: npm run dev:backend
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: employee_management_frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:5173
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - employee_network
+    command: npm run dev:frontend
+
+volumes:
+  postgres_data:
+
+networks:
+  employee_network:
+    driver: bridge
