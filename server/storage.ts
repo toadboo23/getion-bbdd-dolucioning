@@ -315,7 +315,7 @@ export class MemStorage implements IStorage {
     };
     this.companyLeaves.set(id, leave);
     
-    // Remove employee from active employees
+    // Remove employee from active employees when baja is approved
     this.employees.delete(leaveData.employeeId);
     
     return leave;

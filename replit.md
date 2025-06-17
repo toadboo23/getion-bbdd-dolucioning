@@ -130,6 +130,12 @@ Changelog:
   * Removed employee images from interface for cleaner design
   * Updated storage and schema to handle all new required fields
   * Enhanced authentication to default super_admin role for full access
+- June 17, 2025. Implemented complete "Baja Empresa" workflow:
+  * Created dedicated "Baja Empresa" page with comprehensive employee tracking
+  * Added complete audit trail: request date, requested by, approval date, approved by
+  * Updated schema to capture all employee data when baja is approved
+  * Integrated baja approval flow to automatically move employees to baja table
+  * Added sidebar navigation access to Baja Empresa section
 ```
 
 ## User Preferences
