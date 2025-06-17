@@ -136,6 +136,12 @@ Changelog:
   * Updated schema to capture all employee data when baja is approved
   * Integrated baja approval flow to automatically move employees to baja table
   * Added sidebar navigation access to Baja Empresa section
+- June 17, 2025. Updated bulk upload to completely replace employee database:
+  * Modified bulk upload to clear entire employee database before loading new data
+  * Added clearAllEmployees() and bulkCreateEmployees() functions to storage
+  * Updated interface with clear warnings about database replacement
+  * Enhanced logging and error reporting for bulk operations
+  * Changed UI messaging to emphasize complete database replacement
 ```
 
 ## User Preferences

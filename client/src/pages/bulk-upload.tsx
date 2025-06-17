@@ -150,16 +150,30 @@ export default function BulkUpload() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">Carga Masiva de Empleados</h2>
-        <p className="mt-1 text-sm text-gray-600">Carga empleados mediante archivo Excel</p>
+        <h2 className="text-2xl font-semibold text-gray-900">Reemplazar Base de Datos</h2>
+        <p className="mt-1 text-sm text-gray-600">Reemplaza completamente todos los empleados con archivo Excel</p>
       </div>
 
       <Card>
         <CardContent className="p-6">
           <div className="max-w-lg mx-auto">
             <div className="text-center">
-              <FileSpreadsheet className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <FileSpreadsheet className="w-16 h-16 text-red-500 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">Subir Archivo Excel</h3>
+              
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-center mb-2">
+                  <span className="text-xl">⚠️</span>
+                  <span className="ml-2 font-semibold text-yellow-800">ATENCIÓN</span>
+                </div>
+                <p className="text-sm text-yellow-800 font-medium">
+                  Esta acción eliminará TODOS los empleados actuales
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  La base de datos se reemplazará completamente con el archivo Excel
+                </p>
+              </div>
+              
               <p className="text-sm text-gray-500 mb-6">
                 Selecciona un archivo .xlsx con los datos de los empleados
               </p>
@@ -200,19 +214,23 @@ export default function BulkUpload() {
             </div>
 
             {uploadResults && (
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-2">Resultados de la carga</h4>
+              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <h4 className="font-medium text-green-800 mb-2">✅ Base de datos reemplazada</h4>
                 <div className="space-y-2 text-sm">
-                  <p>
-                    <span className="font-medium">Total procesados:</span> {uploadResults.summary.total}
+                  <p className="text-green-700">
+                    <span className="font-medium">Nueva base de datos:</span> {uploadResults.summary.successful} empleados
                   </p>
-                  <p className="text-green-600">
-                    <span className="font-medium">Exitosos:</span> {uploadResults.summary.successful}
+                  <p className="text-gray-600">
+                    <span className="font-medium">Procesados del archivo:</span> {uploadResults.summary.total}
                   </p>
-                  {uploadResults.summary.total - uploadResults.summary.successful > 0 && (
+                  {uploadResults.summary.failed > 0 && (
                     <p className="text-red-600">
-                      <span className="font-medium">Con errores:</span>{" "}
-                      {uploadResults.summary.total - uploadResults.summary.successful}
+                      <span className="font-medium">Con errores:</span> {uploadResults.summary.failed}
+                    </p>
+                  )}
+                  {uploadResults.summary.replaceMode && (
+                    <p className="text-blue-600 text-xs font-medium mt-2">
+                      ℹ️ Se eliminaron todos los empleados anteriores
                     </p>
                   )}
                 </div>
