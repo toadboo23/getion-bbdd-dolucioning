@@ -82,10 +82,20 @@ export class MemStorage implements IStorage {
         lastName: "García López",
         email: "maria.garcia@empresa.com",
         phone: "+34 612 345 678",
-        position: "Desarrolladora Senior",
         city: "Madrid",
-        status: "active",
-        profileImageUrl: "https://images.unsplash.com/photo-1494790108755-2616b612b5bc?w=100&h=100&fit=crop&crop=face"
+        dniNie: "12345678A",
+        birthDate: new Date("1990-05-15"),
+        nationality: "Española",
+        naf: "NAF001",
+        address: "Calle Mayor 123, 28001 Madrid",
+        iban: "ES91 2100 0418 4502 0005 1332",
+        vehicle: "Coche propio",
+        contractHours: "40 horas/semana",
+        contractType: "Indefinido",
+        ssStatus: "Alta",
+        startDate: new Date("2020-01-15"),
+        age: 34,
+        status: "active"
       },
       {
         id: 2,
@@ -93,10 +103,20 @@ export class MemStorage implements IStorage {
         lastName: "López Martín",
         email: "carlos.lopez@empresa.com",
         phone: "+34 678 901 234",
-        position: "Project Manager",
         city: "Barcelona",
-        status: "it_leave",
-        profileImageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face"
+        dniNie: "87654321B",
+        birthDate: new Date("1988-08-22"),
+        nationality: "Española",
+        naf: "NAF002",
+        address: "Passeig de Gràcia 45, 08007 Barcelona",
+        iban: "ES79 2100 0813 6101 2345 6789",
+        vehicle: null,
+        contractHours: "35 horas/semana",
+        contractType: "Temporal",
+        ssStatus: "Baja IT",
+        startDate: new Date("2021-03-10"),
+        age: 36,
+        status: "it_leave"
       },
       {
         id: 3,
@@ -104,10 +124,20 @@ export class MemStorage implements IStorage {
         lastName: "Martínez Silva",
         email: "ana.martinez@empresa.com",
         phone: "+34 654 321 987",
-        position: "UX Designer",
         city: "Valencia",
-        status: "active",
-        profileImageUrl: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&h=100&fit=crop&crop=face"
+        dniNie: "11223344C",
+        birthDate: new Date("1992-12-03"),
+        nationality: "Española",
+        naf: null,
+        address: "Avenida del Reino de Valencia 87, 46005 Valencia",
+        iban: "ES12 2077 0024 0030 1234 5678",
+        vehicle: "Motocicleta",
+        contractHours: "40 horas/semana",
+        contractType: "Indefinido",
+        ssStatus: "Alta",
+        startDate: new Date("2019-06-20"),
+        age: 32,
+        status: "active"
       },
       {
         id: 4,
@@ -115,16 +145,29 @@ export class MemStorage implements IStorage {
         lastName: "Sánchez Ruiz",
         email: "pedro.sanchez@empresa.com",
         phone: "+34 698 123 456",
-        position: "Backend Developer",
         city: "Sevilla",
-        status: "active",
-        profileImageUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face"
+        dniNie: "55667788D",
+        birthDate: new Date("1985-03-18"),
+        nationality: "Española",
+        naf: "NAF003",
+        address: "Calle Sierpes 25, 41004 Sevilla",
+        iban: "ES65 0049 0001 5020 1234 5678",
+        vehicle: "Coche propio",
+        contractHours: "40 horas/semana",
+        contractType: "Indefinido",
+        ssStatus: "Alta",
+        startDate: new Date("2018-09-05"),
+        age: 39,
+        status: "active"
       }
     ];
 
     sampleEmployees.forEach(emp => {
-      const employee = {
+      const employee: Employee = {
         ...emp,
+        naf: emp.naf || null,
+        iban: emp.iban || null,
+        vehicle: emp.vehicle || null,
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -202,6 +245,9 @@ export class MemStorage implements IStorage {
     const employee: Employee = {
       id,
       ...employeeData,
+      naf: employeeData.naf || null,
+      iban: employeeData.iban || null,
+      vehicle: employeeData.vehicle || null,
       createdAt: new Date(),
       updatedAt: new Date()
     };

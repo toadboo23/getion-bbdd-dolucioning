@@ -60,7 +60,7 @@ export default function EmployeeTable({
                       <div className="text-sm font-medium text-gray-900">
                         {employee.firstName} {employee.lastName}
                       </div>
-                      <div className="text-sm text-gray-500">{employee.position}</div>
+                      <div className="text-sm text-gray-500">{employee.contractType}</div>
                     </div>
                   </TableCell>
                   <TableCell>
