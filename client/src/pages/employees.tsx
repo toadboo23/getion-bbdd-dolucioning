@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { exportToExcel, createExcelTemplate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +12,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import EmployeeTable from "@/components/employee-table";
 import EditEmployeeModal from "@/components/modals/edit-employee-modal";
 import LeaveManagementModal from "@/components/modals/leave-management-modal";
-import { Plus, Search } from "lucide-react";
+import ImportEmployeesModal from "@/components/modals/import-employees-modal";
+import EmployeeDetailModal from "@/components/modals/employee-detail-modal";
+import { Plus, Search, Download, FileSpreadsheet, Upload } from "lucide-react";
 import type { Employee } from "@shared/schema";
 
 export default function Employees() {
@@ -20,9 +23,13 @@ export default function Employees() {
   const [searchTerm, setSearchTerm] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [trafficManagerFilter, setTrafficManagerFilter] = useState("all");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [detailEmployee, setDetailEmployee] = useState<Employee | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -43,16 +50,38 @@ export default function Employees() {
     queryKey: ["/api/employees", { 
       search: searchTerm, 
       city: cityFilter === "all" ? "" : cityFilter, 
-      status: statusFilter === "all" ? "" : statusFilter 
+      status: statusFilter === "all" ? "" : statusFilter,
+      trafficManager: trafficManagerFilter === "all" ? "" : trafficManagerFilter
     }],
+    retry: false,
+  });
+
+  // Obtener ciudades únicas para el filtro
+  const { data: cities } = useQuery<string[]>({
+    queryKey: ["/api/cities"],
+    retry: false,
+  });
+
+  // Obtener jefes de tráfico únicos para el filtro
+  const { data: trafficManagers } = useQuery<string[]>({
+    queryKey: ["/api/traffic-managers"],
     retry: false,
   });
 
   const createEmployeeMutation = useMutation({
     mutationFn: async (employeeData: any) => {
-      await apiRequest("POST", "/api/employees", employeeData);
+      console.log("🔧 createEmployeeMutation called with data:", employeeData);
+      try {
+        const response = await apiRequest("POST", "/api/employees", employeeData);
+        console.log("✅ createEmployeeMutation response:", response);
+        return response;
+      } catch (error) {
+        console.error("❌ createEmployeeMutation error:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
+      console.log("✅ createEmployeeMutation onSuccess called");
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       toast({
         title: "Empleado creado",
@@ -62,6 +91,7 @@ export default function Employees() {
       setSelectedEmployee(null);
     },
     onError: (error) => {
+      console.error("❌ createEmployeeMutation onError called:", error);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -82,7 +112,7 @@ export default function Employees() {
   });
 
   const updateEmployeeMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
       await apiRequest("PUT", `/api/employees/${id}`, data);
     },
     onSuccess: () => {
@@ -114,7 +144,12 @@ export default function Employees() {
     },
   });
 
+  // Definir permisos específicos por rol
   const canEditEmployees = user?.role === "admin" || user?.role === "super_admin";
+  const canImportEmployees = user?.role === "super_admin"; // Solo super admin puede importar
+  const canExportEmployees = user?.role === "admin" || user?.role === "super_admin"; // Admin y super admin pueden exportar
+  const canDownloadTemplate = user?.role === "admin" || user?.role === "super_admin"; // Admin y super admin pueden descargar plantillas
+  const isReadOnlyUser = user?.role === "normal"; // Usuario normal solo puede consultar
 
   const handleEditEmployee = (employee: Employee) => {
     setSelectedEmployee(employee);
@@ -129,6 +164,119 @@ export default function Employees() {
   const handleAddEmployee = () => {
     setSelectedEmployee(null);
     setIsEditModalOpen(true);
+  };
+
+  const handleViewDetails = (employee: Employee) => {
+    setDetailEmployee(employee);
+    setIsDetailModalOpen(true);
+  };
+
+  // Función para exportar empleados a Excel
+  const handleExportEmployees = () => {
+    if (!employees || employees.length === 0) {
+      toast({
+        title: "Sin datos",
+        description: "No hay empleados para exportar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Preparar datos para export (con nombres de columnas en español)
+    const exportData = employees.map(emp => ({
+      'ID Glovo': emp.idGlovo,
+      'Email Glovo': emp.emailGlovo,
+      'Turno': emp.turno,
+      'Nombre': emp.nombre,
+      'Apellido': emp.apellido,
+      'Teléfono': emp.telefono,
+      'Email': emp.email,
+      'Horas': emp.horas,
+      'Complementarios': emp.complementaries,
+      'Ciudad': emp.ciudad,
+      'Código Ciudad': emp.cityCode,
+      'DNI/NIE': emp.dniNie,
+      'IBAN': emp.iban,
+      'Dirección': emp.direccion,
+      'Vehículo': emp.vehiculo,
+      'NAF': emp.naf,
+      'Fecha Alta Seg. Social': emp.fechaAltaSegSoc ? new Date(emp.fechaAltaSegSoc).toLocaleDateString('es-ES') : '',
+      'Status Baja': emp.statusBaja,
+      'Estado SS': emp.estadoSs,
+      'Informado Horario': emp.informadoHorario ? 'Sí' : 'No',
+      'Cuenta Divilo': emp.cuentaDivilo,
+      'Próxima Asignación Slots': emp.proximaAsignacionSlots ? new Date(emp.proximaAsignacionSlots).toLocaleDateString('es-ES') : '',
+      'Jefe Tráfico': emp.jefeTrafico,
+      'Comentarios Jefe Tráfico': emp.comentsJefeDeTrafico,
+      'Incidencias': emp.incidencias,
+      'Fecha Incidencia': emp.fechaIncidencia ? new Date(emp.fechaIncidencia).toLocaleDateString('es-ES') : '',
+      'Faltas No Check-in (días)': emp.faltasNoCheckInEnDias,
+      'Cruce': emp.cruce,
+      'Estado': emp.status === 'active' ? 'Activo' : 
+               emp.status === 'it_leave' ? 'Baja IT' : 
+               emp.status === 'company_leave_pending' ? 'Baja Empresa Pendiente' :
+               emp.status === 'company_leave_approved' ? 'Baja Empresa Aprobada' : emp.status,
+      'Fecha Creación': emp.createdAt ? new Date(emp.createdAt).toLocaleDateString('es-ES') : '',
+      'Última Actualización': emp.updatedAt ? new Date(emp.updatedAt).toLocaleDateString('es-ES') : ''
+    }));
+
+    const fileName = `empleados_${new Date().toISOString().split('T')[0]}`;
+    exportToExcel(exportData, fileName, 'Empleados');
+    
+    toast({
+      title: "Exportación completada",
+      description: `Se han exportado ${employees.length} empleados a Excel`,
+    });
+  };
+
+  // Función para limpiar todos los filtros
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setCityFilter("all");
+    setStatusFilter("all");
+    setTrafficManagerFilter("all");
+  };
+
+  // Función para descargar plantilla de carga masiva
+  const handleDownloadTemplate = () => {
+    const headers = [
+      'ID Glovo',
+      'Email Glovo',
+      'Turno',
+      'Nombre', 
+      'Apellido',
+      'Teléfono',
+      'Email',
+      'Horas',
+      'Complementarios',
+      'Ciudad',
+      'Código Ciudad',
+      'DNI/NIE',
+      'IBAN',
+      'Dirección',
+      'Vehículo',
+      'NAF',
+      'Fecha Alta Seg. Social (AAAA-MM-DD)',
+      'Status Baja',
+      'Estado SS',
+      'Informado Horario (true/false)',
+      'Cuenta Divilo',
+      'Próxima Asignación Slots (AAAA-MM-DD)',
+      'Jefe Tráfico',
+      'Comentarios Jefe Tráfico',
+      'Incidencias',
+      'Fecha Incidencia (AAAA-MM-DD)',
+      'Faltas No Check-in (días)',
+      'Cruce',
+      'Estado (active/it_leave/company_leave_pending/company_leave_approved)'
+    ];
+
+    createExcelTemplate(headers, 'plantilla_empleados', 'Plantilla Empleados');
+    
+    toast({
+      title: "Plantilla descargada",
+      description: "La plantilla para carga masiva ha sido descargada",
+    });
   };
 
   if (isLoading || employeesLoading) {
@@ -153,21 +301,67 @@ export default function Employees() {
             <h2 className="text-2xl font-semibold text-gray-900">Gestión de Empleados</h2>
             <p className="mt-1 text-sm text-gray-600">Administra la información de los empleados</p>
           </div>
-          {canEditEmployees && (
-            <div className="mt-4 sm:mt-0">
+          <div className="mt-4 sm:mt-0 flex flex-wrap gap-2">
+            {/* Botón Descargar Plantilla - Solo Admin y Super Admin */}
+            {canDownloadTemplate && (
+              <Button 
+                variant="outline" 
+                onClick={handleDownloadTemplate}
+                className="border-blue-500 text-blue-600 hover:bg-blue-50"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Plantilla Excel
+              </Button>
+            )}
+            
+            {/* Botón Importar Empleados - Solo Super Admin */}
+            {canImportEmployees && (
+              <Button 
+                variant="outline" 
+                onClick={() => setIsImportModalOpen(true)}
+                className="border-purple-500 text-purple-600 hover:bg-purple-50"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Importar Excel
+              </Button>
+            )}
+            
+            {/* Botón Exportar - Solo Admin y Super Admin */}
+            {canExportEmployees && (
+              <Button 
+                variant="outline" 
+                onClick={handleExportEmployees}
+                className="border-green-500 text-green-600 hover:bg-green-50"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exportar Excel
+              </Button>
+            )}
+            
+            {/* Botón Agregar Empleado - Solo Admin y Super Admin */}
+            {canEditEmployees && (
               <Button onClick={handleAddEmployee}>
                 <Plus className="w-4 h-4 mr-2" />
                 Agregar Empleado
               </Button>
-            </div>
-          )}
+            )}
+            
+            {/* Mensaje para usuario de solo consulta */}
+            {isReadOnlyUser && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+                <p className="text-sm text-blue-700">
+                  👁️ Usuario de consulta - Solo puedes ver información
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Filters */}
       <Card className="mb-6">
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
                 Buscar
@@ -194,10 +388,11 @@ export default function Employees() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las ciudades</SelectItem>
-                  <SelectItem value="madrid">Madrid</SelectItem>
-                  <SelectItem value="barcelona">Barcelona</SelectItem>
-                  <SelectItem value="valencia">Valencia</SelectItem>
-                  <SelectItem value="sevilla">Sevilla</SelectItem>
+                  {cities?.map((city) => (
+                    <SelectItem key={city} value={city}>
+                      {city}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -214,10 +409,42 @@ export default function Employees() {
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="active">Activo</SelectItem>
                   <SelectItem value="it_leave">Baja IT</SelectItem>
-                  <SelectItem value="company_leave">Baja Empresa</SelectItem>
+                  <SelectItem value="company_leave_pending">Baja Empresa Pendiente</SelectItem>
+                  <SelectItem value="company_leave_approved">Baja Empresa Aprobada</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            <div>
+              <label htmlFor="traffic-manager-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                Jefe de Tráfico
+              </label>
+              <Select value={trafficManagerFilter} onValueChange={setTrafficManagerFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos los jefes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los jefes</SelectItem>
+                  {trafficManagers?.map((manager) => (
+                    <SelectItem key={manager} value={manager}>
+                      {manager}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Botón para limpiar filtros */}
+          <div className="mt-4 flex justify-end">
+            <Button 
+              variant="outline" 
+              onClick={handleClearFilters}
+              size="sm"
+              className="text-gray-600 hover:text-gray-800"
+            >
+              Limpiar filtros
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -227,7 +454,9 @@ export default function Employees() {
         employees={employees ?? []}
         onEditEmployee={handleEditEmployee}
         onManageLeave={handleManageLeave}
+        onViewDetails={handleViewDetails}
         canEdit={canEditEmployees}
+        isReadOnlyUser={isReadOnlyUser}
       />
 
       {/* Modals */}
@@ -240,7 +469,7 @@ export default function Employees() {
         employee={selectedEmployee}
         onSave={(data) => {
           if (selectedEmployee) {
-            updateEmployeeMutation.mutate({ id: selectedEmployee.id, data });
+            updateEmployeeMutation.mutate({ id: selectedEmployee.idGlovo, data });
           } else {
             createEmployeeMutation.mutate(data);
           }
@@ -255,6 +484,24 @@ export default function Employees() {
           setSelectedEmployee(null);
         }}
         employee={selectedEmployee}
+      />
+
+      <ImportEmployeesModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
+
+      <EmployeeDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setDetailEmployee(null);
+        }}
+        employee={detailEmployee}
+        onEmployeeUpdate={() => {
+          // Refrescar la lista de empleados después de reactivar
+          queryClient.invalidateQueries({ queryKey: ['employees'] });
+        }}
       />
     </div>
   );

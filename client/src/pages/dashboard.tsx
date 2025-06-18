@@ -5,11 +5,11 @@ import { useEffect } from "react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import DashboardMetrics from "@/components/dashboard-metrics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, UserCheck, UserX, AlertTriangle } from "lucide-react";
+import { Users, UserCheck, UserX, AlertTriangle, Bell } from "lucide-react";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -28,6 +28,8 @@ export default function Dashboard() {
 
   const { data: metrics, isLoading: metricsLoading } = useQuery({
     queryKey: ["/api/dashboard/metrics"],
+    refetchInterval: 10000,
+    refetchIntervalInBackground: true,
     retry: false,
   });
 
@@ -118,21 +120,45 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <AlertTriangle className="w-8 h-8 text-red-500" />
+        {/* Solo mostrar notificaciones pendientes al super admin */}
+        {user?.role === 'super_admin' && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <Bell className="w-8 h-8 text-red-500" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Notificaciones Pendientes</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {metrics?.pendingActions || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Solo visible para Super Admin</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pendientes</p>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {metrics?.pendingActions || 0}
-                </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Para otros usuarios, mostrar una métrica diferente */}
+        {user?.role !== 'super_admin' && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <AlertTriangle className="w-8 h-8 text-yellow-500" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Bajas Empresa</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {((metrics?.totalEmployees || 0) - (metrics?.activeEmployees || 0) - (metrics?.itLeaves || 0)) || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Empleados con baja empresa</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Charts and Recent Activity */}

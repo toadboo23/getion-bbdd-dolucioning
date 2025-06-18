@@ -29,6 +29,7 @@ export default function LeaveManagementModal({
   employee,
 }: LeaveManagementModalProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [leaveType, setLeaveType] = useState<"it" | "company" | "">("");
   const [itReason, setItReason] = useState<"enfermedad" | "accidente" | "">("");
   const [companyReason, setCompanyReason] = useState<"despido" | "voluntaria" | "nspp" | "anulacion" | "">("");
@@ -37,23 +38,55 @@ export default function LeaveManagementModal({
   const itLeaveMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!employee) throw new Error("No employee selected");
-      await apiRequest("POST", `/api/employees/${employee.id}/it-leave`, data);
+      console.log('🚀 [MUTATION] Enviando request baja IT:', {
+        url: `/api/employees/${employee.idGlovo}/it-leave`,
+        data,
+        employeeId: employee.idGlovo
+      });
+      const response = await apiRequest("POST", `/api/employees/${employee.idGlovo}/it-leave`, data);
+      console.log('✅ [MUTATION] Response baja IT:', response);
+      return response;
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      console.log('🎉 [MUTATION] Baja IT exitosa, invalidando queries...');
+      
+      // Invalidar TODAS las queries relacionadas con empleados
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      
+      // Forzar refetch inmediato con opciones específicas
+      queryClient.refetchQueries({ 
+        queryKey: ["/api/employees"],
+        type: 'active'
+      });
+      
+      // También invalidar queries con filtros específicos
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === "/api/employees"
+      });
+      
+      console.log('🔄 [MUTATION] Queries invalidadas y refetch ejecutado');
+      
+      // Pequeño delay para asegurar que el backend haya procesado
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["/api/employees"] });
+        console.log('🔄 [MUTATION] Refetch adicional ejecutado después de delay');
+      }, 100);
+      
       toast({
-        title: "Baja IT procesada",
-        description: "La baja IT ha sido procesada correctamente",
+        title: "✅ Baja IT procesada",
+        description: `La baja IT ha sido procesada correctamente. Estado del empleado actualizado a "Baja IT".`,
       });
       onClose();
       resetForm();
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error('❌ [MUTATION] Error en baja IT:', error);
+      
       if (isUnauthorizedError(error)) {
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
+          title: "Sin autorización",
+          description: "Sesión expirada. Redirigiendo al login...",
           variant: "destructive",
         });
         setTimeout(() => {
@@ -61,9 +94,11 @@ export default function LeaveManagementModal({
         }, 500);
         return;
       }
+      
+      const errorMessage = error?.message || error?.data?.message || "Error desconocido";
       toast({
-        title: "Error",
-        description: "No se pudo procesar la baja IT",
+        title: "❌ Error al procesar baja IT",
+        description: `No se pudo procesar la baja IT: ${errorMessage}`,
         variant: "destructive",
       });
     },
@@ -72,10 +107,11 @@ export default function LeaveManagementModal({
   const companyLeaveMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!employee) throw new Error("No employee selected");
-      await apiRequest("POST", `/api/employees/${employee.id}/company-leave`, data);
+      await apiRequest("POST", `/api/employees/${employee.idGlovo}/company-leave`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       toast({
         title: "Solicitud de baja empresa enviada",
         description: "La solicitud ha sido enviada para aprobación del Super Admin",
@@ -86,20 +122,11 @@ export default function LeaveManagementModal({
     onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
+          title: "Error",
+          description: error.message || "No se pudo crear la solicitud de baja empresa",
           variant: "destructive",
         });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
       }
-      toast({
-        title: "Error",
-        description: "No se pudo crear la solicitud de baja empresa",
-        variant: "destructive",
-      });
     },
   });
 
@@ -129,10 +156,13 @@ export default function LeaveManagementModal({
         });
         return;
       }
-      itLeaveMutation.mutate({
+      const itLeaveData = {
         leaveType: itReason,
         leaveDate: new Date(leaveDate),
-      });
+      };
+      console.log('🚀 [FRONTEND] Enviando datos de baja IT:', itLeaveData);
+      console.log('🚀 [FRONTEND] Empleado ID:', employee?.idGlovo);
+      itLeaveMutation.mutate(itLeaveData);
     } else if (leaveType === "company") {
       if (!companyReason) {
         toast({
@@ -161,9 +191,10 @@ export default function LeaveManagementModal({
             <Card>
               <CardContent className="p-4">
                 <h4 className="font-medium text-gray-900 mb-2">
-                  Empleado: {employee.firstName} {employee.lastName}
+                  Empleado: {employee.nombre} {employee.apellido || ""}
                 </h4>
-                <p className="text-sm text-gray-600">Puesto: {employee.position}</p>
+                <p className="text-sm text-gray-600">ID Glovo: {employee.idGlovo}</p>
+                <p className="text-sm text-gray-600">Teléfono: {employee.telefono}</p>
               </CardContent>
             </Card>
           )}

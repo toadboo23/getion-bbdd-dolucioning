@@ -1,15 +1,112 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 
+// Get API base URL from environment or default to proxy
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
 export function useAuth() {
-  const { data: user, isLoading } = useQuery<User>({
+  const queryClient = useQueryClient();
+  
+  const { data: user, isLoading, error } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
+    queryFn: async () => {
+      try {
+        const authUrl = `${API_BASE_URL}/api/auth/user`;
+        console.log("Auth URL:", authUrl);
+        
+        const response = await fetch(authUrl, {
+          credentials: "include",
+        });
+        
+        if (response.status === 401) {
+          return null; // Usuario no autenticado
+        }
+        
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        return null;
+      }
+    },
     retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5 minutos
   });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      const logoutUrl = `${API_BASE_URL}/api/auth/logout`;
+      console.log("Logout URL:", logoutUrl);
+      
+      const response = await fetch(logoutUrl, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidar la query del usuario y redirigir
+      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.clear();
+      window.location.href = "/";
+    },
+    onError: (error) => {
+      console.error("Error during logout:", error);
+      // Aunque haya error, intentamos limpiar y redirigir
+      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.clear();
+      window.location.href = "/";
+    },
+  });
+
+  const logout = () => {
+    logoutMutation.mutate();
+  };
 
   return {
     user,
     isLoading,
     isAuthenticated: !!user,
+    error,
+    logout,
+    isLoggingOut: logoutMutation.isPending,
   };
+}
+
+// Hook para obtener el contador de notificaciones
+export function useNotificationCount() {
+  const { data: notifications } = useQuery({
+    queryKey: ["/api/notifications"],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      return response.json();
+    },
+    refetchInterval: 30000, // Refrescar cada 30 segundos
+    retry: false,
+  });
+
+  const pendingCount = notifications?.filter((notification: any) => 
+    notification.status === "pending"
+  ).length || 0;
+
+  return pendingCount;
 }

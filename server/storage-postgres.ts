@@ -6,6 +6,8 @@ import {
   companyLeaves,
   itLeaves,
   notifications,
+  systemUsers,
+  auditLogs,
   type User,
   type UpsertUser,
   type Employee,
@@ -17,10 +19,15 @@ import {
   type InsertItLeave,
   type Notification,
   type InsertNotification,
+  type SystemUser,
+  type InsertSystemUser,
+  type UpdateSystemUser,
+  type AuditLog,
+  type InsertAuditLog,
 } from "../shared/schema.js";
-import { IStorage } from "./storage.js";
+// import { IStorage } from "./storage.js";
 
-export class PostgresStorage implements IStorage {
+export class PostgresStorage {
   // User operations (required for Replit Auth)
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -28,27 +35,34 @@ export class PostgresStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
+    try {
+      // Try to insert first
+      const [user] = await db
+        .insert(users)
+        .values(userData)
+        .returning();
+      return user;
+    } catch (error) {
+      // If insert fails (user exists), update instead
+      const [user] = await db
+        .update(users)
+        .set({
           ...userData,
           updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
+        })
+        .where(eq(users.id, userData.id))
+        .returning();
+      return user;
+    }
   }
 
   // Employee operations
   async getAllEmployees(): Promise<Employee[]> {
-    return await db.select().from(employees).orderBy(employees.createdAt);
+    return await db.select().from(employees);
   }
 
-  async getEmployee(id: number): Promise<Employee | undefined> {
-    const [employee] = await db.select().from(employees).where(eq(employees.id, id));
+  async getEmployee(id: string): Promise<Employee | undefined> {
+    const [employee] = await db.select().from(employees).where(eq(employees.idGlovo, id));
     return employee;
   }
 
@@ -57,21 +71,21 @@ export class PostgresStorage implements IStorage {
     return employee;
   }
 
-  async updateEmployee(id: number, employeeData: UpdateEmployee): Promise<Employee> {
+  async updateEmployee(id: string, employeeData: UpdateEmployee): Promise<Employee> {
     const [employee] = await db
       .update(employees)
-      .set({ ...employeeData, updatedAt: new Date() })
-      .where(eq(employees.id, id))
+      .set(employeeData)
+      .where(eq(employees.idGlovo, id))
       .returning();
     return employee;
   }
 
-  async deleteEmployee(id: number): Promise<void> {
-    await db.delete(employees).where(eq(employees.id, id));
+  async deleteEmployee(id: string): Promise<void> {
+    await db.delete(employees).where(eq(employees.idGlovo, id));
   }
 
   async getEmployeesByCity(city: string): Promise<Employee[]> {
-    return await db.select().from(employees).where(eq(employees.city, city));
+    return await db.select().from(employees).where(eq(employees.ciudad, city));
   }
 
   async searchEmployees(query: string): Promise<Employee[]> {
@@ -79,14 +93,15 @@ export class PostgresStorage implements IStorage {
       .select()
       .from(employees)
       .where(
-        sql`LOWER(${employees.firstName}) LIKE ${`%${query.toLowerCase()}%`} OR 
-            LOWER(${employees.lastName}) LIKE ${`%${query.toLowerCase()}%`} OR 
-            LOWER(${employees.email}) LIKE ${`%${query.toLowerCase()}%`}`
+        sql`LOWER(${employees.nombre}) LIKE ${`%${query.toLowerCase()}%`} OR 
+            LOWER(${employees.apellido}) LIKE ${`%${query.toLowerCase()}%`} OR 
+            LOWER(${employees.email}) LIKE ${`%${query.toLowerCase()}%`} OR
+            LOWER(${employees.emailGlovo}) LIKE ${`%${query.toLowerCase()}%`}`
       );
   }
 
   async getEmployeesByStatus(status: string): Promise<Employee[]> {
-    return await db.select().from(employees).where(eq(employees.status, status));
+    return await db.select().from(employees).where(eq(employees.statusBaja, status));
   }
 
   // Company leave operations
@@ -99,14 +114,48 @@ export class PostgresStorage implements IStorage {
     return leave;
   }
 
+
+
   // IT leave operations
   async getAllItLeaves(): Promise<ItLeave[]> {
     return await db.select().from(itLeaves).orderBy(itLeaves.createdAt);
   }
 
   async createItLeave(leaveData: InsertItLeave): Promise<ItLeave> {
-    const [leave] = await db.insert(itLeaves).values(leaveData).returning();
-    return leave;
+    console.log('🚀 [STORAGE] Starting createItLeave with data:', JSON.stringify(leaveData, null, 2));
+    
+    try {
+      // Validate required fields
+      if (!leaveData.employeeId) {
+        throw new Error('employeeId is required');
+      }
+      if (!leaveData.leaveType) {
+        throw new Error('leaveType is required');
+      }
+      if (!leaveData.requestedBy) {
+        throw new Error('requestedBy is required');
+      }
+
+      // Ensure dates are properly formatted
+      const processedData = {
+        ...leaveData,
+        leaveDate: leaveData.leaveDate || new Date(),
+        requestedAt: leaveData.requestedAt || new Date(),
+        approvedAt: leaveData.approvedAt || new Date(),
+        status: (leaveData.status as "pending" | "approved" | "rejected") || "approved"
+      };
+
+      console.log('📝 [STORAGE] Processed data for insertion:', JSON.stringify(processedData, null, 2));
+
+      const [leave] = await db.insert(itLeaves).values(processedData).returning();
+      
+      console.log('✅ [STORAGE] IT leave created successfully:', JSON.stringify(leave, null, 2));
+      return leave;
+    } catch (error) {
+      console.error('💥 [STORAGE] Error in createItLeave:', error);
+      console.error('💥 [STORAGE] Original data that failed:', JSON.stringify(leaveData, null, 2));
+      throw error;
+    }
   }
 
   // Notification operations
@@ -119,7 +168,7 @@ export class PostgresStorage implements IStorage {
     return notification;
   }
 
-  async updateNotificationStatus(id: number, status: string): Promise<Notification> {
+  async updateNotificationStatus(id: number, status: "pending" | "approved" | "rejected" | "processed"): Promise<Notification> {
     const [notification] = await db
       .update(notifications)
       .set({ status, updatedAt: new Date() })
@@ -132,34 +181,93 @@ export class PostgresStorage implements IStorage {
     await db.delete(notifications).where(eq(notifications.id, id));
   }
 
-  // Dashboard metrics
+  // Dashboard metrics - COMPLETAMENTE REDISEÑADO
   async getDashboardMetrics() {
-    const allEmployees = await this.getAllEmployees();
-    const activeEmployees = allEmployees.filter(emp => emp.status === "active");
-    const itLeaveEmployees = allEmployees.filter(emp => emp.status === "it_leave");
-    const allNotifications = await this.getAllNotifications();
-    const pendingNotifications = allNotifications.filter(notif => notif.status === "pending");
+    console.log("📊 [METRICS] Calculando métricas del dashboard...");
     
-    // Group employees by city
-    const cityGroups = allEmployees.reduce((acc, emp) => {
-      const city = emp.city || "Sin ciudad";
+    // Obtener todos los datos necesarios
+    const [allEmployees, allCompanyLeaves, allNotifications] = await Promise.all([
+      this.getAllEmployees(),
+      this.getAllCompanyLeaves(), 
+      this.getAllNotifications()
+    ]);
+
+    console.log("📊 [METRICS] Datos obtenidos:", {
+      empleadosEnTablaEmpleados: allEmployees.length,
+      empleadosEnBajaEmpresa: allCompanyLeaves.length,
+      notificaciones: allNotifications.length
+    });
+
+    // TOTAL DE EMPLEADOS: Todos los que existen (activos + baja IT + baja empresa)
+    const totalEmployees = allEmployees.length + allCompanyLeaves.length;
+
+    // TRABAJADORES ACTIVOS: Solo activos + baja IT (excluye baja empresa y pendientes de baja empresa)
+    const activeEmployees = allEmployees.filter(emp => 
+      emp.status === "active" || emp.status === "it_leave"
+    );
+
+    // EMPLEADOS EN BAJA IT: Solo los que están en baja IT
+    const itLeaveEmployees = allEmployees.filter(emp => emp.status === "it_leave");
+
+    // NOTIFICACIONES PENDIENTES: Solo las que necesitan acción del super admin
+    const pendingNotifications = allNotifications.filter(notif => notif.status === "pending");
+
+    // EMPLEADOS POR CIUDAD: Incluir TODOS los empleados (activos + baja IT + baja empresa)
+    const allEmployeesForCities = [...allEmployees];
+    
+    // Agregar empleados de baja empresa (extraer de employeeData JSON)
+    allCompanyLeaves.forEach(leave => {
+      if (leave.employeeData) {
+        const empData = leave.employeeData as any;
+        allEmployeesForCities.push({
+          ...empData,
+          status: `company_leave_${leave.status}` // para identificación
+        });
+      }
+    });
+
+    // Agrupar por ciudad
+    const cityGroups = allEmployeesForCities.reduce((acc, emp) => {
+      const city = emp.ciudad || "Sin ciudad";
       if (!acc[city]) acc[city] = 0;
       acc[city]++;
       return acc;
     }, {} as Record<string, number>);
     
-    const employeesByCity = Object.entries(cityGroups).map(([city, count]) => ({
-      city,
-      count
-    }));
+    // Convertir a array y ordenar por cantidad (mayor a menor)
+    const employeesByCity = Object.entries(cityGroups)
+      .map(([city, count]) => ({ city, count }))
+      .sort((a, b) => b.count - a.count);
 
-    return {
-      totalEmployees: allEmployees.length,
-      activeEmployees: activeEmployees.length,
-      itLeaves: itLeaveEmployees.length,
-      pendingActions: pendingNotifications.length,
-      employeesByCity
+    const metrics = {
+      totalEmployees,                    // TODOS: activos + baja IT + baja empresa
+      activeEmployees: activeEmployees.length,  // TRABAJANDO: activos + baja IT
+      itLeaves: itLeaveEmployees.length,       // SOLO BAJA IT
+      pendingActions: pendingNotifications.length, // NOTIFICACIONES PENDIENTES
+      employeesByCity,                         // POR CIUDAD (TODOS)
+      // Métricas adicionales para debugging
+      debug: {
+        employeesInActiveTable: allEmployees.length,
+        employeesInCompanyLeave: allCompanyLeaves.length,
+        employeesByStatus: {
+          active: allEmployees.filter(e => e.status === "active").length,
+          it_leave: allEmployees.filter(e => e.status === "it_leave").length,
+          company_leave_pending: allEmployees.filter(e => e.status === "company_leave_pending").length,
+          company_leave_approved: allEmployees.filter(e => e.status === "company_leave_approved").length,
+        }
+      }
     };
+
+    console.log("📊 [METRICS] Métricas calculadas:", {
+      totalEmployees: metrics.totalEmployees,
+      activeEmployees: metrics.activeEmployees,
+      itLeaves: metrics.itLeaves,
+      pendingActions: metrics.pendingActions,
+      topCities: metrics.employeesByCity.slice(0, 5),
+      debug: metrics.debug
+    });
+
+    return metrics;
   }
 
   // Bulk operations for replacing entire employee database
@@ -173,5 +281,181 @@ export class PostgresStorage implements IStorage {
     const createdEmployees = await db.insert(employees).values(employeeDataList).returning();
     console.log("Bulk operation completed. Total employees:", createdEmployees.length);
     return createdEmployees;
+  }
+
+  // Filter helpers for unique values
+  async getUniqueCities(): Promise<string[]> {
+    const result = await db
+      .selectDistinct({ ciudad: employees.ciudad })
+      .from(employees)
+      .where(sql`${employees.ciudad} IS NOT NULL AND ${employees.ciudad} != ''`)
+      .orderBy(employees.ciudad);
+    
+    return result.map(row => row.ciudad!).filter(Boolean);
+  }
+
+  async getUniqueTrafficManagers(): Promise<string[]> {
+    const result = await db
+      .selectDistinct({ jefeTrafico: employees.jefeTrafico })
+      .from(employees)
+      .where(sql`${employees.jefeTrafico} IS NOT NULL AND ${employees.jefeTrafico} != ''`)
+      .orderBy(employees.jefeTrafico);
+    
+    return result.map(row => row.jefeTrafico!).filter(Boolean);
+  }
+
+  // ============================================
+  // SYSTEM USERS MANAGEMENT (Super Admin Only)
+  // ============================================
+  
+  async getAllSystemUsers(): Promise<SystemUser[]> {
+    console.log("👥 [USERS] Getting all system users");
+    return await db.select().from(systemUsers).orderBy(systemUsers.createdAt);
+  }
+
+  async getSystemUser(id: number): Promise<SystemUser | undefined> {
+    console.log("👤 [USERS] Getting system user by ID:", id);
+    const [user] = await db.select().from(systemUsers).where(eq(systemUsers.id, id));
+    return user;
+  }
+
+  async getSystemUserByEmail(email: string): Promise<SystemUser | undefined> {
+    console.log("👤 [USERS] Getting system user by email:", email);
+    const [user] = await db.select().from(systemUsers).where(eq(systemUsers.email, email));
+    return user;
+  }
+
+  async createSystemUser(userData: InsertSystemUser): Promise<SystemUser> {
+    console.log("➕ [USERS] Creating new system user:", userData.email, userData.role);
+    const [user] = await db.insert(systemUsers).values(userData).returning();
+    console.log("✅ [USERS] System user created successfully:", user.id, user.email);
+    return user;
+  }
+
+  async updateSystemUser(id: number, userData: UpdateSystemUser): Promise<SystemUser> {
+    console.log("📝 [USERS] Updating system user:", id, userData);
+    const [user] = await db
+      .update(systemUsers)
+      .set({ ...userData, updatedAt: new Date() })
+      .where(eq(systemUsers.id, id))
+      .returning();
+    console.log("✅ [USERS] System user updated successfully:", user.email);
+    return user;
+  }
+
+  async deleteSystemUser(id: number): Promise<void> {
+    console.log("🗑️ [USERS] Deleting system user:", id);
+    await db.delete(systemUsers).where(eq(systemUsers.id, id));
+    console.log("✅ [USERS] System user deleted successfully");
+  }
+
+  async updateSystemUserLastLogin(id: number): Promise<void> {
+    console.log("🔄 [USERS] Updating last login for user:", id);
+    await db
+      .update(systemUsers)
+      .set({ lastLogin: new Date() })
+      .where(eq(systemUsers.id, id));
+  }
+
+  // ============================================
+  // AUDIT LOGS (Comprehensive Action Tracking)
+  // ============================================
+
+  async createAuditLog(logData: InsertAuditLog): Promise<AuditLog> {
+    console.log("📝 [AUDIT] Creating audit log:", {
+      user: logData.userId,
+      action: logData.action,
+      entity: logData.entityType,
+      entityId: logData.entityId
+    });
+    
+    const [log] = await db.insert(auditLogs).values(logData).returning();
+    console.log("✅ [AUDIT] Audit log created:", log.id);
+    return log;
+  }
+
+  async getAllAuditLogs(limit: number = 1000): Promise<AuditLog[]> {
+    console.log("📋 [AUDIT] Getting audit logs, limit:", limit);
+    return await db
+      .select()
+      .from(auditLogs)
+      .orderBy(sql`${auditLogs.createdAt} DESC`)
+      .limit(limit);
+  }
+
+  async getAuditLogsByUser(userId: string, limit: number = 100): Promise<AuditLog[]> {
+    console.log("👤 [AUDIT] Getting audit logs for user:", userId, "limit:", limit);
+    return await db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.userId, userId))
+      .orderBy(sql`${auditLogs.createdAt} DESC`)
+      .limit(limit);
+  }
+
+  async getAuditLogsByAction(action: string, limit: number = 100): Promise<AuditLog[]> {
+    console.log("🔍 [AUDIT] Getting audit logs for action:", action, "limit:", limit);
+    return await db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.action, action))
+      .orderBy(sql`${auditLogs.createdAt} DESC`)
+      .limit(limit);
+  }
+
+  async getAuditLogsByEntity(entityType: string, entityId?: string, limit: number = 100): Promise<AuditLog[]> {
+    console.log("🎯 [AUDIT] Getting audit logs for entity:", entityType, entityId, "limit:", limit);
+    
+    if (entityId) {
+      return await db
+        .select()
+        .from(auditLogs)
+        .where(sql`${auditLogs.entityType} = ${entityType} AND ${auditLogs.entityId} = ${entityId}`)
+        .orderBy(sql`${auditLogs.createdAt} DESC`)
+        .limit(limit);
+    } else {
+      return await db
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.entityType, entityType))
+        .orderBy(sql`${auditLogs.createdAt} DESC`)
+        .limit(limit);
+    }
+  }
+
+  async getAuditLogsStats(): Promise<{
+    totalLogs: number;
+    logsByAction: Record<string, number>;
+    logsByUser: Record<string, number>;
+    logsByEntity: Record<string, number>;
+    recentActivity: AuditLog[];
+  }> {
+    console.log("📊 [AUDIT] Getting audit logs statistics");
+    
+    const allLogs = await this.getAllAuditLogs(5000); // Obtener últimos 5000 logs
+    
+    const stats = {
+      totalLogs: allLogs.length,
+      logsByAction: {} as Record<string, number>,
+      logsByUser: {} as Record<string, number>,
+      logsByEntity: {} as Record<string, number>,
+      recentActivity: allLogs.slice(0, 20) // Últimas 20 actividades
+    };
+
+    // Contar por acción
+    allLogs.forEach(log => {
+      stats.logsByAction[log.action] = (stats.logsByAction[log.action] || 0) + 1;
+      stats.logsByUser[log.userId] = (stats.logsByUser[log.userId] || 0) + 1;
+      stats.logsByEntity[log.entityType] = (stats.logsByEntity[log.entityType] || 0) + 1;
+    });
+
+    console.log("📊 [AUDIT] Stats calculated:", {
+      totalLogs: stats.totalLogs,
+      actionsCount: Object.keys(stats.logsByAction).length,
+      usersCount: Object.keys(stats.logsByUser).length,
+      entitiesCount: Object.keys(stats.logsByEntity).length
+    });
+
+    return stats;
   }
 }

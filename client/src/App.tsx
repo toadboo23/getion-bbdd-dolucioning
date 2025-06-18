@@ -9,9 +9,12 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import Employees from "@/pages/employees";
+
 import CompanyLeaves from "@/pages/company-leaves";
 import Notifications from "@/pages/notifications";
-import BulkUpload from "@/pages/bulk-upload";
+import SystemLogs from "@/pages/system-logs";
+import UserManagement from "@/pages/user-management";
+
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 
@@ -40,9 +43,12 @@ function Router() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/employees" component={Employees} />
+
             <Route path="/company-leaves" component={CompanyLeaves} />
             <Route path="/notifications" component={Notifications} />
-            <Route path="/bulk-upload" component={BulkUpload} />
+            <Route path="/system-logs" component={SystemLogs} />
+            <Route path="/user-management" component={UserManagement} />
+            
             <Route component={NotFound} />
           </Switch>
         </main>

@@ -1,45 +1,86 @@
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import ConfirmationModal from "@/components/modals/confirmation-modal";
-import { AlertTriangle, Info, Check, X } from "lucide-react";
-import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertTriangle, Info, Check, X, Filter, Calendar, FileText, Clock, CheckCircle, XCircle, Settings } from "lucide-react";
 import type { Notification } from "@shared/schema";
 
 export default function Notifications() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
-  const [confirmationModal, setConfirmationModal] = useState<{
+  
+  // Estados para filtros
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Función para aplicar filtro al hacer clic en las tarjetas de métricas
+  const handleMetricCardClick = (status: string) => {
+    setStatusFilter(status);
+    
+    // Mostrar toast de confirmación
+    const statusNames = {
+      pending: "Pendientes",
+      approved: "Tramitadas", 
+      rejected: "Rechazadas",
+      processed: "Procesadas"
+    };
+    
+    toast({
+      title: "Filtro aplicado",
+      description: `Mostrando solo notificaciones ${statusNames[status as keyof typeof statusNames]}`,
+      duration: 2000,
+    });
+    
+    // Scroll automático a la sección de filtros para que el usuario vea el cambio
+    setTimeout(() => {
+      const filtersSection = document.getElementById('filters-section');
+      if (filtersSection) {
+        filtersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
+  
+  // Estados para modal de tramitación
+  const [tramitationModal, setTramitationModal] = useState<{
     isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
+    notification: Notification | null;
+    action: "approve" | "reject";
+    processingDate: string;
   }>({
     isOpen: false,
-    title: "",
-    message: "",
-    onConfirm: () => {},
+    notification: null,
+    action: "approve",
+    processingDate: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
   });
 
-  // Redirect if not authenticated or not super admin
+  // Definir permisos específicos por rol
+  const canProcessNotifications = user?.role === "super_admin"; // Solo super admin puede procesar
+  const canViewNotifications = user?.role === "admin" || user?.role === "super_admin"; // Admin y super admin pueden ver
+  const isReadOnlyUser = user?.role === "normal";
+
+  // Redirect if not authenticated or not authorized to view notifications
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "super_admin")) {
+    if (!isLoading && (!isAuthenticated || !canViewNotifications)) {
       toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
+        title: "Sin permisos",
+        description: "No tienes permisos para acceder a esta sección",
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/dashboard";
       }, 500);
       return;
     }
-  }, [isAuthenticated, isLoading, user, toast]);
+  }, [isAuthenticated, isLoading, canViewNotifications, toast]);
 
   const { data: notifications, isLoading: notificationsLoading } = useQuery({
     queryKey: ["/api/notifications"],
@@ -58,17 +99,27 @@ export default function Notifications() {
     },
   });
 
-  const approveMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("POST", `/api/notifications/${id}/approve`);
+  const processMutation = useMutation({
+    mutationFn: async ({ id, action, processingDate }: { id: number, action: "approve" | "reject", processingDate: string }) => {
+      await apiRequest("POST", `/api/notifications/${id}/process`, { 
+        action, 
+        processingDate: new Date(processingDate).toISOString()
+      });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/company-leaves"] });
+      
+      const actionText = variables.action === "approve" ? "tramitada" : "rechazada";
       toast({
-        title: "Baja aprobada",
-        description: "La baja ha sido aprobada correctamente",
+        title: `Baja ${actionText}`,
+        description: `La baja ha sido ${actionText} correctamente con fecha ${new Date(variables.processingDate).toLocaleDateString('es-ES')}`,
       });
+      
+      // Cerrar modal
+      setTramitationModal(prev => ({ ...prev, isOpen: false }));
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -84,79 +135,111 @@ export default function Notifications() {
       }
       toast({
         title: "Error",
-        description: "No se pudo aprobar la baja",
+        description: "No se pudo procesar la solicitud",
         variant: "destructive",
       });
     },
   });
 
-  const rejectMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("POST", `/api/notifications/${id}/reject`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-      toast({
-        title: "Baja rechazada",
-        description: "La baja ha sido rechazada",
+  // Función para abrir modal de tramitación
+  const handleTramitar = (notification: Notification, action: "approve" | "reject") => {
+    setTramitationModal({
+      isOpen: true,
+      notification,
+      action,
+      processingDate: new Date().toISOString().split('T')[0], // Fecha de hoy
       });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
+  };
+
+  // Función para confirmar tramitación
+  const handleConfirmTramitacion = () => {
+    if (!tramitationModal.notification || !tramitationModal.processingDate) {
       toast({
         title: "Error",
-        description: "No se pudo rechazar la baja",
+        description: "Por favor selecciona una fecha de tramitación",
         variant: "destructive",
       });
-    },
-  });
+      return;
+    }
 
-  const handleApprove = (notification: Notification) => {
-    setConfirmationModal({
-      isOpen: true,
-      title: "Aprobar Baja",
-      message: `¿Estás seguro de que deseas aprobar la baja de ${notification.employeeName}?`,
-      onConfirm: () => {
-        approveMutation.mutate(notification.id);
-        setConfirmationModal(prev => ({ ...prev, isOpen: false }));
-      },
+    processMutation.mutate({
+      id: tramitationModal.notification.id,
+      action: tramitationModal.action,
+      processingDate: tramitationModal.processingDate,
     });
   };
 
-  const handleReject = (notification: Notification) => {
-    setConfirmationModal({
-      isOpen: true,
-      title: "Rechazar Baja",
-      message: `¿Estás seguro de que deseas rechazar la baja de ${notification.employeeName}?`,
-      onConfirm: () => {
-        rejectMutation.mutate(notification.id);
-        setConfirmationModal(prev => ({ ...prev, isOpen: false }));
-      },
-    });
-  };
+  // Filtrar notificaciones
+  const filteredNotifications = useMemo(() => {
+    if (!notifications) return [];
+
+    return notifications.filter(notification => {
+      // Filtro por estado
+      if (statusFilter !== "all" && notification.status !== statusFilter) {
+        return false;
+      }
+
+      // Filtro por tipo
+      if (typeFilter !== "all" && notification.type !== typeFilter) {
+        return false;
+      }
+
+      // Filtro por búsqueda
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const searchableText = [
+          notification.title,
+          notification.message,
+          notification.requestedBy,
+          (notification.metadata as any)?.employeeName || "",
+          (notification.metadata as any)?.leaveType || "",
+        ].join(" ").toLowerCase();
+        
+        if (!searchableText.includes(query)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+  }, [notifications, statusFilter, typeFilter, searchQuery]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
-        return <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pendiente</span>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+            <Clock className="w-3 h-3 mr-1" />
+            Pendiente
+          </span>
+        );
       case "approved":
-        return <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Aprobado</span>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Tramitada
+          </span>
+        );
       case "rejected":
-        return <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Rechazado</span>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+            <XCircle className="w-3 h-3 mr-1" />
+            Rechazada
+          </span>
+        );
       case "processed":
-        return <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Procesado</span>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+            <Settings className="w-3 h-3 mr-1" />
+            Procesada
+          </span>
+        );
       default:
-        return <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">{status}</span>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+            {status}
+          </span>
+        );
     }
   };
 
@@ -192,20 +275,203 @@ export default function Notifications() {
     );
   }
 
+  // Obtener estadísticas para los filtros
+  const notificationStats = useMemo(() => {
+    if (!notifications) return { pending: 0, approved: 0, rejected: 0, processed: 0 };
+    
+    return notifications.reduce((stats, notif) => {
+      stats[notif.status as keyof typeof stats] = (stats[notif.status as keyof typeof stats] || 0) + 1;
+      return stats;
+    }, { pending: 0, approved: 0, rejected: 0, processed: 0 });
+  }, [notifications]);
+
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">Panel de Notificaciones</h2>
-        <p className="mt-1 text-sm text-gray-600">Gestiona las notificaciones del sistema</p>
+    <div className="p-6 space-y-6">
+      {/* HEADER */}
+      <div>
+        <h2 className="text-3xl font-bold text-gray-900">Panel de Notificaciones</h2>
+        <p className="mt-2 text-gray-600">Gestiona y tramita las solicitudes de baja empresa</p>
+        
+        {/* Mensaje de permisos según el rol */}
+        <div className="mt-3">
+          {canProcessNotifications && (
+            <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+              <p className="text-sm text-green-700">
+                ✅ <strong>Super Admin</strong> - Puedes ver y tramitar todas las notificaciones
+              </p>
+            </div>
+          )}
+          
+          {!canProcessNotifications && user?.role === "admin" && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+              <p className="text-sm text-blue-700">
+                👁️ <strong>Admin</strong> - Puedes ver todas las notificaciones pero no tramitarlas
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ESTADÍSTICAS RÁPIDAS - CLICABLES */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card 
+          className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 cursor-pointer hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+          onClick={() => handleMetricCardClick('pending')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Clock className="w-8 h-8 text-yellow-600" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-yellow-700">Pendientes</p>
+                <p className="text-2xl font-bold text-yellow-900">{notificationStats.pending}</p>
+                <p className="text-xs text-yellow-600 mt-1">Clic para filtrar</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card 
+          className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 cursor-pointer hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+          onClick={() => handleMetricCardClick('approved')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-green-700">Tramitadas</p>
+                <p className="text-2xl font-bold text-green-900">{notificationStats.approved}</p>
+                <p className="text-xs text-green-600 mt-1">Clic para filtrar</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card 
+          className="bg-gradient-to-br from-red-50 to-red-100 border-red-200 cursor-pointer hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+          onClick={() => handleMetricCardClick('rejected')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <XCircle className="w-8 h-8 text-red-600" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-red-700">Rechazadas</p>
+                <p className="text-2xl font-bold text-red-900">{notificationStats.rejected}</p>
+                <p className="text-xs text-red-600 mt-1">Clic para filtrar</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card 
+          className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 cursor-pointer hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+          onClick={() => handleMetricCardClick('processed')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Settings className="w-8 h-8 text-blue-600" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-blue-700">Procesadas</p>
+                <p className="text-2xl font-bold text-blue-900">{notificationStats.processed}</p>
+                <p className="text-xs text-blue-600 mt-1">Clic para filtrar</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* FILTROS */}
+      <Card id="filters-section">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="w-5 h-5" />
+            Filtros de Búsqueda
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="search">Buscar</Label>
+              <Input
+                id="search"
+                placeholder="Buscar por empleado, tipo, email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="status-filter">Estado</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger id="status-filter" className="mt-1">
+                  <SelectValue placeholder="Seleccionar estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados ({notifications?.length || 0})</SelectItem>
+                  <SelectItem value="pending">Pendientes ({notificationStats.pending})</SelectItem>
+                  <SelectItem value="approved">Tramitadas ({notificationStats.approved})</SelectItem>
+                  <SelectItem value="rejected">Rechazadas ({notificationStats.rejected})</SelectItem>
+                  <SelectItem value="processed">Procesadas ({notificationStats.processed})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="type-filter">Tipo</Label>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger id="type-filter" className="mt-1">
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  <SelectItem value="company_leave_request">Solicitudes de Baja Empresa</SelectItem>
+                  <SelectItem value="employee_update">Actualizaciones de Empleado</SelectItem>
+                  <SelectItem value="bulk_upload">Cargas Masivas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* LISTA DE NOTIFICACIONES */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Notificaciones ({filteredNotifications.length})
+          </h3>
+          {searchQuery || statusFilter !== "all" || typeFilter !== "all" ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600">
+                Filtros activos: {[
+                  searchQuery ? "Búsqueda" : null,
+                  statusFilter !== "all" ? "Estado" : null,
+                  typeFilter !== "all" ? "Tipo" : null
+                ].filter(Boolean).join(", ")}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                  setTypeFilter("all");
+                }}
+                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              >
+                Limpiar Filtros
+              </Button>
+            </div>
+          ) : null}
       </div>
 
       <div className="space-y-4">
-        {notifications?.map((notification) => (
-          <Card key={notification.id}>
+          {filteredNotifications.map((notification) => (
+            <Card key={notification.id} className="shadow-md hover:shadow-lg transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-start space-x-4">
                 <div className="flex-shrink-0">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
                     notification.type === "company_leave_request" ? "bg-yellow-100" :
                     notification.type === "employee_update" ? "bg-blue-100" : "bg-green-100"
                   }`}>
@@ -213,56 +479,85 @@ export default function Notifications() {
                   </div>
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-lg font-medium text-gray-900">{notification.title}</h4>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-lg font-semibold text-gray-900">{notification.title}</h4>
+                      <div className="flex items-center space-x-3">
                       {getStatusBadge(notification.status)}
-                      <span className="text-sm text-gray-500">
+                        <span className="text-sm text-gray-500 flex items-center">
+                          <Calendar className="w-4 h-4 mr-1" />
                         {new Date(notification.createdAt!).toLocaleString('es-ES')}
                       </span>
                     </div>
                   </div>
-                  <div className="mt-2 space-y-2">
-                    <p className="text-sm text-gray-600">{notification.message}</p>
-                    {notification.employeeName && (
-                      <p className="text-sm text-gray-600">
-                        <strong>Empleado:</strong> {notification.employeeName}
-                      </p>
+                    
+                    <div className="space-y-2 mb-4">
+                      <p className="text-sm text-gray-700">{notification.message}</p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                        {notification.metadata && (notification.metadata as any).employeeName && (
+                          <div className="bg-gray-50 p-3 rounded-lg">
+                            <p className="text-sm font-medium text-gray-700">Empleado</p>
+                            <p className="text-sm text-gray-900">{(notification.metadata as any).employeeName}</p>
+                          </div>
                     )}
-                    <p className="text-sm text-gray-600">
-                      <strong>Solicitado por:</strong> {notification.requestedBy}
-                    </p>
+                        
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                          <p className="text-sm font-medium text-gray-700">Solicitado por</p>
+                          <p className="text-sm text-gray-900">{notification.requestedBy}</p>
+                        </div>
+                        
                     {notification.metadata && notification.type === "company_leave_request" && (
                       <>
-                        <p className="text-sm text-gray-600">
-                          <strong>Tipo:</strong> {(notification.metadata as any).leaveType}
+                            <div className="bg-gray-50 p-3 rounded-lg">
+                              <p className="text-sm font-medium text-gray-700">Tipo de Baja</p>
+                              <p className="text-sm text-gray-900 capitalize">{(notification.metadata as any).leaveType}</p>
+                            </div>
+                            
+                            <div className="bg-gray-50 p-3 rounded-lg">
+                              <p className="text-sm font-medium text-gray-700">Fecha Solicitada</p>
+                              <p className="text-sm text-gray-900">
+                                {new Date((notification.metadata as any).leaveDate).toLocaleDateString('es-ES')}
                         </p>
-                        <p className="text-sm text-gray-600">
-                          <strong>Fecha:</strong> {new Date((notification.metadata as any).leaveDate).toLocaleDateString('es-ES')}
-                        </p>
+                            </div>
                       </>
                     )}
                   </div>
+                    </div>
+                    
                   {notification.status === "pending" && notification.type === "company_leave_request" && (
-                    <div className="mt-4 flex space-x-3">
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleApprove(notification)}
-                        disabled={approveMutation.isPending}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <Check className="w-4 h-4 mr-2" />
-                        Aprobar
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive"
-                        onClick={() => handleReject(notification)}
-                        disabled={rejectMutation.isPending}
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Rechazar
-                      </Button>
+                    <div className="flex space-x-3 pt-3 border-t border-gray-200">
+                      {/* Botones de tramitación - Solo Super Admin */}
+                      {canProcessNotifications && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleTramitar(notification, "approve")}
+                            disabled={processMutation.isPending}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <Check className="w-4 h-4 mr-2" />
+                            Tramitar
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => handleTramitar(notification, "reject")}
+                            disabled={processMutation.isPending}
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Rechazar
+                          </Button>
+                        </>
+                      )}
+                      
+                      {/* Mensaje para usuarios sin permisos de procesamiento */}
+                      {!canProcessNotifications && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+                          <p className="text-sm text-blue-700">
+                            👁️ Solo puedes ver - Requiere permisos de Super Admin para tramitar
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -271,26 +566,114 @@ export default function Notifications() {
           </Card>
         ))}
 
-        {(!notifications || notifications.length === 0) && (
+          {filteredNotifications.length === 0 && (
           <Card>
-            <CardContent className="p-6 text-center">
-              <Info className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No hay notificaciones</h3>
-              <p className="text-gray-600">No tienes notificaciones pendientes en este momento.</p>
+              <CardContent className="p-8 text-center">
+                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-medium text-gray-900 mb-2">
+                  {searchQuery || statusFilter !== "all" || typeFilter !== "all" 
+                    ? "No se encontraron notificaciones"
+                    : "No hay notificaciones"
+                  }
+                </h3>
+                <p className="text-gray-600 max-w-md mx-auto">
+                  {searchQuery || statusFilter !== "all" || typeFilter !== "all"
+                    ? "Intenta ajustar los filtros o la búsqueda para encontrar las notificaciones que buscas."
+                    : "No tienes notificaciones pendientes en este momento. Las nuevas solicitudes aparecerán aquí."
+                  }
+                </p>
             </CardContent>
           </Card>
         )}
+        </div>
       </div>
 
-      <ConfirmationModal
-        isOpen={confirmationModal.isOpen}
-        title={confirmationModal.title}
-        message={confirmationModal.message}
-        onConfirm={confirmationModal.onConfirm}
-        onCancel={() => setConfirmationModal(prev => ({ ...prev, isOpen: false }))}
-        confirmText="Confirmar"
-        cancelText="Cancelar"
-      />
+      {/* MODAL DE TRAMITACIÓN */}
+      <Dialog 
+        open={tramitationModal.isOpen} 
+        onOpenChange={(open) => !open && setTramitationModal(prev => ({ ...prev, isOpen: false }))}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              {tramitationModal.action === "approve" ? "Tramitar Solicitud" : "Rechazar Solicitud"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {tramitationModal.notification && (
+            <div className="space-y-6">
+              {/* Información de la solicitud */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-medium text-gray-900 mb-2">Detalles de la Solicitud</h4>
+                <div className="space-y-1 text-sm">
+                  <p><strong>Empleado:</strong> {(tramitationModal.notification.metadata as any)?.employeeName || "N/A"}</p>
+                  <p><strong>Tipo:</strong> {(tramitationModal.notification.metadata as any)?.leaveType || "N/A"}</p>
+                  <p><strong>Solicitado por:</strong> {tramitationModal.notification.requestedBy}</p>
+                </div>
+      </div>
+
+              {/* Selector de fecha */}
+              <div>
+                <Label htmlFor="processing-date" className="text-base font-medium">
+                  Fecha de {tramitationModal.action === "approve" ? "Tramitación" : "Rechazo"}
+                </Label>
+                <p className="text-sm text-gray-600 mb-2">
+                  Selecciona la fecha en que se {tramitationModal.action === "approve" ? "tramita" : "rechaza"} esta solicitud
+                </p>
+                <Input
+                  id="processing-date"
+                  type="date"
+                  value={tramitationModal.processingDate}
+                  onChange={(e) => setTramitationModal(prev => ({ ...prev, processingDate: e.target.value }))}
+                  max={new Date().toISOString().split('T')[0]} // No permitir fechas futuras
+                  className="mt-1"
+                />
+              </div>
+
+              {/* Mensaje de confirmación */}
+              <div className={`p-4 rounded-lg ${
+                tramitationModal.action === "approve" 
+                  ? "bg-green-50 border border-green-200" 
+                  : "bg-red-50 border border-red-200"
+              }`}>
+                <p className={`text-sm ${
+                  tramitationModal.action === "approve" ? "text-green-800" : "text-red-800"
+                }`}>
+                  {tramitationModal.action === "approve" 
+                    ? "⚠️ Al tramitar esta solicitud, el empleado será movido de la tabla de empleados activos a la tabla de bajas empresa."
+                    : "⚠️ Al rechazar esta solicitud, se registrará el rechazo pero el empleado permanecerá como activo."
+                  }
+                </p>
+              </div>
+
+              {/* Botones */}
+              <div className="flex justify-end space-x-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setTramitationModal(prev => ({ ...prev, isOpen: false }))}
+                  disabled={processMutation.isPending}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleConfirmTramitacion}
+                  disabled={processMutation.isPending || !tramitationModal.processingDate}
+                  className={tramitationModal.action === "approve" 
+                    ? "bg-green-600 hover:bg-green-700" 
+                    : "bg-red-600 hover:bg-red-700"
+                  }
+                >
+                  {processMutation.isPending ? "Procesando..." : (
+                    tramitationModal.action === "approve" ? "Tramitar" : "Rechazar"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

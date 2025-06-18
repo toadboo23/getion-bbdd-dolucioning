@@ -1,21 +1,23 @@
 import { Link, useLocation } from "wouter";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, useNotificationCount } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
   Users, 
   Bell, 
-  FileSpreadsheet, 
   LogOut,
-  UserX
+  UserX,
+  FileText,
+  UserCog
 } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Empleados", href: "/employees", icon: Users },
   { name: "Baja Empresa", href: "/company-leaves", icon: UserX },
-  { name: "Notificaciones", href: "/notifications", icon: Bell, superAdminOnly: true },
-  { name: "Carga Masiva", href: "/bulk-upload", icon: FileSpreadsheet, superAdminOnly: true },
+  { name: "Notificaciones", href: "/notifications", icon: Bell, adminOnly: true }, // Admin y Super Admin
+  { name: "System Logs", href: "/system-logs", icon: FileText, superAdminOnly: true }, // Solo Super Admin
+  { name: "Gestión de Usuarios", href: "/user-management", icon: UserCog, superAdminOnly: true }, // Solo Super Admin
 ];
 
 interface SidebarProps {
@@ -25,17 +27,46 @@ interface SidebarProps {
 
 export default function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const notificationCount = useNotificationCount();
 
   const canAccess = (item: any) => {
     if (item.superAdminOnly) {
       return user?.role === "super_admin";
     }
+    if (item.adminOnly) {
+      return user?.role === "admin" || user?.role === "super_admin";
+    }
     return true;
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    if (onMobileClose) onMobileClose();
   };
 
   const sidebarContent = (
     <div className="flex-1 flex flex-col min-h-0 pt-16">
+      {/* Información del usuario y rol */}
+      <div className="px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-gray-900">{user?.email}</p>
+            <div className="flex items-center mt-1">
+              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                user?.role === "super_admin" ? "bg-red-100 text-red-800" :
+                user?.role === "admin" ? "bg-blue-100 text-blue-800" :
+                "bg-gray-100 text-gray-800"
+              }`}>
+                {user?.role === "super_admin" ? "🔴 Super Admin" :
+                 user?.role === "admin" ? "🟡 Admin" :
+                 "🟢 Normal"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <nav className="flex-1 px-2 py-4 space-y-1">
         {navigation.map((item) => {
           if (!canAccess(item)) return null;
@@ -54,9 +85,9 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }: Sidebar
               >
                 <Icon className="w-5 h-5 mr-3" />
                 <span>{item.name}</span>
-                {item.name === "Notificaciones" && (
+                {item.name === "Notificaciones" && notificationCount > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    3
+                    {notificationCount}
                   </span>
                 )}
               </div>
@@ -65,13 +96,13 @@ export default function Sidebar({ isMobileOpen = false, onMobileClose }: Sidebar
         })}
         
         <div className="mt-8 pt-4 border-t border-gray-200">
-          <a
-            href="/api/logout"
-            className="sidebar-link text-red-600 hover:bg-red-50"
+          <button
+            onClick={handleLogout}
+            className="sidebar-link text-red-600 hover:bg-red-50 w-full text-left"
           >
             <LogOut className="w-5 h-5 mr-3" />
             <span>Cerrar Sesión</span>
-          </a>
+          </button>
         </div>
       </nav>
     </div>
