@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Info } from "lucide-react";
 
 interface ImportEmployeesModalProps {
   isOpen: boolean;
@@ -62,6 +62,7 @@ export default function ImportEmployeesModal({
   const [progress, setProgress] = useState(0);
   const [processedData, setProcessedData] = useState<ProcessedEmployee[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
+  const [showFieldLimits, setShowFieldLimits] = useState(false);
 
   const importMutation = useMutation({
     mutationFn: async (employees: ProcessedEmployee[]) => {
@@ -151,33 +152,41 @@ export default function ImportEmployeesModal({
             }
             const cleaned = String(value).trim();
             if (cleaned.length > maxLength) {
-  
               return cleaned.substring(0, maxLength);
             }
             return cleaned;
           };
+
+          // Función para validar longitudes y reportar errores específicos
+          const validateFieldLength = (fieldName: string, value: string, maxLength: number, rowIndex: number): boolean => {
+            if (value && value.length > maxLength) {
+              newErrors.push(`Fila ${rowIndex + 2}: El campo "${fieldName}" es demasiado largo (${value.length} caracteres, máximo ${maxLength}). Valor: "${value.substring(0, 50)}..."`);
+              return false;
+            }
+            return true;
+          };
           
           // Mapear campos del Excel a nuestro schema con validación de longitud
-          const employee: ProcessedEmployee = {
+          const rawEmployee = {
             idGlovo: cleanString(row['ID Glovo'], 50),
             emailGlovo: cleanString(row['Email Glovo'], 100),
             turno: cleanString(row['Turno'], 50),
             nombre: cleanString(row['Nombre'], 100),
             apellido: cleanString(row['Apellido'], 100),
-            telefono: cleanString(row['Teléfono'], 30), // Ampliado a 30
+            telefono: cleanString(row['Teléfono'], 30),
             email: cleanString(row['Email'], 100),
             horas: row['Horas'] ? Number(row['Horas']) : undefined,
             complementaries: cleanString(row['Complementarios']),
             ciudad: cleanString(row['Ciudad'], 100),
-            cityCode: cleanString(row['Código Ciudad'], 30), // Ampliado a 30
-            dniNie: cleanString(row['DNI/NIE'], 30), // Ampliado a 30
+            cityCode: cleanString(row['Código Ciudad'], 30),
+            dniNie: cleanString(row['DNI/NIE'], 30),
             iban: cleanString(row['IBAN'], 34),
             direccion: cleanString(row['Dirección'], 255),
             vehiculo: cleanString(row['Vehículo'], 50),
-            naf: cleanString(row['NAF'], 30), // Ampliado a 30
+            naf: cleanString(row['NAF'], 30),
             fechaAltaSegSoc: cleanString(row['Fecha Alta Seg. Social (AAAA-MM-DD)']),
-            statusBaja: cleanString(row['Status Baja'], 100), // Ampliado a 100
-            estadoSs: cleanString(row['Estado SS'], 100), // Ampliado a 100
+            statusBaja: cleanString(row['Status Baja'], 100),
+            estadoSs: cleanString(row['Estado SS'], 100),
             informadoHorario: row['Informado Horario (true/false)'] === 'true' || row['Informado Horario (true/false)'] === true,
             cuentaDivilo: cleanString(row['Cuenta Divilo'], 100),
             proximaAsignacionSlots: cleanString(row['Próxima Asignación Slots (AAAA-MM-DD)']),
@@ -191,18 +200,62 @@ export default function ImportEmployeesModal({
           };
 
           // Validar campos requeridos
-          if (!employee.idGlovo || !employee.nombre || !employee.telefono) {
-            newErrors.push(`Fila ${index + 2}: Faltan campos requeridos (ID Glovo: "${employee.idGlovo}", Nombre: "${employee.nombre}", Teléfono: "${employee.telefono}")`);
+          if (!rawEmployee.idGlovo || !rawEmployee.nombre || !rawEmployee.telefono) {
+            newErrors.push(`Fila ${index + 2}: Faltan campos requeridos (ID Glovo: "${rawEmployee.idGlovo || 'VACÍO'}", Nombre: "${rawEmployee.nombre || 'VACÍO'}", Teléfono: "${rawEmployee.telefono || 'VACÍO'}")`);
             return;
           }
 
-          // Validar longitudes específicas después de limpieza
-          if (employee.telefono && employee.telefono.length > 30) {
-            newErrors.push(`Fila ${index + 2}: Teléfono demasiado largo (${employee.telefono.length} caracteres, máximo 30)`);
-            return;
-          }
-
+          // Validar longitudes específicas antes de limpiar (para detectar problemas originales)
+          let hasLengthErrors = false;
           
+          // Validaciones específicas con los valores originales antes de truncar
+          const originalValues = {
+            idGlovo: String(row['ID Glovo'] || '').trim(),
+            emailGlovo: String(row['Email Glovo'] || '').trim(),
+            turno: String(row['Turno'] || '').trim(),
+            nombre: String(row['Nombre'] || '').trim(),
+            apellido: String(row['Apellido'] || '').trim(),
+            telefono: String(row['Teléfono'] || '').trim(),
+            email: String(row['Email'] || '').trim(),
+            ciudad: String(row['Ciudad'] || '').trim(),
+            cityCode: String(row['Código Ciudad'] || '').trim(),
+            dniNie: String(row['DNI/NIE'] || '').trim(),
+            iban: String(row['IBAN'] || '').trim(),
+            direccion: String(row['Dirección'] || '').trim(),
+            vehiculo: String(row['Vehículo'] || '').trim(),
+            naf: String(row['NAF'] || '').trim(),
+            statusBaja: String(row['Status Baja'] || '').trim(),
+            estadoSs: String(row['Estado SS'] || '').trim(),
+            cuentaDivilo: String(row['Cuenta Divilo'] || '').trim(),
+            jefeTrafico: String(row['Jefe Tráfico'] || '').trim(),
+          };
+
+          // Validar cada campo con su longitud máxima
+          if (!validateFieldLength('ID Glovo', originalValues.idGlovo, 50, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Email Glovo', originalValues.emailGlovo, 100, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Turno', originalValues.turno, 50, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Nombre', originalValues.nombre, 100, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Apellido', originalValues.apellido, 100, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Teléfono', originalValues.telefono, 30, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Email', originalValues.email, 100, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Ciudad', originalValues.ciudad, 100, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Código Ciudad', originalValues.cityCode, 30, index)) hasLengthErrors = true;
+          if (!validateFieldLength('DNI/NIE', originalValues.dniNie, 30, index)) hasLengthErrors = true;
+          if (!validateFieldLength('IBAN', originalValues.iban, 34, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Dirección', originalValues.direccion, 255, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Vehículo', originalValues.vehiculo, 50, index)) hasLengthErrors = true;
+          if (!validateFieldLength('NAF', originalValues.naf, 30, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Status Baja', originalValues.statusBaja, 100, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Estado SS', originalValues.estadoSs, 100, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Cuenta Divilo', originalValues.cuentaDivilo, 100, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Jefe Tráfico', originalValues.jefeTrafico, 100, index)) hasLengthErrors = true;
+
+          // Si hay errores de longitud, no procesar este empleado
+          if (hasLengthErrors) {
+            return;
+          }
+
+          const employee: ProcessedEmployee = rawEmployee;
           processed.push(employee);
         } catch (error) {
 
@@ -216,7 +269,11 @@ export default function ImportEmployeesModal({
       setProgress(100);
 
       if (processed.length === 0) {
-        throw new Error("No se pudieron procesar empleados válidos");
+        if (newErrors.length > 0) {
+          throw new Error(`No se pudieron procesar empleados válidos. Se encontraron ${newErrors.length} errores de validación.`);
+        } else {
+          throw new Error("No se pudieron procesar empleados válidos");
+        }
       }
 
     } catch (error) {
@@ -279,6 +336,52 @@ export default function ImportEmployeesModal({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Información de limitaciones de campos */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-blue-600" />
+                <span className="text-blue-800 font-medium">Limitaciones de campos</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowFieldLimits(!showFieldLimits)}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                {showFieldLimits ? 'Ocultar' : 'Ver detalles'}
+              </Button>
+            </div>
+            {showFieldLimits && (
+              <div className="mt-3 text-sm text-blue-700">
+                <p className="mb-2">Los siguientes campos tienen limitaciones de longitud:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                  <div>• ID Glovo: <strong>50 caracteres</strong></div>
+                  <div>• Email Glovo: <strong>100 caracteres</strong></div>
+                  <div>• Turno: <strong>50 caracteres</strong></div>
+                  <div>• Nombre: <strong>100 caracteres</strong></div>
+                  <div>• Apellido: <strong>100 caracteres</strong></div>
+                  <div>• Teléfono: <strong>30 caracteres</strong></div>
+                  <div>• Email: <strong>100 caracteres</strong></div>
+                  <div>• Ciudad: <strong>100 caracteres</strong></div>
+                  <div>• Código Ciudad: <strong>30 caracteres</strong></div>
+                  <div>• DNI/NIE: <strong>30 caracteres</strong></div>
+                  <div>• IBAN: <strong>34 caracteres</strong></div>
+                  <div>• Dirección: <strong>255 caracteres</strong></div>
+                  <div>• Vehículo: <strong>50 caracteres</strong></div>
+                  <div>• NAF: <strong>30 caracteres</strong></div>
+                  <div>• Status Baja: <strong>100 caracteres</strong></div>
+                  <div>• Estado SS: <strong>100 caracteres</strong></div>
+                  <div>• Cuenta Divilo: <strong>100 caracteres</strong></div>
+                  <div>• Jefe Tráfico: <strong>100 caracteres</strong></div>
+                </div>
+                <p className="mt-2 text-blue-600">
+                  Los campos que exceden estos límites serán truncados automáticamente o generarán errores de validación.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Area de drag & drop */}
           <div
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
