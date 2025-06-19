@@ -1,3 +1,6 @@
+# Versión de PRODUCCIÓN - docker-compose.prod.yml
+# Para usar: docker-compose -f docker-compose.prod.yml up -d
+
 services:
   # PostgreSQL Database
   postgres:
@@ -7,15 +10,17 @@ services:
     environment:
       POSTGRES_DB: employee_management
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password123
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_this_secure_password}
+      POSTGRES_HOST_AUTH_METHOD: md5
     ports:
-      - "5432:5432"
+      - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"  # Permite acceso externo
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres.conf:/etc/postgresql/postgresql.conf  # Configuración personalizada
     networks:
       - employee_network
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
 
   # Backend API
   backend:
@@ -25,22 +30,17 @@ services:
     container_name: employee_management_backend
     restart: unless-stopped
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:password123@postgres:5432/employee_management
-      SESSION_SECRET: your-super-secret-session-key-change-this-in-production
-      REPL_ID: local-development
-      ISSUER_URL: http://localhost:5173/oidc
-      REPLIT_DOMAINS: localhost:5173
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change_this_secure_password}@postgres:5432/employee_management
+      SESSION_SECRET: ${SESSION_SECRET:-change-this-super-secret-key-in-production}
+      PORT: 5173
     ports:
-      - "5173:5173"
+      - "${BACKEND_PORT:-5173}:5173"
     depends_on:
       - postgres
-    volumes:
-      - .:/app
-      - /app/node_modules
     networks:
       - employee_network
-    command: npm run dev:backend
+    command: npm run start
 
   # Frontend
   frontend:
@@ -50,17 +50,14 @@ services:
     container_name: employee_management_frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:5173
+      VITE_API_URL: ${API_URL:-http://localhost:5173}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - backend
-    volumes:
-      - .:/app
-      - /app/node_modules
     networks:
       - employee_network
-    command: npm run dev:frontend
+    command: npm run start
 
 volumes:
   postgres_data:

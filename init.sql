@@ -77,13 +77,13 @@ CREATE TABLE IF NOT EXISTS it_leaves (
   id serial PRIMARY KEY,
   employee_id varchar(50) NOT NULL,
   leave_type varchar(100) NOT NULL,
-  leave_date date NOT NULL,
+  leave_date timestamp NOT NULL,
+  requested_at timestamp DEFAULT CURRENT_TIMESTAMP,
   requested_by varchar(255) NOT NULL,
   approved_by varchar(255),
   approved_at timestamp,
-  status varchar(50) DEFAULT 'approved',
-  created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-  updated_at timestamp DEFAULT CURRENT_TIMESTAMP
+  status varchar(50) DEFAULT 'pending',
+  created_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create notifications table
@@ -178,6 +178,34 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                    WHERE table_name = 'employees' AND column_name = 'updated_at') THEN
         ALTER TABLE employees ADD COLUMN updated_at timestamp DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+END $$;
+
+-- Migration: Fix it_leaves table structure to match schema
+DO $$ 
+BEGIN 
+    -- Add requested_at column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'it_leaves' AND column_name = 'requested_at') THEN
+        ALTER TABLE it_leaves ADD COLUMN requested_at timestamp DEFAULT CURRENT_TIMESTAMP;
+    END IF;
+    
+    -- Change leave_date from date to timestamp if it exists as date
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'it_leaves' AND column_name = 'leave_date' AND data_type = 'date') THEN
+        ALTER TABLE it_leaves ALTER COLUMN leave_date TYPE timestamp USING leave_date::timestamp;
+    END IF;
+    
+    -- Update status default to 'pending' if column exists with different default
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'it_leaves' AND column_name = 'status') THEN
+        ALTER TABLE it_leaves ALTER COLUMN status SET DEFAULT 'pending';
+    END IF;
+    
+    -- Remove updated_at column if it exists (not in schema)
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'it_leaves' AND column_name = 'updated_at') THEN
+        ALTER TABLE it_leaves DROP COLUMN updated_at;
     END IF;
 END $$;
 
