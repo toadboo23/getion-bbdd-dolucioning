@@ -227,13 +227,13 @@ INSERT INTO notifications (type, title, message, requested_by, status) VALUES
 ('system', 'Sistema Iniciado', 'El sistema de gestión de empleados ha sido iniciado correctamente', 'Sistema', 'processed'),
 ('info', 'Base de Datos Configurada', 'La base de datos PostgreSQL ha sido configurada para el entorno local', 'Sistema', 'processed');
 
--- Insert default super admin user (password: admin123)
--- Note: In production, this should be changed immediately
+-- Insert production super admin users
 INSERT INTO system_users (email, first_name, last_name, password, role, created_by, is_active) 
 SELECT * FROM (VALUES 
-  ('admin@dvv5.com', 'Super', 'Admin', '$2b$10$8R1QkTQZJZGvKb4vJ7QJrOXYR1QkTQZJZGvKb4vJ7QJrOXYR1QkTQ', 'super_admin', 'SYSTEM', true)
+  ('nmartinez@solucioning.net', 'Nicolas', 'Martinez', '$2b$10$DsYjQKJM/dj1Xqm1iPjlG.NhMxW2XY.CsZ1eOwqsX8WP8SwgXZ/5u', 'super_admin', 'SYSTEM', true),
+  ('lvega@solucioning.net', 'Luis', 'Vega', '$2b$10$uXIrjF2pO/CeY./qT825ruTZOocZ0o7BdpOhGASaBGdaUOncUTaF.', 'super_admin', 'SYSTEM', true)
 ) AS v(email, first_name, last_name, password, role, created_by, is_active)
-WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email = 'admin@dvv5.com');
+WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email IN ('nmartinez@solucioning.net', 'lvega@solucioning.net'));
 
 -- Insert initial audit log for system setup
 INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)

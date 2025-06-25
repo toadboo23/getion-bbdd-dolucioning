@@ -10,7 +10,7 @@ services:
     environment:
       POSTGRES_DB: employee_management
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_this_secure_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-db_solucioning_2027}
       POSTGRES_HOST_AUTH_METHOD: md5
     ports:
       - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"  # Permite acceso externo
@@ -30,9 +30,9 @@ services:
     container_name: employee_management_backend
     restart: unless-stopped
     environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change_this_secure_password}@postgres:5432/employee_management
-      SESSION_SECRET: ${SESSION_SECRET:-change-this-super-secret-key-in-production}
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-db_solucioning_2027}@postgres:5432/employee_management
+      SESSION_SECRET: ${SESSION_SECRET:-solucioning_session_secret_2027_ultra_secure}
       PORT: 5173
     ports:
       - "${BACKEND_PORT:-5173}:5173"
@@ -40,7 +40,6 @@ services:
       - postgres
     networks:
       - employee_network
-    command: npm run start
 
   # Frontend
   frontend:
@@ -57,7 +56,6 @@ services:
       - backend
     networks:
       - employee_network
-    command: npm run start
 
 volumes:
   postgres_data:
