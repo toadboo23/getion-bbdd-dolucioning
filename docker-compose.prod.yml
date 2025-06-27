@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL
+  postgres:
+    image: postgres:16
+    container_name: solucioning_db
+    environment:
+      POSTGRES_DB: employee_management
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres.conf:/etc/postgresql/postgresql.conf
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT}:5432"
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    restart: unless-stopped
+    networks:
+      - solucioning_network
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: solucioning_backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/employee_management
+      SESSION_SECRET: ${SESSION_SECRET}
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: employee_management
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${BACKEND_PORT}:5173"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - solucioning_network
+    volumes:
+      - ./server:/app/server
+      - ./shared:/app/shared
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: solucioning_frontend
+    environment:
+      VITE_API_URL: ${API_URL}
+    ports:
+      - "${FRONTEND_PORT}:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - solucioning_network
+
+volumes:
+  postgres_data:
+
+networks:
+  solucioning_network:
+    driver: bridge 
