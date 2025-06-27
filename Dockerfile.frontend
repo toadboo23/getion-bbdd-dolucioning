@@ -2,14 +2,29 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files from client directory
+COPY client/package*.json ./
 
 # Install dependencies
 RUN npm ci
 
-# Copy source code
-COPY . .
+# Copy client source code
+COPY client/ ./
+
+# Copy shared files
+COPY shared/ ./shared/
+
+# Copy vite config
+COPY vite.config.ts ./
+
+# Copy tailwind config
+COPY tailwind.config.ts ./
+
+# Copy postcss config
+COPY postcss.config.js ./
+
+# Copy tsconfig
+COPY tsconfig.json ./
 
 # Build the project
 RUN npm run build

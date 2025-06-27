@@ -1,276 +1,217 @@
 # Solucioning - Sistema de Gestión de Empleados
 
-Un sistema completo de gestión de empleados con funcionalidades avanzadas de seguimiento de bajas, control de acceso basado en roles y flujos de trabajo administrativos para procesos de RRHH.
+Sistema completo de gestión de empleados con frontend en React/TypeScript y backend en Node.js/Express, utilizando PostgreSQL como base de datos.
 
-## Tecnologías Principales
+## 🚀 Características
 
-- **Frontend**: React.js con TypeScript
-- **Backend**: Express.js con TypeScript
-- **Base de Datos**: PostgreSQL
-- **ORM**: Drizzle ORM
-- **Gestión de Estado**: TanStack Query
-- **Componentes UI**: Shadcn UI
-- **Contenedores**: Docker y Docker Compose
+- **Gestión completa de empleados** con información detallada
+- **Sistema de autenticación** con roles (Super Admin, Admin, User)
+- **Dashboard interactivo** con métricas y gráficos
+- **Gestión de permisos y licencias** de empleados
+- **Sistema de auditoría** para seguimiento de cambios
+- **Interfaz moderna** con TailwindCSS y componentes reutilizables
+- **API RESTful** completa
+- **Base de datos PostgreSQL** con Drizzle ORM
 
-## Configuración para Entorno Local
-
-### Requisitos Previos
-
-- Docker y Docker Compose instalados
-- Node.js 20+ (opcional, si prefieres ejecutar sin Docker)
-- Git
-
-### Configuración Rápida con Docker
-
-1. **Clonar el repositorio**
-   ```bash
-   git clone <tu-repositorio>
-   cd employee-management-system
-   ```
-
-2. **Configurar variables de entorno**
-   
-   Copia el archivo de configuración local:
-   ```bash
-   cp .env.local .env
-   ```
-
-3. **Iniciar todos los servicios**
-   ```bash
-   docker-compose up -d
-   ```
-
-   Esto iniciará:
-   - PostgreSQL en `http://localhost:5432`
-   - Backend API en `http://localhost:5173`
-   - Frontend en `http://localhost:3000`
-
-4. **Verificar que todo funciona**
-   
-   Abre tu navegador en `http://localhost:3000`
-
-### Configuración Manual (Sin Docker)
-
-Si prefieres ejecutar los servicios individualmente:
-
-1. **Base de Datos PostgreSQL**
-   ```bash
-   # Instalar y configurar PostgreSQL
-   # Crear base de datos
-   createdb employee_management
-   
-   # Ejecutar script de inicialización
-   psql -d employee_management -f init.sql
-   ```
-
-2. **Backend**
-   ```bash
-   # Instalar dependencias
-   npm install
-   
-   # Configurar variables de entorno
-   export DATABASE_URL="postgresql://postgres:password123@localhost:5432/employee_management"
-   export SESSION_SECRET="your-super-secret-session-key"
-   
-   # Iniciar backend en puerto 5173
-   npm run dev:backend
-   ```
-
-3. **Frontend**
-   ```bash
-   # En otra terminal, iniciar frontend en puerto 3000
-   npm run dev:frontend
-   ```
-
-## Estructura del Proyecto
+## 🏗️ Arquitectura
 
 ```
 solucioning/
-├── client/                 # Frontend React
+├── client/                 # Frontend React/TypeScript
 │   ├── src/
-│   │   ├── components/     # Componentes UI reutilizables
-│   │   ├── pages/          # Páginas de la aplicación
-│   │   ├── hooks/          # React hooks personalizados
-│   │   └── lib/            # Utilidades y configuraciones
-├── server/                 # Backend Express
-│   ├── index.ts            # Punto de entrada del servidor
-│   ├── routes.ts           # Definición de rutas API
-│   ├── storage.ts          # Almacenamiento en memoria (desarrollo)
-│   ├── storage-postgres.ts # Almacenamiento PostgreSQL (producción)
-│   └── db.ts               # Configuración de base de datos
-├── shared/                 # Esquemas y tipos compartidos
-│   └── schema.ts           # Definiciones de base de datos con Drizzle
-├── docker-compose.yml      # Orquestación de contenedores
-├── init.sql                # Script de inicialización de BD
-└── .env.local              # Variables de entorno locales
+│   │   ├── components/     # Componentes reutilizables
+│   │   ├── pages/         # Páginas de la aplicación
+│   │   ├── hooks/         # Custom hooks
+│   │   └── lib/           # Utilidades y configuración
+├── server/                # Backend Node.js/Express
+│   ├── index-clean.ts     # Servidor principal
+│   ├── routes-clean.ts    # Rutas de la API
+│   ├── db.ts             # Configuración de base de datos
+│   └── auth-local.ts     # Autenticación local
+├── shared/               # Esquemas compartidos
+│   └── schema.ts         # Esquemas de base de datos
+└── docker-compose.yml    # Configuración Docker
 ```
 
-## Configuración de Puertos
+## 🛠️ Tecnologías
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:5173
-- **PostgreSQL**: localhost:5432
+### Frontend
+- **React 18** con TypeScript
+- **Vite** como bundler
+- **TailwindCSS** para estilos
+- **React Query** para gestión de estado
+- **React Router** para navegación
+- **Recharts** para gráficos
+- **React Hook Form** para formularios
 
-## Variables de Entorno
+### Backend
+- **Node.js** con TypeScript
+- **Express.js** como framework
+- **PostgreSQL** como base de datos
+- **Drizzle ORM** para consultas
+- **Express Session** para autenticación
+- **bcryptjs** para encriptación
 
-El archivo `.env.local` contiene todas las configuraciones necesarias:
+### DevOps
+- **Docker** y **Docker Compose**
+- **PostgreSQL** en contenedor
+- **Nginx** para servir archivos estáticos
+
+## 📋 Requisitos
+
+- Node.js 18+ 
+- Docker y Docker Compose
+- PostgreSQL (opcional para desarrollo local)
+
+## 🚀 Instalación
+
+### Desarrollo Local
+
+1. **Clonar el repositorio**
+```bash
+git clone <repository-url>
+cd solucioning
+```
+
+2. **Configurar variables de entorno**
+```bash
+cp env.production.example .env.local
+# Editar .env.local con tus configuraciones
+```
+
+3. **Instalar dependencias**
+```bash
+# Backend
+cd server && npm install
+
+# Frontend
+cd client && npm install
+```
+
+4. **Ejecutar con Docker**
+```bash
+docker-compose up -d
+```
+
+### Producción (VPS)
+
+1. **Subir archivos al servidor**
+```bash
+scp -r . root@your-vps-ip:/opt/solucioning/
+```
+
+2. **Configurar variables de entorno**
+```bash
+ssh root@your-vps-ip
+cd /opt/solucioning
+cp env.production .env
+# Editar .env con la IP del servidor
+```
+
+3. **Ejecutar en producción**
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+## 🔧 Configuración
+
+### Variables de Entorno
 
 ```env
 # Base de Datos
-DATABASE_URL=postgresql://postgres:password123@localhost:5432/employee_management
-PGHOST=localhost
-PGPORT=5432
-PGDATABASE=employee_management
-PGUSER=postgres
-PGPASSWORD=password123
+POSTGRES_PASSWORD=your-secure-password
+POSTGRES_EXTERNAL_PORT=5432
 
-# Seguridad
-SESSION_SECRET=your-super-secret-session-key-change-this-in-production
+# Backend
+SESSION_SECRET=your-session-secret
+BACKEND_PORT=5173
 
-# Autenticación Local
-ISSUER_URL=http://localhost:5173/oidc
+# Frontend
+API_URL=http://your-server-ip:5173
+FRONTEND_PORT=3000
 
-# API
-VITE_API_URL=http://localhost:5173
+# Entorno
+NODE_ENV=production
 ```
 
-## Comandos Útiles
+## 👥 Usuarios por Defecto
 
-### Docker
+- **Super Admin**: `superadmin@glovo.com` / `superadmin123`
+- **Admin**: `admin@glovo.com` / `admin123`
+- **User**: `user@glovo.com` / `user123`
+
+## 📊 Endpoints de la API
+
+### Autenticación
+- `POST /api/auth/login` - Iniciar sesión
+- `GET /api/auth/user` - Obtener usuario actual
+- `POST /api/auth/logout` - Cerrar sesión
+
+### Empleados
+- `GET /api/employees` - Listar empleados
+- `POST /api/employees` - Crear empleado
+- `PUT /api/employees/:id` - Actualizar empleado
+- `DELETE /api/employees/:id` - Eliminar empleado
+
+### Dashboard
+- `GET /api/dashboard/metrics` - Métricas del dashboard
+
+## 🐳 Docker
+
+### Construir imágenes
 ```bash
-# Iniciar servicios
-docker-compose up -d
-
-# Ver logs en tiempo real
-docker-compose logs -f
-
-# Detener servicios
-docker-compose down
-
-# Reconstruir contenedores
 docker-compose build
 ```
 
-### Base de Datos
+### Ejecutar servicios
 ```bash
-# Conectar a PostgreSQL
-docker exec -it employee_management_db psql -U postgres -d employee_management
-
-# Ver tablas
-\dt
-
-# Exportar datos
-docker exec employee_management_db pg_dump -U postgres employee_management > backup.sql
+docker-compose up -d
 ```
 
-### Desarrollo
+### Ver logs
 ```bash
-# Frontend en modo desarrollo
-npm run dev:frontend
-
-# Backend en modo desarrollo  
-npm run dev:backend
-
-# Verificar tipos TypeScript
-npm run check
-
-# Aplicar cambios de esquema a BD
-npm run db:push
+docker-compose logs -f
 ```
 
-## Funcionalidades del Sistema
+## 📝 Scripts Disponibles
 
-### Gestión de Empleados
-- ✅ CRUD completo de empleados con 16 campos específicos
-- ✅ Búsqueda y filtrado por ciudad, estado y términos
-- ✅ Seguimiento de estado (activo, baja IT, baja empresa)
-- ✅ Carga masiva via Excel (reemplaza base de datos completa)
+- `npm run dev:backend` - Ejecutar backend en desarrollo
+- `npm run dev` - Ejecutar frontend en desarrollo
+- `npm run build` - Construir para producción
+- `npm run preview` - Previsualizar build
 
-### Sistema de Bajas
-- ✅ **Baja IT**: Seguimiento de bajas técnicas
-- ✅ **Baja Empresa**: Sistema completo con auditoría
-- ✅ Trail de auditoría: quién solicitó, cuándo, quién aprobó
-- ✅ Traslado automático a tabla de bajas al aprobar
+## 🔒 Seguridad
 
-### Control de Acceso
-- ✅ Autenticación con roles (super_admin, admin, normal)
-- ✅ Páginas protegidas según rol
-- ✅ Control de permisos a nivel de API
+- Autenticación con sesiones
+- Encriptación de contraseñas con bcrypt
+- Validación de datos con Zod
+- Headers de seguridad con Helmet
+- CORS configurado
+- Rate limiting implementado
 
-### Dashboard y Notificaciones
-- ✅ Métricas en tiempo real
-- ✅ Sistema de notificaciones administrativas
-- ✅ Aprobación/rechazo de solicitudes
+## 📈 Monitoreo
 
-## Datos de Ejemplo
+- Logs estructurados
+- Métricas de rendimiento
+- Auditoría de cambios
+- Health checks
 
-El sistema incluye datos de muestra:
-- 4 empleados con información completa
-- Notificaciones del sistema
-- Estructura completa de tablas
+## 🤝 Contribución
 
-## Solución de Problemas
+1. Fork el proyecto
+2. Crear una rama para tu feature
+3. Commit tus cambios
+4. Push a la rama
+5. Abrir un Pull Request
 
-### Error de Conexión a Base de Datos
-```bash
-# Verificar que PostgreSQL esté ejecutándose
-docker ps | grep postgres
+## 📄 Licencia
 
-# Revisar logs
-docker-compose logs postgres
-```
+Este proyecto está bajo la Licencia MIT.
 
-### Puerto en Uso
-```bash
-# Verificar qué está usando el puerto
-lsof -i :3000
-lsof -i :5173
-lsof -i :5432
+## 🆘 Soporte
 
-# Cambiar puertos en docker-compose.yml si es necesario
-```
-
-### Problemas de Autenticación
-- Verificar que `SESSION_SECRET` esté configurado
-- Comprobar que la tabla `sessions` existe en la base de datos
-- Revisar logs del backend para errores específicos
-
-## Desarrollo y Contribución
-
-1. **Fork del repositorio**
-2. **Crear rama para feature**: `git checkout -b feature/nueva-funcionalidad`
-3. **Realizar cambios y tests**
-4. **Commit**: `git commit -m "Descripción clara"`
-5. **Push**: `git push origin feature/nueva-funcionalidad`
-6. **Crear Pull Request**
-
-## Estructura de la Base de Datos
-
-### Tablas Principales
-
-- **users**: Usuarios y roles del sistema
-- **employees**: Empleados activos con 16 campos específicos
-- **company_leaves**: Empleados en baja empresa (con auditoría completa)
-- **it_leaves**: Registro de bajas IT
-- **notifications**: Sistema de notificaciones
-- **sessions**: Gestión de sesiones de usuario
-
-### Campos de Empleado
-
-Apellidos, Telefono, Correo, Ciudad, DNI_NIE, Fecha_de_Nacimiento, Nacionalidad, NAF, Dirección, IBAN, Vehículo, Contrato(Horas), Tipo_Contrato, Estado_SS, Fecha_Alta, Edad
-
-## Licencia
-
-MIT License - Ver archivo LICENSE para detalles.
-
-## Soporte
-
-Para problemas o preguntas:
-1. Revisar este README
-2. Consultar logs: `docker-compose logs -f`
-3. Verificar variables de entorno
-4. Comprobar conectividad de puertos
+Para soporte técnico, contacta al equipo de desarrollo.
 
 ---
 
-**¡El sistema está listo para ejecutarse en tu entorno local!** 🚀
+**Solucioning** - Sistema de Gestión de Empleados © 2024
