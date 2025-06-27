@@ -350,8 +350,8 @@ export default function UserManagement() {
             <Users className="h-8 w-8" />
             Gestión de Usuarios
           </h1>
-          <p className="text-gray-600 mt-2">
-            Administra los usuarios del sistema DVV5
+          <p className="text-gray-600 mb-6">
+            Administra los usuarios del sistema Solucioning
           </p>
         </div>
         <div className="mt-4 sm:mt-0">

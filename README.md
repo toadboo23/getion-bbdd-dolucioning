@@ -1,4 +1,4 @@
-# Sistema de Gestión de Empleados
+# Solucioning - Sistema de Gestión de Empleados
 
 Un sistema completo de gestión de empleados con funcionalidades avanzadas de seguimiento de bajas, control de acceso basado en roles y flujos de trabajo administrativos para procesos de RRHH.
 

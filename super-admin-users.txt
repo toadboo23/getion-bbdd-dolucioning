@@ -1,4 +1,4 @@
-SUPER USUARIOS ADMIN - CREDENCIALES
+SOLUCIONING - SUPER USUARIOS ADMIN - CREDENCIALES
 
 ===========================================
 SUPER ADMIN USUARIOS
@@ -31,7 +31,7 @@ Total de usuarios: 24
 NOTAS IMPORTANTES
 ===========================================
 
-- Todos los super_admin tienen acceso completo al sistema
+- Todos los super_admin tienen acceso completo al sistema Solucioning
 - Los usuarios admin tienen acceso restringido (solo pueden editar campos específicos)
 - Las contraseñas de los nuevos super usuarios son números aleatorios de 8 dígitos
 - Se recomienda cambiar las contraseñas después del primer acceso por seguridad 

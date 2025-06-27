@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 5173;
 
 // Enhanced logging
-console.log("🔥 Starting Employee Management System Server...");
+console.log("🔥 Starting Solucioning Server...");
 console.log("📍 Port:", PORT);
 console.log("🌍 Environment:", process.env.NODE_ENV || "development");
 

@@ -1,4 +1,4 @@
--- Initialize PostgreSQL database for Employee Management System
+-- Initialize PostgreSQL database for Solucioning System
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create sessions table for authentication
@@ -228,7 +228,7 @@ INSERT INTO employees (
 
 -- Insert sample notifications
 INSERT INTO notifications (type, title, message, requested_by, status) VALUES
-('system', 'Sistema Iniciado', 'El sistema de gestión de empleados ha sido iniciado correctamente', 'Sistema', 'processed'),
+('system', 'Sistema Iniciado', 'El sistema Solucioning ha sido iniciado correctamente', 'Sistema', 'processed'),
 ('info', 'Base de Datos Configurada', 'La base de datos PostgreSQL ha sido configurada para el entorno local', 'Sistema', 'processed');
 
 -- Insert default super admin user (password: admin123)
@@ -276,7 +276,7 @@ WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email = v.email);
 -- Insert initial audit log for system setup
 INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
 SELECT * FROM (VALUES 
-  ('SYSTEM', 'super_admin', 'system_init', 'database', 'db_init', 'Database Initialization', 'Sistema DVV5 inicializado con tablas de usuarios y logs de auditoría', '127.0.0.1', 'System')
+  ('SYSTEM', 'super_admin', 'system_init', 'database', 'db_init', 'Database Initialization', 'Sistema Solucioning inicializado con tablas de usuarios y logs de auditoría', '127.0.0.1', 'System')
 ) AS v(user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
 WHERE NOT EXISTS (SELECT 1 FROM audit_logs WHERE action = 'system_init');
 
