@@ -14,7 +14,8 @@ import EditEmployeeModal from "@/components/modals/edit-employee-modal";
 import LeaveManagementModal from "@/components/modals/leave-management-modal";
 import ImportEmployeesModal from "@/components/modals/import-employees-modal";
 import EmployeeDetailModal from "@/components/modals/employee-detail-modal";
-import { Plus, Search, Download, FileSpreadsheet, Upload } from "lucide-react";
+import PenalizationModal from "@/components/modals/penalization-modal";
+import { Plus, Search, Download, FileSpreadsheet, Upload, Loader2, Trash2 } from "lucide-react";
 import type { Employee } from "@shared/schema";
 
 export default function Employees() {
@@ -23,13 +24,16 @@ export default function Employees() {
   const [searchTerm, setSearchTerm] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [trafficManagerFilter, setTrafficManagerFilter] = useState("all");
+  const [fleetFilter, setFleetFilter] = useState("all");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailEmployee, setDetailEmployee] = useState<Employee | null>(null);
+  const [isPenalizationModalOpen, setIsPenalizationModalOpen] = useState(false);
+  const [penalizationAction, setPenalizationAction] = useState<"penalize" | "remove">("penalize");
+  const [penalizationEmployee, setPenalizationEmployee] = useState<Employee | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -51,7 +55,7 @@ export default function Employees() {
       search: searchTerm, 
       city: cityFilter === "all" ? "" : cityFilter, 
       status: statusFilter === "all" ? "" : statusFilter,
-      trafficManager: trafficManagerFilter === "all" ? "" : trafficManagerFilter
+      fleet: fleetFilter === "all" ? "" : fleetFilter
     }],
     retry: false,
   });
@@ -62,9 +66,9 @@ export default function Employees() {
     retry: false,
   });
 
-  // Obtener jefes de tráfico únicos para el filtro
-  const { data: trafficManagers } = useQuery<string[]>({
-    queryKey: ["/api/traffic-managers"],
+  // Obtener flotas únicas para el filtro
+  const { data: fleets } = useQuery<string[]>({
+    queryKey: ["/api/fleets"],
     retry: false,
   });
 
@@ -144,11 +148,49 @@ export default function Employees() {
     },
   });
 
+  // Mutación para eliminar todos los empleados (solo super admin)
+  const deleteAllEmployeesMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/employees/all");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      toast({
+        title: "Empleados eliminados",
+        description: "Todos los empleados han sido eliminados exitosamente",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "No se pudieron eliminar todos los empleados",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Función para manejar la eliminación de todos los empleados
+  const handleDeleteAllEmployees = () => {
+    if (!employees || employees.length === 0) {
+      toast({
+        title: "Sin empleados",
+        description: "No hay empleados para eliminar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Mostrar confirmación antes de eliminar
+    if (window.confirm(`¿Estás seguro de que quieres eliminar TODOS los empleados (${employees.length} empleados)?\n\nEsta acción es IRREVERSIBLE y eliminará permanentemente todos los datos de empleados del sistema.`)) {
+      deleteAllEmployeesMutation.mutate();
+    }
+  };
+
   // Definir permisos específicos por rol
   const canEditEmployees = user?.role === "admin" || user?.role === "super_admin";
   const canImportEmployees = user?.role === "super_admin"; // Solo super admin puede importar
-  const canExportEmployees = user?.role === "admin" || user?.role === "super_admin"; // Admin y super admin pueden exportar
-  const canDownloadTemplate = user?.role === "admin" || user?.role === "super_admin"; // Admin y super admin pueden descargar plantillas
+  const canExportEmployees = user?.role === "super_admin"; // Solo super admin puede exportar
+  const canDownloadTemplate = user?.role === "super_admin"; // Solo super admin puede descargar plantillas
   const isReadOnlyUser = user?.role === "normal"; // Usuario normal solo puede consultar
 
   const handleEditEmployee = (employee: Employee) => {
@@ -169,6 +211,18 @@ export default function Employees() {
   const handleViewDetails = (employee: Employee) => {
     setDetailEmployee(employee);
     setIsDetailModalOpen(true);
+  };
+
+  const handlePenalize = (employee: Employee) => {
+    setPenalizationEmployee(employee);
+    setPenalizationAction("penalize");
+    setIsPenalizationModalOpen(true);
+  };
+
+  const handleRemovePenalization = (employee: Employee) => {
+    setPenalizationEmployee(employee);
+    setPenalizationAction("remove");
+    setIsPenalizationModalOpen(true);
   };
 
   // Función para exportar empleados a Excel
@@ -192,6 +246,7 @@ export default function Employees() {
       'Teléfono': emp.telefono,
       'Email': emp.email,
       'Horas': emp.horas,
+      'CDP (%)': emp.cdp,
       'Complementarios': emp.complementaries,
       'Ciudad': emp.ciudad,
       'Código Ciudad': emp.cityCode,
@@ -206,7 +261,8 @@ export default function Employees() {
       'Informado Horario': emp.informadoHorario ? 'Sí' : 'No',
       'Cuenta Divilo': emp.cuentaDivilo,
       'Próxima Asignación Slots': emp.proximaAsignacionSlots ? new Date(emp.proximaAsignacionSlots).toLocaleDateString('es-ES') : '',
-      'Jefe Tráfico': emp.jefeTrafico,
+      'Jefe de Tráfico': emp.jefeTrafico,
+      'Flota': emp.flota,
       'Comentarios Jefe Tráfico': emp.comentsJefeDeTrafico,
       'Incidencias': emp.incidencias,
       'Fecha Incidencia': emp.fechaIncidencia ? new Date(emp.fechaIncidencia).toLocaleDateString('es-ES') : '',
@@ -234,7 +290,7 @@ export default function Employees() {
     setSearchTerm("");
     setCityFilter("all");
     setStatusFilter("all");
-    setTrafficManagerFilter("all");
+    setFleetFilter("all");
   };
 
   // Función para descargar plantilla de carga masiva
@@ -248,6 +304,7 @@ export default function Employees() {
       'Teléfono',
       'Email',
       'Horas',
+      'CDP (%)',
       'Complementarios',
       'Ciudad',
       'Código Ciudad',
@@ -262,7 +319,8 @@ export default function Employees() {
       'Informado Horario (true/false)',
       'Cuenta Divilo',
       'Próxima Asignación Slots (AAAA-MM-DD)',
-      'Jefe Tráfico',
+      'Jefe de Tráfico',
+      'Flota',
       'Comentarios Jefe Tráfico',
       'Incidencias',
       'Fecha Incidencia (AAAA-MM-DD)',
@@ -323,6 +381,23 @@ export default function Employees() {
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Importar Excel
+              </Button>
+            )}
+            
+            {/* Botón Eliminar Todos los Empleados - Solo Super Admin */}
+            {user?.role === "super_admin" && (
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteAllEmployees}
+                disabled={deleteAllEmployeesMutation.isPending}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleteAllEmployeesMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 mr-2" />
+                )}
+                Eliminar Todos
               </Button>
             )}
             
@@ -411,23 +486,25 @@ export default function Employees() {
                   <SelectItem value="it_leave">Baja IT</SelectItem>
                   <SelectItem value="company_leave_pending">Baja Empresa Pendiente</SelectItem>
                   <SelectItem value="company_leave_approved">Baja Empresa Aprobada</SelectItem>
+                  <SelectItem value="pending_laboral">Pendiente Laboral</SelectItem>
+                  <SelectItem value="penalizado">Penalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <label htmlFor="traffic-manager-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                Jefe de Tráfico
+              <label htmlFor="fleet-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                Flota
               </label>
-              <Select value={trafficManagerFilter} onValueChange={setTrafficManagerFilter}>
+              <Select value={fleetFilter} onValueChange={setFleetFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Todos los jefes" />
+                  <SelectValue placeholder="Todas las flotas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los jefes</SelectItem>
-                  {trafficManagers?.map((manager) => (
-                    <SelectItem key={manager} value={manager}>
-                      {manager}
+                  <SelectItem value="all">Todas las flotas</SelectItem>
+                  {fleets?.map((fleet) => (
+                    <SelectItem key={fleet} value={fleet}>
+                      {fleet}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -455,6 +532,8 @@ export default function Employees() {
         onEditEmployee={handleEditEmployee}
         onManageLeave={handleManageLeave}
         onViewDetails={handleViewDetails}
+        onPenalize={handlePenalize}
+        onRemovePenalization={handleRemovePenalization}
         canEdit={canEditEmployees}
         isReadOnlyUser={isReadOnlyUser}
       />
@@ -462,10 +541,7 @@ export default function Employees() {
       {/* Modals */}
       <EditEmployeeModal
         isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setSelectedEmployee(null);
-        }}
+        onClose={() => setIsEditModalOpen(false)}
         employee={selectedEmployee}
         onSave={(data) => {
           if (selectedEmployee) {
@@ -475,6 +551,7 @@ export default function Employees() {
           }
         }}
         isLoading={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}
+        user={user}
       />
 
       <LeaveManagementModal
@@ -502,6 +579,16 @@ export default function Employees() {
           // Refrescar la lista de empleados después de reactivar
           queryClient.invalidateQueries({ queryKey: ['employees'] });
         }}
+      />
+
+      <PenalizationModal
+        isOpen={isPenalizationModalOpen}
+        onClose={() => {
+          setIsPenalizationModalOpen(false);
+          setPenalizationEmployee(null);
+        }}
+        employee={penalizationEmployee}
+        action={penalizationAction}
       />
     </div>
   );

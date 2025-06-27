@@ -11,8 +11,14 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Build the project
+RUN npm run build
+
+# Install serve globally
+RUN npm install -g serve
+
 # Expose port
 EXPOSE 3000
 
 # Start frontend
-CMD ["npm", "run", "dev:frontend"]
+CMD ["serve", "-s", "dist/public", "-l", "3000"]

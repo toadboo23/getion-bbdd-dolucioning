@@ -45,13 +45,14 @@ export const employees = pgTable("employees", {
   telefono: varchar("telefono", { length: 30 }),
   email: varchar("email", { length: 100 }),
   horas: integer("horas"),
+  cdp: integer("cdp"), // Cumplimiento de Horas (porcentaje basado en 38h = 100%)
   complementaries: text("complementaries"),
   ciudad: varchar("ciudad", { length: 100 }),
   cityCode: varchar("citycode", { length: 30 }),
-  dniNie: varchar("dni_nie", { length: 30 }),
+  dniNie: varchar("dni_nie", { length: 30 }).unique(),
   iban: varchar("iban", { length: 34 }),
   direccion: varchar("direccion", { length: 255 }),
-  vehiculo: varchar("vehiculo", { length: 50 }),
+  vehiculo: varchar("vehiculo", { enum: ["Bicicleta", "Patinete", "Moto", "Otro"] }),
   naf: varchar("naf", { length: 30 }),
   fechaAltaSegSoc: date("fecha_alta_seg_soc"),
   statusBaja: varchar("status_baja", { length: 100 }),
@@ -66,8 +67,12 @@ export const employees = pgTable("employees", {
   faltasNoCheckInEnDias: integer("faltas_no_check_in_en_dias").default(0),
   cruce: text("cruce"),
   status: varchar("status", { 
-    enum: ["active", "it_leave", "company_leave_pending", "company_leave_approved"] 
+    enum: ["active", "it_leave", "company_leave_pending", "company_leave_approved", "pending_laboral", "penalizado"] 
   }).notNull().default("active"),
+  penalizationStartDate: date("penalization_start_date"),
+  penalizationEndDate: date("penalization_end_date"),
+  originalHours: integer("original_hours"),
+  flota: varchar("flota", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -109,7 +114,7 @@ export const notifications = pgTable("notifications", {
   title: varchar("title").notNull(),
   message: text("message").notNull(),
   requestedBy: varchar("requested_by").notNull(),
-  status: varchar("status", { enum: ["pending", "approved", "rejected", "processed"] }).notNull().default("pending"),
+  status: varchar("status", { enum: ["pending", "pending_laboral", "approved", "rejected", "processed"] }).notNull().default("pending"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -142,7 +147,6 @@ export const auditLogs = pgTable("audit_logs", {
   description: text("description").notNull(), // Human readable description
   oldData: jsonb("old_data"), // Previous state (for updates)
   newData: jsonb("new_data"), // New state (for creates/updates)
-  ipAddress: varchar("ip_address", { length: 45 }), // User's IP
   userAgent: text("user_agent"), // Browser info
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
@@ -166,13 +170,14 @@ export const insertEmployeeSchema = z.object({
   apellido: z.string().optional(),
   email: z.string().optional(),
   horas: z.coerce.number().optional(),
+  cdp: z.coerce.number().optional(),
   complementaries: z.string().optional(),
   ciudad: z.string().optional(),
   cityCode: z.string().optional(),
   dniNie: z.string().optional(),
   iban: z.string().optional(),
   direccion: z.string().optional(),
-  vehiculo: z.string().optional(),
+  vehiculo: z.enum(["Bicicleta", "Patinete", "Moto", "Otro"]).optional(),
   naf: z.string().optional(),
   fechaAltaSegSoc: z.string().optional(),
   statusBaja: z.string().optional(),
@@ -186,7 +191,11 @@ export const insertEmployeeSchema = z.object({
   fechaIncidencia: z.string().optional(),
   faltasNoCheckInEnDias: z.coerce.number().optional(),
   cruce: z.string().optional(),
-  status: z.enum(["active", "it_leave", "company_leave_pending", "company_leave_approved"]).optional(),
+  status: z.enum(["active", "it_leave", "company_leave_pending", "company_leave_approved", "pending_laboral", "penalizado"]).optional(),
+  penalizationStartDate: z.string().optional(),
+  penalizationEndDate: z.string().optional(),
+  originalHours: z.coerce.number().optional(),
+  flota: z.string().optional(),
 });
 
 export const updateEmployeeSchema = insertEmployeeSchema.partial();

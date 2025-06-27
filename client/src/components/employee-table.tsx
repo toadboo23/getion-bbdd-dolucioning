@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Eye, Edit, UserX } from "lucide-react";
+import { Eye, Edit, UserX, AlertTriangle } from "lucide-react";
 import type { Employee } from "@shared/schema";
 
 interface EmployeeTableProps {
@@ -17,6 +17,8 @@ interface EmployeeTableProps {
   onEditEmployee: (employee: Employee) => void;
   onManageLeave: (employee: Employee) => void;
   onViewDetails: (employee: Employee) => void;
+  onPenalize: (employee: Employee) => void;
+  onRemovePenalization: (employee: Employee) => void;
   canEdit: boolean;
   isReadOnlyUser?: boolean;
 }
@@ -26,6 +28,8 @@ export default function EmployeeTable({
   onEditEmployee,
   onManageLeave,
   onViewDetails,
+  onPenalize,
+  onRemovePenalization,
   canEdit,
   isReadOnlyUser = false,
 }: EmployeeTableProps) {
@@ -39,6 +43,10 @@ export default function EmployeeTable({
         return <Badge className="bg-yellow-100 text-yellow-800">Baja Empresa Pendiente</Badge>;
       case "company_leave_approved":
         return <Badge className="bg-red-100 text-red-800">Baja Empresa Aprobada</Badge>;
+      case "pending_laboral":
+        return <Badge className="bg-purple-100 text-purple-800">Pendiente Laboral</Badge>;
+      case "penalizado":
+        return <Badge className="bg-orange-100 text-orange-800">Penalizado</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -47,6 +55,12 @@ export default function EmployeeTable({
   const getRowClassName = (status: string) => {
     if (status === "it_leave") {
       return "bg-orange-50 border-l-4 border-l-orange-400";
+    }
+    if (status === "penalizado") {
+      return "bg-orange-50 border-l-4 border-l-orange-400";
+    }
+    if (status === "pending_laboral") {
+      return "bg-purple-50 border-l-4 border-l-purple-400";
     }
     return "";
   };
@@ -63,6 +77,8 @@ export default function EmployeeTable({
                 <TableHead>Ciudad</TableHead>
                 <TableHead>DNI/NIE</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead>Horas</TableHead>
+                <TableHead>CDP</TableHead>
                 <TableHead>Turno</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
@@ -89,6 +105,38 @@ export default function EmployeeTable({
                     {employee.dniNie || 'N/A'}
                   </TableCell>
                   <TableCell>{getStatusBadge(employee.status)}</TableCell>
+                  <TableCell>
+                    {employee.status === "penalizado" ? (
+                      <span className="inline-block px-2 py-1 rounded bg-red-100 text-red-700 font-semibold text-xs">
+                        0 <span className="ml-1">(penalizado)</span>
+                      </span>
+                    ) : (
+                      <span className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
+                        (employee.horas ?? 0) > 0 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {employee.horas ?? 0}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {employee.status === "penalizado" ? (
+                      <span className="inline-block px-2 py-1 rounded bg-red-100 text-red-700 font-semibold text-xs">
+                        0%
+                      </span>
+                    ) : (
+                      <span className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
+                        (employee.cdp ?? 0) >= 80 
+                          ? 'bg-green-100 text-green-700' 
+                          : (employee.cdp ?? 0) >= 50
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {employee.cdp ?? 0}%
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-sm text-gray-900">
                     {employee.turno || 'N/A'}
                   </TableCell>
@@ -123,6 +171,32 @@ export default function EmployeeTable({
                           >
                             <UserX className="w-4 h-4" />
                           </Button>
+                          
+                          {/* Botón de penalización */}
+                          {employee.status !== "penalizado" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onPenalize(employee)}
+                              title="Penalizar empleado"
+                              className="text-orange-600 hover:text-orange-700"
+                            >
+                              <AlertTriangle className="w-4 h-4" />
+                            </Button>
+                          )}
+                          
+                          {/* Botón para remover penalización */}
+                          {employee.status === "penalizado" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onRemovePenalization(employee)}
+                              title="Remover penalización"
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <AlertTriangle className="w-4 h-4" />
+                            </Button>
+                          )}
                         </>
                       )}
                       

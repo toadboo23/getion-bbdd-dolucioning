@@ -12,7 +12,7 @@ console.log("🌍 Environment:", process.env.NODE_ENV || "development");
 
 // Manual CORS configuration (more reliable than cors package)
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Origin", "http://localhost:3000");
   res.header("Access-Control-Allow-Credentials", "true");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -102,7 +102,7 @@ async function startServer() {
     
     await initializeSystem();
     
-    httpServer.listen(PORT, "0.0.0.0", () => {
+    httpServer.listen(PORT, () => {
       console.log("\n🚀 Server running on http://localhost:" + PORT);
       console.log("📊 Available users:");
       console.log("   - Super Admin: superadmin@glovo.com / superadmin123");

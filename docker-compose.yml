@@ -30,7 +30,7 @@ services:
     container_name: employee_management_backend
     restart: unless-stopped
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change_this_secure_password}@postgres:5432/employee_management
       SESSION_SECRET: ${SESSION_SECRET:-change-this-super-secret-key-in-production}
       PORT: 5173
@@ -40,7 +40,7 @@ services:
       - postgres
     networks:
       - employee_network
-    command: npm run start
+    command: npm run dev:backend
 
   # Frontend
   frontend:
@@ -57,7 +57,7 @@ services:
       - backend
     networks:
       - employee_network
-    command: npm run start
+    command: npm run dev:frontend
 
 volumes:
   postgres_data:

@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Info, XCircle } from "lucide-react";
 
 interface ImportEmployeesModalProps {
   isOpen: boolean;
@@ -49,6 +52,15 @@ interface ProcessedEmployee {
   faltasNoCheckInEnDias?: number;
   cruce?: string;
   status?: string;
+  flota?: string;
+}
+
+interface ImportError {
+  type: 'validation' | 'duplicate' | 'processing' | 'backend' | 'field_length';
+  message: string;
+  row?: number;
+  field?: string;
+  value?: string;
 }
 
 export default function ImportEmployeesModal({
@@ -61,8 +73,9 @@ export default function ImportEmployeesModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [processedData, setProcessedData] = useState<ProcessedEmployee[]>([]);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [errors, setErrors] = useState<ImportError[]>([]);
   const [showFieldLimits, setShowFieldLimits] = useState(false);
+  const [showDetailedErrors, setShowDetailedErrors] = useState(false);
 
   const importMutation = useMutation({
     mutationFn: async (employees: ProcessedEmployee[]) => {
@@ -78,41 +91,54 @@ export default function ImportEmployeesModal({
       resetState();
     },
     onError: (error: any) => {
+      console.error("Error en importación:", error);
       
+      // Extraer información detallada del error
+      let errorMessage = "Error al importar empleados";
+      let detailedErrors: ImportError[] = [];
+      let errorType = "general";
       
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        errorMessage = errorData.message || errorMessage;
+        errorType = errorData.errorType || "general";
+        
+        // Procesar errores detallados del backend
+        if (errorData.errorDetails && Array.isArray(errorData.errorDetails)) {
+          detailedErrors = errorData.errorDetails.map((err: any) => ({
+            type: err.type === 'duplicate' ? 'duplicate' : 
+                  err.type === 'validation' ? 'validation' : 'backend',
+            message: err.message,
+            row: err.row,
+            field: err.field,
+            value: err.value || err.details ? JSON.stringify(err.details) : undefined
+          }));
+        } else if (errorData.errors && Array.isArray(errorData.errors)) {
+          // Fallback para errores en formato string
+          detailedErrors = errorData.errors.map((err: string) => ({
+            type: errorType === "duplicate_dni_nie" ? "duplicate" : "backend",
+            message: err,
+          }));
+        }
       }
       
-      // Mejorar el manejo de errores específicos
-      let errorMessage = "No se pudo completar la importación";
-      
-      if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error?.message) {
-        errorMessage = error.message;
-      }
-      
-      // Si el error contiene información específica sobre campos
-      if (errorMessage.includes("value too long")) {
-        errorMessage = "Algunos campos contienen valores demasiado largos. Verifique los datos del Excel.";
-      } else if (errorMessage.includes("violates")) {
-        errorMessage = "Error de validación en los datos. Verifique el formato del Excel.";
-      }
-      
+      // Mostrar toast con el error principal
       toast({
-        title: "Error en importación",
+        title: "Error de importación",
         description: errorMessage,
         variant: "destructive",
       });
+      
+      // Actualizar errores en el estado para mostrarlos en el modal
+      setErrors(prev => [...prev, ...detailedErrors]);
+      
+      // Si hay errores de validación, no cerrar el modal para que el usuario pueda ver los detalles
+      if (errorType === "validation_error" || errorType === "duplicate_dni_nie") {
+        setShowDetailedErrors(true);
+      } else {
+        onClose();
+        resetState();
+      }
     },
   });
 
@@ -121,12 +147,14 @@ export default function ImportEmployeesModal({
     setErrors([]);
     setProgress(0);
     setIsProcessing(false);
+    setShowDetailedErrors(false);
   };
 
   const processExcelFile = async (file: File) => {
     try {
       setIsProcessing(true);
       setProgress(10);
+      setErrors([]);
 
       const data = await file.arrayBuffer();
       setProgress(30);
@@ -139,12 +167,14 @@ export default function ImportEmployeesModal({
       setProgress(50);
 
       const processed: ProcessedEmployee[] = [];
-      const newErrors: string[] = [];
+      const newErrors: ImportError[] = [];
+
+      // Verificar duplicados en el archivo
+      const idGlovoSet = new Set<string>();
+      const dniNieSet = new Set<string>();
 
       jsonData.forEach((row: any, index: number) => {
         try {
-  
-          
           // Función helper para truncar y limpiar strings
           const cleanString = (value: any, maxLength: number = 255): string => {
             if (!value || value === "" || value === "null" || value === "undefined") {
@@ -160,7 +190,13 @@ export default function ImportEmployeesModal({
           // Función para validar longitudes y reportar errores específicos
           const validateFieldLength = (fieldName: string, value: string, maxLength: number, rowIndex: number): boolean => {
             if (value && value.length > maxLength) {
-              newErrors.push(`Fila ${rowIndex + 2}: El campo "${fieldName}" es demasiado largo (${value.length} caracteres, máximo ${maxLength}). Valor: "${value.substring(0, 50)}..."`);
+              newErrors.push({
+                type: 'field_length',
+                message: `El campo "${fieldName}" es demasiado largo (${value.length} caracteres, máximo ${maxLength})`,
+                row: rowIndex + 2,
+                field: fieldName,
+                value: value.substring(0, 50) + "..."
+              });
               return false;
             }
             return true;
@@ -190,18 +226,48 @@ export default function ImportEmployeesModal({
             informadoHorario: row['Informado Horario (true/false)'] === 'true' || row['Informado Horario (true/false)'] === true,
             cuentaDivilo: cleanString(row['Cuenta Divilo'], 100),
             proximaAsignacionSlots: cleanString(row['Próxima Asignación Slots (AAAA-MM-DD)']),
-            jefeTrafico: cleanString(row['Jefe Tráfico'], 100),
+            jefeTrafico: cleanString(row['Jefe de Tráfico'], 100),
             comentsJefeDeTrafico: cleanString(row['Comentarios Jefe Tráfico']),
             incidencias: cleanString(row['Incidencias']),
             fechaIncidencia: cleanString(row['Fecha Incidencia (AAAA-MM-DD)']),
             faltasNoCheckInEnDias: row['Faltas No Check-in (días)'] ? Number(row['Faltas No Check-in (días)']) : 0,
             cruce: cleanString(row['Cruce']),
             status: cleanString(row['Estado (active/it_leave/company_leave_pending/company_leave_approved)']) || 'active',
+            flota: cleanString(row['Flota'], 100),
           };
 
           // Validar campos requeridos
           if (!rawEmployee.idGlovo || !rawEmployee.nombre || !rawEmployee.telefono) {
-            newErrors.push(`Fila ${index + 2}: Faltan campos requeridos (ID Glovo: "${rawEmployee.idGlovo || 'VACÍO'}", Nombre: "${rawEmployee.nombre || 'VACÍO'}", Teléfono: "${rawEmployee.telefono || 'VACÍO'}")`);
+            newErrors.push({
+              type: 'validation',
+              message: `Faltan campos requeridos`,
+              row: index + 2,
+              field: 'campos_requeridos',
+              value: `ID Glovo: "${rawEmployee.idGlovo || 'VACÍO'}", Nombre: "${rawEmployee.nombre || 'VACÍO'}", Teléfono: "${rawEmployee.telefono || 'VACÍO'}"`
+            });
+            return;
+          }
+
+          // Verificar duplicados en el archivo
+          if (rawEmployee.idGlovo && idGlovoSet.has(rawEmployee.idGlovo)) {
+            newErrors.push({
+              type: 'duplicate',
+              message: `ID Glovo duplicado en el archivo`,
+              row: index + 2,
+              field: 'idGlovo',
+              value: rawEmployee.idGlovo
+            });
+            return;
+          }
+
+          if (rawEmployee.dniNie && dniNieSet.has(rawEmployee.dniNie)) {
+            newErrors.push({
+              type: 'duplicate',
+              message: `DNI/NIE duplicado en el archivo`,
+              row: index + 2,
+              field: 'dniNie',
+              value: rawEmployee.dniNie
+            });
             return;
           }
 
@@ -227,7 +293,8 @@ export default function ImportEmployeesModal({
             statusBaja: String(row['Status Baja'] || '').trim(),
             estadoSs: String(row['Estado SS'] || '').trim(),
             cuentaDivilo: String(row['Cuenta Divilo'] || '').trim(),
-            jefeTrafico: String(row['Jefe Tráfico'] || '').trim(),
+            jefeTrafico: String(row['Jefe de Tráfico'] || '').trim(),
+            flota: String(row['Flota'] || '').trim(),
           };
 
           // Validar cada campo con su longitud máxima
@@ -248,18 +315,27 @@ export default function ImportEmployeesModal({
           if (!validateFieldLength('Status Baja', originalValues.statusBaja, 100, index)) hasLengthErrors = true;
           if (!validateFieldLength('Estado SS', originalValues.estadoSs, 100, index)) hasLengthErrors = true;
           if (!validateFieldLength('Cuenta Divilo', originalValues.cuentaDivilo, 100, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Jefe Tráfico', originalValues.jefeTrafico, 100, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Jefe de Tráfico', originalValues.jefeTrafico, 100, index)) hasLengthErrors = true;
+          if (!validateFieldLength('Flota', originalValues.flota, 100, index)) hasLengthErrors = true;
 
           // Si hay errores de longitud, no procesar este empleado
           if (hasLengthErrors) {
             return;
           }
 
+          // Agregar a los sets para verificar duplicados
+          if (rawEmployee.idGlovo) idGlovoSet.add(rawEmployee.idGlovo);
+          if (rawEmployee.dniNie) dniNieSet.add(rawEmployee.dniNie);
+
           const employee: ProcessedEmployee = rawEmployee;
           processed.push(employee);
         } catch (error) {
-
-          newErrors.push(`Fila ${index + 2}: Error procesando datos - ${error}`);
+          newErrors.push({
+            type: 'processing',
+            message: `Error procesando datos`,
+            row: index + 2,
+            value: error instanceof Error ? error.message : String(error)
+          });
         }
       });
 
@@ -325,9 +401,81 @@ export default function ImportEmployeesModal({
     importMutation.mutate(processedData);
   };
 
+  const getErrorIcon = (type: ImportError['type']) => {
+    switch (type) {
+      case 'validation':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'duplicate':
+        return <AlertTriangle className="w-4 h-4 text-orange-500" />;
+      case 'field_length':
+        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+      case 'backend':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return <AlertTriangle className="w-4 h-4 text-red-500" />;
+    }
+  };
+
+  const getErrorBadge = (type: ImportError['type']) => {
+    switch (type) {
+      case 'validation':
+        return <Badge variant="destructive" className="text-xs">Validación</Badge>;
+      case 'duplicate':
+        return <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">Duplicado</Badge>;
+      case 'field_length':
+        return <Badge variant="outline" className="text-xs border-yellow-300 text-yellow-700">Longitud</Badge>;
+      case 'backend':
+        return <Badge variant="destructive" className="text-xs">Servidor</Badge>;
+      default:
+        return <Badge variant="outline" className="text-xs">Error</Badge>;
+    }
+  };
+
+  const groupedErrors = errors.reduce((acc, error) => {
+    if (!acc[error.type]) {
+      acc[error.type] = [];
+    }
+    acc[error.type].push(error);
+    return acc;
+  }, {} as Record<string, ImportError[]>);
+
+  const getErrorTypeLabel = (type: string) => {
+    switch (type) {
+      case 'validation':
+        return 'Validación';
+      case 'duplicate':
+        return 'Duplicados';
+      case 'field_length':
+        return 'Longitud';
+      case 'backend':
+        return 'Servidor';
+      case 'processing':
+        return 'Procesamiento';
+      default:
+        return type.replace('_', ' ');
+    }
+  };
+
+  const getErrorTypeColor = (type: string) => {
+    switch (type) {
+      case 'validation':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'duplicate':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'field_length':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'backend':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'processing':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="w-5 h-5" />
@@ -374,6 +522,7 @@ export default function ImportEmployeesModal({
                   <div>• Estado SS: <strong>100 caracteres</strong></div>
                   <div>• Cuenta Divilo: <strong>100 caracteres</strong></div>
                   <div>• Jefe Tráfico: <strong>100 caracteres</strong></div>
+                  <div>• Flota: <strong>100 caracteres</strong></div>
                 </div>
                 <p className="mt-2 text-blue-600">
                   Los campos que exceden estos límites serán truncados automáticamente o generarán errores de validación.
@@ -430,48 +579,121 @@ export default function ImportEmployeesModal({
           {/* Resultados */}
           {processedData.length > 0 && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 p-4 bg-green-50 rounded-lg">
+              <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-green-600" />
-                <span className="text-green-800">
-                  {processedData.length} empleados listos para importar
+                <span className="text-green-800 font-medium">
+                  {processedData.length} empleados procesados correctamente
                 </span>
               </div>
-
+              
               {errors.length > 0 && (
-                <div className="space-y-2 p-4 bg-yellow-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                    <span className="text-yellow-800 font-medium">
-                      {errors.length} errores encontrados:
-                    </span>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-red-600" />
+                      <span className="text-red-800 font-medium">
+                        {errors.length} error(es) encontrado(s)
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowDetailedErrors(!showDetailedErrors)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      {showDetailedErrors ? 'Ocultar detalles' : 'Ver detalles'}
+                    </Button>
                   </div>
-                  <div className="max-h-32 overflow-y-auto">
-                    {errors.map((error, index) => (
-                      <div key={index} className="text-sm text-yellow-700">
-                        • {error}
+                  
+                  {showDetailedErrors && (
+                    <div className="space-y-4">
+                      {/* Resumen de errores por tipo */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {Object.entries(groupedErrors).map(([type, typeErrors]) => (
+                          <div key={type} className={`p-4 rounded-lg border ${getErrorTypeColor(type)}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                              {getErrorIcon(type as ImportError['type'])}
+                              <span className="text-sm font-medium">{getErrorTypeLabel(type)}</span>
+                            </div>
+                            <div className="text-2xl font-bold">{typeErrors.length}</div>
+                            <div className="text-xs opacity-75">errores</div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Lista detallada de errores */}
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-h-96 overflow-y-auto">
+                        <div className="space-y-3">
+                          {errors.map((error, index) => (
+                            <div key={index} className="bg-white p-4 rounded border border-red-200 shadow-sm">
+                              <div className="flex items-start gap-3">
+                                {getErrorIcon(error.type)}
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    {getErrorBadge(error.type)}
+                                    {error.row && (
+                                      <Badge variant="outline" className="text-xs">
+                                        Fila {error.row}
+                                      </Badge>
+                                    )}
+                                    {error.field && error.field !== 'campos_requeridos' && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {error.field}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-800 font-medium mb-1">{error.message}</p>
+                                  {error.value && (
+                                    <div className="text-xs text-gray-600">
+                                      <span className="font-medium">Valor:</span>
+                                      <span className="font-mono bg-gray-100 px-2 py-1 rounded ml-1">
+                                        {error.value.length > 100 ? error.value.substring(0, 100) + '...' : error.value}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* Sugerencias para corregir errores */}
+                      <Alert className="border-orange-200 bg-orange-50">
+                        <AlertTriangle className="h-4 w-4 text-orange-600" />
+                        <AlertDescription className="text-orange-800">
+                          <div className="font-medium mb-2">Sugerencias para corregir los errores:</div>
+                          <ul className="text-sm space-y-1">
+                            <li>• <strong>Validación:</strong> Completa todos los campos requeridos (ID Glovo, Nombre, Teléfono)</li>
+                            <li>• <strong>Duplicados:</strong> Verifica que no haya IDs de Glovo o DNI/NIE duplicados en el archivo</li>
+                            <li>• <strong>Longitud:</strong> Acorta los campos que exceden el límite de caracteres</li>
+                            <li>• <strong>Servidor:</strong> Verifica que no haya DNI/NIE duplicados en la base de datos existente</li>
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
+                    </div>
+                  )}
                 </div>
               )}
+              
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleImport}
+                  disabled={errors.length > 0 || importMutation.isPending}
+                  className="flex-1"
+                >
+                  {importMutation.isPending ? "Importando..." : "Importar Empleados"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={resetState}
+                  disabled={importMutation.isPending}
+                >
+                  Procesar Otro Archivo
+                </Button>
+              </div>
             </div>
           )}
-
-          {/* Botones */}
-          <div className="flex justify-end space-x-3 pt-6 border-t">
-            <Button variant="outline" onClick={onClose} disabled={importMutation.isPending}>
-              Cancelar
-            </Button>
-            {processedData.length > 0 && (
-              <Button 
-                onClick={handleImport} 
-                disabled={importMutation.isPending}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {importMutation.isPending ? "Importando..." : `Importar ${processedData.length} empleados`}
-              </Button>
-            )}
-          </div>
         </div>
       </DialogContent>
     </Dialog>

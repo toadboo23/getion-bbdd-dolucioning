@@ -12,10 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle, Info, Check, X, Filter, Calendar, FileText, Clock, CheckCircle, XCircle, Settings } from "lucide-react";
 import type { Notification } from "@shared/schema";
+import { useNavigate } from "react-router-dom";
 
 export default function Notifications() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   // Estados para filtros
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -29,6 +31,7 @@ export default function Notifications() {
     // Mostrar toast de confirmación
     const statusNames = {
       pending: "Pendientes",
+      pending_laboral: "Pendiente Laboral",
       approved: "Tramitadas", 
       rejected: "Rechazadas",
       processed: "Procesadas"
@@ -53,7 +56,7 @@ export default function Notifications() {
   const [tramitationModal, setTramitationModal] = useState<{
     isOpen: boolean;
     notification: Notification | null;
-    action: "approve" | "reject";
+    action: "approve" | "reject" | "pending_laboral" | "processed";
     processingDate: string;
   }>({
     isOpen: false,
@@ -82,25 +85,48 @@ export default function Notifications() {
     }
   }, [isAuthenticated, isLoading, canViewNotifications, toast]);
 
-  const { data: notifications, isLoading: notificationsLoading } = useQuery({
+  useEffect(() => {
+    if (!isLoading && user?.role === "admin") {
+      navigate("/employees", { replace: true });
+    }
+  }, [user, isLoading, navigate]);
+
+  const {
+    data: notifications,
+    isLoading: notificationsLoading,
+    error: notificationsError
+  } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
-    retry: false,
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-      }
+    queryFn: async () => {
+      const res = await fetch("/api/notifications", { credentials: "include" });
+      if (!res.ok) throw new Error("Error al obtener notificaciones");
+      return res.json();
     },
+    retry: false,
   });
 
+  // Manejo profesional de errores con useEffect
+  useEffect(() => {
+    if (notificationsError && isUnauthorizedError(notificationsError)) {
+      toast({
+        title: "Unauthorized",
+        description: "You are logged out. Logging in again...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+    } else if (notificationsError) {
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las notificaciones",
+        variant: "destructive",
+      });
+    }
+  }, [notificationsError, toast]);
+
   const processMutation = useMutation({
-    mutationFn: async ({ id, action, processingDate }: { id: number, action: "approve" | "reject", processingDate: string }) => {
+    mutationFn: async ({ id, action, processingDate }: { id: number, action: "approve" | "reject" | "pending_laboral" | "processed", processingDate: string }) => {
       await apiRequest("POST", `/api/notifications/${id}/process`, { 
         action, 
         processingDate: new Date(processingDate).toISOString()
@@ -112,7 +138,7 @@ export default function Notifications() {
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/company-leaves"] });
       
-      const actionText = variables.action === "approve" ? "tramitada" : "rechazada";
+      const actionText = variables.action === "approve" ? "tramitada" : variables.action === "reject" ? "rechazada" : variables.action === "pending_laboral" ? "pendiente laboral" : "procesada";
       toast({
         title: `Baja ${actionText}`,
         description: `La baja ha sido ${actionText} correctamente con fecha ${new Date(variables.processingDate).toLocaleDateString('es-ES')}`,
@@ -142,7 +168,7 @@ export default function Notifications() {
   });
 
   // Función para abrir modal de tramitación
-  const handleTramitar = (notification: Notification, action: "approve" | "reject") => {
+  const handleTramitar = (notification: Notification, action: "approve" | "reject" | "pending_laboral" | "processed") => {
     setTramitationModal({
       isOpen: true,
       notification,
@@ -213,6 +239,13 @@ export default function Notifications() {
             Pendiente
           </span>
         );
+      case "pending_laboral":
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            Pendiente Laboral
+          </span>
+        );
       case "approved":
         return (
           <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
@@ -277,39 +310,66 @@ export default function Notifications() {
 
   // Obtener estadísticas para los filtros
   const notificationStats = useMemo(() => {
-    if (!notifications) return { pending: 0, approved: 0, rejected: 0, processed: 0 };
+    if (!notifications) return { pending: 0, pending_laboral: 0, approved: 0, rejected: 0, processed: 0 };
     
     return notifications.reduce((stats, notif) => {
       stats[notif.status as keyof typeof stats] = (stats[notif.status as keyof typeof stats] || 0) + 1;
       return stats;
-    }, { pending: 0, approved: 0, rejected: 0, processed: 0 });
+    }, { pending: 0, pending_laboral: 0, approved: 0, rejected: 0, processed: 0 });
   }, [notifications]);
+
+  if (!isLoading && user?.role === "admin") return null;
 
   return (
     <div className="p-6 space-y-6">
       {/* HEADER */}
-      <div>
-        <h2 className="text-3xl font-bold text-gray-900">Panel de Notificaciones</h2>
-        <p className="mt-2 text-gray-600">Gestiona y tramita las solicitudes de baja empresa</p>
-        
-        {/* Mensaje de permisos según el rol */}
-        <div className="mt-3">
-          {canProcessNotifications && (
-            <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-              <p className="text-sm text-green-700">
-                ✅ <strong>Super Admin</strong> - Puedes ver y tramitar todas las notificaciones
-              </p>
-            </div>
-          )}
-          
-          {!canProcessNotifications && user?.role === "admin" && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-              <p className="text-sm text-blue-700">
-                👁️ <strong>Admin</strong> - Puedes ver todas las notificaciones pero no tramitarlas
-              </p>
-            </div>
-          )}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900">Panel de Notificaciones</h2>
+          <p className="mt-2 text-gray-600">Gestiona y tramita las solicitudes de baja empresa</p>
         </div>
+        <Button
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+          onClick={async () => {
+            try {
+              const res = await fetch("/api/notifications/export", { credentials: "include" });
+              if (!res.ok) throw new Error("Error al exportar notificaciones");
+              const blob = await res.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "notificaciones_ultimos_90_dias.xlsx";
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              window.URL.revokeObjectURL(url);
+              toast({ title: "Exportación completada", description: "Archivo Excel descargado correctamente" });
+            } catch (e) {
+              toast({ title: "Error", description: "No se pudo exportar el archivo", variant: "destructive" });
+            }
+          }}
+        >
+          <FileText className="w-4 h-4 mr-2" /> Exportar notificaciones
+        </Button>
+      </div>
+
+      {/* Mensaje de permisos según el rol */}
+      <div className="mt-3">
+        {canProcessNotifications && (
+          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+            <p className="text-sm text-green-700">
+              ✅ <strong>Super Admin</strong> - Puedes ver y tramitar todas las notificaciones
+            </p>
+          </div>
+        )}
+        
+        {!canProcessNotifications && user?.role === "admin" && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+            <p className="text-sm text-blue-700">
+              👁️ <strong>Admin</strong> - Puedes ver todas las notificaciones pero no tramitarlas
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ESTADÍSTICAS RÁPIDAS - CLICABLES */}
@@ -325,6 +385,22 @@ export default function Notifications() {
                 <p className="text-sm font-medium text-yellow-700">Pendientes</p>
                 <p className="text-2xl font-bold text-yellow-900">{notificationStats.pending}</p>
                 <p className="text-xs text-yellow-600 mt-1">Clic para filtrar</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card 
+          className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 cursor-pointer hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+          onClick={() => handleMetricCardClick('pending_laboral')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <AlertTriangle className="w-8 h-8 text-purple-600" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-purple-700">Pendiente Laboral</p>
+                <p className="text-2xl font-bold text-purple-900">{notificationStats.pending_laboral}</p>
+                <p className="text-xs text-purple-600 mt-1">Clic para filtrar</p>
               </div>
             </div>
           </CardContent>
@@ -361,22 +437,6 @@ export default function Notifications() {
             </div>
           </CardContent>
         </Card>
-        
-        <Card 
-          className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 cursor-pointer hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-          onClick={() => handleMetricCardClick('processed')}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Settings className="w-8 h-8 text-blue-600" />
-              <div className="ml-3">
-                <p className="text-sm font-medium text-blue-700">Procesadas</p>
-                <p className="text-2xl font-bold text-blue-900">{notificationStats.processed}</p>
-                <p className="text-xs text-blue-600 mt-1">Clic para filtrar</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* FILTROS */}
@@ -409,6 +469,7 @@ export default function Notifications() {
                 <SelectContent>
                   <SelectItem value="all">Todos los estados ({notifications?.length || 0})</SelectItem>
                   <SelectItem value="pending">Pendientes ({notificationStats.pending})</SelectItem>
+                  <SelectItem value="pending_laboral">Pendiente Laboral ({notificationStats.pending_laboral})</SelectItem>
                   <SelectItem value="approved">Tramitadas ({notificationStats.approved})</SelectItem>
                   <SelectItem value="rejected">Rechazadas ({notificationStats.rejected})</SelectItem>
                   <SelectItem value="processed">Procesadas ({notificationStats.processed})</SelectItem>
@@ -531,18 +592,18 @@ export default function Notifications() {
                         <>
                           <Button 
                             size="sm" 
-                            onClick={() => handleTramitar(notification, "approve")}
+                            onClick={() => handleTramitar(notification, "pending_laboral")}
                             disabled={processMutation.isPending}
-                            className="bg-green-600 hover:bg-green-700 text-white"
+                            className="bg-purple-600 hover:bg-purple-700 text-white"
                           >
-                            <Check className="w-4 h-4 mr-2" />
-                            Tramitar
+                            <AlertTriangle className="w-4 h-4 mr-2" />
+                            Pendiente Laboral
                           </Button>
                           <Button 
                             size="sm" 
-                            variant="destructive"
                             onClick={() => handleTramitar(notification, "reject")}
                             disabled={processMutation.isPending}
+                            variant="destructive"
                           >
                             <X className="w-4 h-4 mr-2" />
                             Rechazar
@@ -555,6 +616,43 @@ export default function Notifications() {
                         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
                           <p className="text-sm text-blue-700">
                             👁️ Solo puedes ver - Requiere permisos de Super Admin para tramitar
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {notification.status === "pending_laboral" && notification.type === "company_leave_request" && (
+                    <div className="flex space-x-3 pt-3 border-t border-gray-200">
+                      {/* Botones para notificaciones en estado pending_laboral - Solo Super Admin */}
+                      {canProcessNotifications && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleTramitar(notification, "processed")}
+                            disabled={processMutation.isPending}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <Check className="w-4 h-4 mr-2" />
+                            Tramitar
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleTramitar(notification, "reject")}
+                            disabled={processMutation.isPending}
+                            variant="destructive"
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Rechazar
+                          </Button>
+                        </>
+                      )}
+                      
+                      {/* Mensaje para usuarios sin permisos de procesamiento */}
+                      {!canProcessNotifications && (
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2">
+                          <p className="text-sm text-purple-700">
+                            ⏳ Estado: Pendiente Laboral - Requiere permisos de Super Admin para tramitar
                           </p>
                         </div>
                       )}
@@ -597,7 +695,7 @@ export default function Notifications() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="w-5 h-5" />
-              {tramitationModal.action === "approve" ? "Tramitar Solicitud" : "Rechazar Solicitud"}
+              {tramitationModal.action === "approve" ? "Tramitar Solicitud" : tramitationModal.action === "reject" ? "Rechazar Solicitud" : tramitationModal.action === "pending_laboral" ? "Pendiente Laboral" : "Procesar Solicitud"}
             </DialogTitle>
           </DialogHeader>
 
@@ -616,33 +714,51 @@ export default function Notifications() {
               {/* Selector de fecha */}
               <div>
                 <Label htmlFor="processing-date" className="text-base font-medium">
-                  Fecha de {tramitationModal.action === "approve" ? "Tramitación" : "Rechazo"}
+                  Fecha de {tramitationModal.action === "approve" ? "Tramitación" : tramitationModal.action === "reject" ? "Rechazo" : tramitationModal.action === "pending_laboral" ? "Pendiente Laboral" : "Procesamiento"}
                 </Label>
                 <p className="text-sm text-gray-600 mb-2">
-                  Selecciona la fecha en que se {tramitationModal.action === "approve" ? "tramita" : "rechaza"} esta solicitud
+                  Selecciona la fecha en que se {tramitationModal.action === "approve" ? "tramita" : tramitationModal.action === "reject" ? "rechaza" : tramitationModal.action === "pending_laboral" ? "marca como pendiente laboral" : "procese"} esta solicitud
                 </p>
-                <Input
-                  id="processing-date"
-                  type="date"
-                  value={tramitationModal.processingDate}
-                  onChange={(e) => setTramitationModal(prev => ({ ...prev, processingDate: e.target.value }))}
-                  max={new Date().toISOString().split('T')[0]} // No permitir fechas futuras
-                  className="mt-1"
-                />
+                {tramitationModal.action === 'pending_laboral' ? (
+                  <Input
+                    id="processing-date"
+                    type="date"
+                    value={tramitationModal.processingDate}
+                    onChange={(e) => setTramitationModal(prev => ({ ...prev, processingDate: e.target.value }))}
+                    className="mt-1"
+                  />
+                ) : (
+                  <Input
+                    id="processing-date"
+                    type="date"
+                    value={tramitationModal.processingDate}
+                    onChange={(e) => setTramitationModal(prev => ({ ...prev, processingDate: e.target.value }))}
+                    max={new Date().toISOString().split('T')[0]}
+                    className="mt-1"
+                  />
+                )}
               </div>
 
               {/* Mensaje de confirmación */}
               <div className={`p-4 rounded-lg ${
                 tramitationModal.action === "approve" 
                   ? "bg-green-50 border border-green-200" 
-                  : "bg-red-50 border border-red-200"
+                  : tramitationModal.action === "reject" 
+                    ? "bg-red-50 border border-red-200"
+                    : tramitationModal.action === "pending_laboral" 
+                      ? "bg-purple-50 border border-purple-200"
+                      : "bg-blue-50 border border-blue-200"
               }`}>
                 <p className={`text-sm ${
-                  tramitationModal.action === "approve" ? "text-green-800" : "text-red-800"
+                  tramitationModal.action === "approve" ? "text-green-800" : tramitationModal.action === "reject" ? "text-red-800" : tramitationModal.action === "pending_laboral" ? "text-purple-800" : "text-blue-800"
                 }`}>
                   {tramitationModal.action === "approve" 
                     ? "⚠️ Al tramitar esta solicitud, el empleado será movido de la tabla de empleados activos a la tabla de bajas empresa."
-                    : "⚠️ Al rechazar esta solicitud, se registrará el rechazo pero el empleado permanecerá como activo."
+                    : tramitationModal.action === "reject" 
+                      ? "⚠️ Al rechazar esta solicitud, se registrará el rechazo pero el empleado permanecerá como activo."
+                      : tramitationModal.action === "pending_laboral" 
+                        ? "⚠️ Al marcar esta solicitud como pendiente laboral, se registrará como pendiente pero el empleado permanecerá como activo."
+                        : "⚠️ Al procesar esta solicitud, se registrará como procesada y el empleado permanecerá como activo."
                   }
                 </p>
               </div>
@@ -662,11 +778,15 @@ export default function Notifications() {
                   disabled={processMutation.isPending || !tramitationModal.processingDate}
                   className={tramitationModal.action === "approve" 
                     ? "bg-green-600 hover:bg-green-700" 
-                    : "bg-red-600 hover:bg-red-700"
+                    : tramitationModal.action === "reject" 
+                      ? "bg-red-600 hover:bg-red-700"
+                      : tramitationModal.action === "pending_laboral" 
+                        ? "bg-purple-600 hover:bg-purple-700"
+                        : "bg-blue-600 hover:bg-blue-700"
                   }
                 >
                   {processMutation.isPending ? "Procesando..." : (
-                    tramitationModal.action === "approve" ? "Tramitar" : "Rechazar"
+                    tramitationModal.action === "approve" ? "Tramitar" : tramitationModal.action === "reject" ? "Rechazar" : tramitationModal.action === "pending_laboral" ? "Pendiente Laboral" : "Procesar"
                   )}
                 </Button>
               </div>

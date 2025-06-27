@@ -41,7 +41,6 @@ export class AuditService {
         description,
         oldData: oldData ? JSON.parse(JSON.stringify(oldData)) : null,
         newData: newData ? JSON.parse(JSON.stringify(newData)) : null,
-        ipAddress: req?.ip || req?.connection?.remoteAddress || 'unknown',
         userAgent: req?.headers?.['user-agent'] || 'unknown'
       };
 

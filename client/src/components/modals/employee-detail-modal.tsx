@@ -21,7 +21,8 @@ import {
   Users,
   AlertTriangle,
   UserCheck,
-  RefreshCw
+  RefreshCw,
+  Percent
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -52,7 +53,7 @@ export default function EmployeeDetailModal({
     
     setIsReactivating(true);
     try {
-      const response = await fetch(`/api/employees/${employee.id}/reactivate`, {
+      const response = await fetch(`/api/employees/${employee.idGlovo}/reactivate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,17 +107,22 @@ export default function EmployeeDetailModal({
         return <Badge className="bg-yellow-100 text-yellow-800">Baja Empresa Pendiente</Badge>;
       case "company_leave_approved":
         return <Badge className="bg-red-100 text-red-800">Baja Empresa Aprobada</Badge>;
+      case "pending_laboral":
+        return <Badge className="bg-purple-100 text-purple-800">Pendiente Laboral</Badge>;
+      case "penalizado":
+        return <Badge className="bg-orange-100 text-orange-800">Penalizado</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "No especificado";
+  const formatDate = (dateString?: string | Date | null) => {
+    if (!dateString) return "No especificada";
     try {
-      return new Date(dateString).toLocaleDateString('es-ES');
+      const date = new Date(dateString);
+      return date.toLocaleDateString('es-ES');
     } catch {
-      return dateString;
+      return "Fecha inválida";
     }
   };
 
@@ -264,12 +270,22 @@ export default function EmployeeDetailModal({
                 <InfoItem
                   icon={Clock}
                   label="Horas de Trabajo"
-                  value={employee.horas ? `${employee.horas} horas` : undefined}
+                  value={employee.status === "penalizado" ? "0 (penalizado)" : `${employee.horas ?? 0} horas`}
+                />
+                <InfoItem
+                  icon={Percent}
+                  label="CDP (Cumplimiento)"
+                  value={employee.status === "penalizado" ? "0% (penalizado)" : `${employee.cdp ?? 0}%`}
                 />
                 <InfoItem
                   icon={Users}
                   label="Jefe de Tráfico"
                   value={employee.jefeTrafico}
+                />
+                <InfoItem
+                  icon={Building}
+                  label="Flota"
+                  value={employee.flota}
                 />
                 <InfoItem
                   icon={MapPin}
@@ -426,6 +442,26 @@ export default function EmployeeDetailModal({
               </div>
             </CardContent>
           </Card>
+
+          {/* Sección especial para empleados penalizados */}
+          {employee.status === "penalizado" && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-6 h-6 text-red-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-bold text-red-800 mb-1">Empleado penalizado</h4>
+                  <p className="text-red-700 text-sm mb-2">
+                    Este empleado está penalizado. Sus horas actuales están en <b>0</b> y no podrá trabajar hasta que finalice la penalización o se reactive manualmente.
+                  </p>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    <li><b>Horas originales:</b> {employee.originalHours ?? "No registradas"}</li>
+                    <li><b>Fecha inicio penalización:</b> {employee.penalizationStartDate ? new Date(employee.penalizationStartDate).toLocaleDateString('es-ES') : "No especificada"}</li>
+                    <li><b>Fecha fin penalización:</b> {employee.penalizationEndDate ? new Date(employee.penalizationEndDate).toLocaleDateString('es-ES') : "No especificada"}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

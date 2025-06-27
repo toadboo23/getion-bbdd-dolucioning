@@ -19,14 +19,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { Download, Search, Filter } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { CompanyLeave } from "@shared/schema";
+import { useNavigate } from "react-router-dom";
 
 export default function CompanyLeaves() {
   const { toast } = useToast();
   const { user, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
   // Estados para filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -43,6 +45,14 @@ export default function CompanyLeaves() {
     refetchIntervalInBackground: true, // Actualizar incluso cuando la ventana no está en foco
     retry: false,
   });
+
+  useEffect(() => {
+    if (!authLoading && user?.role === "normal") {
+      navigate("/employees", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
+
+  if (!authLoading && user?.role === "normal") return null;
 
   // Filtrar bajas según los criterios de búsqueda
   const companyLeaves = useMemo(() => {
@@ -111,24 +121,24 @@ export default function CompanyLeaves() {
 
     // Preparar datos para export
     const exportData = companyLeaves.map(leave => {
-      const employeeData = leave.employeeData as any;
+      const employeeData = leave.employeeData as any || {};
       return {
-        'ID Empleado': leave.employeeId,
-        'ID Glovo': employeeData?.idGlovo || '',
-        'Nombre': employeeData?.nombre || '',
-        'Apellido': employeeData?.apellido || '',
-        'Email': employeeData?.email || '',
-        'Teléfono': employeeData?.telefono || '',
-        'DNI/NIE': employeeData?.dniNie || '',
-        'Ciudad': employeeData?.ciudad || '',
-        'Tipo de Baja': leave.leaveType,
-        'Fecha de Baja': new Date(leave.leaveDate).toLocaleDateString('es-ES'),
-        'Solicitado por': leave.leaveRequestedBy,
-        'Fecha Solicitud': new Date(leave.leaveRequestedAt).toLocaleDateString('es-ES'),
+        'ID Glovo': employeeData.idGlovo || '',
+        'Nombre': employeeData.nombre || '',
+        'Apellido': employeeData.apellido || '',
+        'Email Glovo': employeeData.emailGlovo || '',
+        'Teléfono': employeeData.telefono || '',
+        'DNI/NIE': employeeData.dniNie || '',
+        'Ciudad': employeeData.ciudad || '',
+        'Flota': employeeData.flota || '',
+        'Tipo de Baja': leave.leaveType || '',
+        'Fecha de Baja': leave.leaveDate ? new Date(leave.leaveDate).toLocaleDateString('es-ES') : '',
+        'Solicitado por': leave.leaveRequestedBy || '',
+        'Fecha Solicitud': leave.leaveRequestedAt ? new Date(leave.leaveRequestedAt).toLocaleDateString('es-ES') : '',
         'Aprobado por': leave.approvedBy || '',
         'Fecha Aprobación': leave.approvedAt ? new Date(leave.approvedAt).toLocaleDateString('es-ES') : '',
         'Estado': leave.status === 'approved' ? 'Aprobado' : 
-                 leave.status === 'rejected' ? 'Rechazado' : leave.status,
+                 leave.status === 'rejected' ? 'Rechazado' : leave.status || '',
         'Fecha Creación': leave.createdAt ? new Date(leave.createdAt).toLocaleDateString('es-ES') : '',
         'Última Actualización': leave.updatedAt ? new Date(leave.updatedAt).toLocaleDateString('es-ES') : ''
       };

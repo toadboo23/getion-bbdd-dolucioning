@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS employees (
   telefono varchar(20),
   email varchar(100),
   horas integer,
+  cdp integer, -- Cumplimiento de Horas (porcentaje basado en 38h = 100%)
   complementaries text,
   ciudad varchar(100),
   citycode varchar(20),
@@ -51,7 +52,10 @@ CREATE TABLE IF NOT EXISTS employees (
   fecha_incidencia date,
   faltas_no_check_in_en_dias integer DEFAULT 0,
   cruce text,
-  status varchar(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'it_leave', 'company_leave_pending', 'company_leave_approved')),
+  status varchar(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'it_leave', 'company_leave_pending', 'company_leave_approved', 'pending_laboral', 'penalizado')),
+  penalization_start_date date,
+  penalization_end_date date,
+  original_hours integer,
   created_at timestamp DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
@@ -235,9 +239,100 @@ SELECT * FROM (VALUES
 ) AS v(email, first_name, last_name, password, role, created_by, is_active)
 WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email = 'admin@dvv5.com');
 
+-- Insert additional super admin users
+INSERT INTO system_users (email, first_name, last_name, password, role, created_by, is_active) 
+SELECT * FROM (VALUES 
+  ('lvega@solucioning.net', 'Luis', 'Vega', '84739265', 'super_admin', 'SYSTEM', true),
+  ('superadmin@solucioning.net', 'Super', 'Admin', '39284756', 'super_admin', 'SYSTEM', true)
+) AS v(email, first_name, last_name, password, role, created_by, is_active)
+WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email = v.email);
+
+-- Insert admin users for traffic management
+INSERT INTO system_users (email, first_name, last_name, password, role, created_by, is_active) 
+SELECT * FROM (VALUES 
+  ('trafico1@solucioning.net', 'trafico1', 'Admin', '83931493', 'admin', 'SYSTEM', true),
+  ('trafico2@solucioning.net', 'trafico2', 'Admin', '69243740', 'admin', 'SYSTEM', true),
+  ('trafico3@solucioning.net', 'trafico3', 'Admin', '57442923', 'admin', 'SYSTEM', true),
+  ('trafico4@solucioning.net', 'trafico4', 'Admin', '70843610', 'admin', 'SYSTEM', true),
+  ('trafico5@solucioning.net', 'trafico5', 'Admin', '44261275', 'admin', 'SYSTEM', true),
+  ('trafico6@solucioning.net', 'trafico6', 'Admin', '11002575', 'admin', 'SYSTEM', true),
+  ('trafico7@solucioning.net', 'trafico7', 'Admin', '90446835', 'admin', 'SYSTEM', true),
+  ('trafico8@solucioning.net', 'trafico8', 'Admin', '61740149', 'admin', 'SYSTEM', true),
+  ('trafico9@solucioning.net', 'trafico9', 'Admin', '75117531', 'admin', 'SYSTEM', true),
+  ('trafico10@solucioning.net', 'trafico10', 'Admin', '25215238', 'admin', 'SYSTEM', true),
+  ('trafico11@solucioning.net', 'trafico11', 'Admin', '10404579', 'admin', 'SYSTEM', true),
+  ('trafico12@solucioning.net', 'trafico12', 'Admin', '92143056', 'admin', 'SYSTEM', true),
+  ('trafico13@solucioning.net', 'trafico13', 'Admin', '20276604', 'admin', 'SYSTEM', true),
+  ('trafico14@solucioning.net', 'trafico14', 'Admin', '10194566', 'admin', 'SYSTEM', true),
+  ('trafico15@solucioning.net', 'trafico15', 'Admin', '85264810', 'admin', 'SYSTEM', true),
+  ('trafico16@solucioning.net', 'trafico16', 'Admin', '49055073', 'admin', 'SYSTEM', true),
+  ('trafico17@solucioning.net', 'trafico17', 'Admin', '46719224', 'admin', 'SYSTEM', true),
+  ('trafico18@solucioning.net', 'trafico18', 'Admin', '74772716', 'admin', 'SYSTEM', true),
+  ('trafico19@solucioning.net', 'trafico19', 'Admin', '14516355', 'admin', 'SYSTEM', true),
+  ('trafico20@solucioning.net', 'trafico20', 'Admin', '98167078', 'admin', 'SYSTEM', true)
+) AS v(email, first_name, last_name, password, role, created_by, is_active)
+WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email = v.email);
+
 -- Insert initial audit log for system setup
 INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
 SELECT * FROM (VALUES 
   ('SYSTEM', 'super_admin', 'system_init', 'database', 'db_init', 'Database Initialization', 'Sistema DVV5 inicializado con tablas de usuarios y logs de auditoría', '127.0.0.1', 'System')
 ) AS v(user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
 WHERE NOT EXISTS (SELECT 1 FROM audit_logs WHERE action = 'system_init');
+
+-- Migration: Add unique constraint to dni_nie field to prevent duplicates
+DO $$ 
+BEGIN 
+    -- Check if the unique constraint already exists
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'employees_dni_nie_unique' 
+        AND conrelid = 'employees'::regclass
+    ) THEN
+        -- Add unique constraint to dni_nie field
+        ALTER TABLE employees ADD CONSTRAINT employees_dni_nie_unique UNIQUE (dni_nie);
+        
+        -- Log the migration
+        INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
+        VALUES ('SYSTEM', 'super_admin', 'migration', 'database', 'employees', 'Employees Table', 'Añadida restricción única al campo dni_nie para prevenir duplicados', '127.0.0.1', 'Migration Script');
+    END IF;
+END $$;
+
+-- Migration: Update employee status enum to include pending_laboral
+DO $$ 
+BEGIN 
+    -- Update the check constraint for employees status
+    ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_status_check;
+    ALTER TABLE employees ADD CONSTRAINT employees_status_check 
+    CHECK (status IN ('active', 'it_leave', 'company_leave_pending', 'company_leave_approved', 'pending_laboral', 'penalizado'));
+    
+    -- Log the migration
+    INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
+    VALUES ('SYSTEM', 'super_admin', 'migration', 'database', 'employees', 'Employees Table', 'Actualizado enum de status para incluir pending_laboral', '127.0.0.1', 'Migration Script');
+END $$;
+
+-- Migration: Add penalization fields to employees table
+DO $$ 
+BEGIN 
+    -- Add penalization_start_date column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'employees' AND column_name = 'penalization_start_date') THEN
+        ALTER TABLE employees ADD COLUMN penalization_start_date date;
+    END IF;
+    
+    -- Add penalization_end_date column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'employees' AND column_name = 'penalization_end_date') THEN
+        ALTER TABLE employees ADD COLUMN penalization_end_date date;
+    END IF;
+    
+    -- Add original_hours column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'employees' AND column_name = 'original_hours') THEN
+        ALTER TABLE employees ADD COLUMN original_hours integer;
+    END IF;
+    
+    -- Log the migration
+    INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
+    VALUES ('SYSTEM', 'super_admin', 'migration', 'database', 'employees', 'Employees Table', 'Añadidos campos de penalización (fechas y horas originales)', '127.0.0.1', 'Migration Script');
+END $$;

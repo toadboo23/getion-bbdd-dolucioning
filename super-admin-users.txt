@@ -1,0 +1,37 @@
+SUPER USUARIOS ADMIN - CREDENCIALES
+
+===========================================
+SUPER ADMIN USUARIOS
+===========================================
+
+1. admin@dvv5.com
+   - Nombre: Super Admin
+   - Contraseña: admin123
+   - Rol: super_admin
+
+2. lvega@solucioning.net
+   - Nombre: Luis Vega
+   - Contraseña: 84739265
+   - Rol: super_admin
+
+3. superadmin@solucioning.net
+   - Nombre: Super Admin
+   - Contraseña: 39284756
+   - Rol: super_admin
+
+===========================================
+RESUMEN DE USUARIOS EN EL SISTEMA
+===========================================
+
+Total de usuarios: 24
+- Super Admin: 3 usuarios
+- Admin: 21 usuarios (incluyendo admin@solucioning.net y trafico1-trafico20)
+
+===========================================
+NOTAS IMPORTANTES
+===========================================
+
+- Todos los super_admin tienen acceso completo al sistema
+- Los usuarios admin tienen acceso restringido (solo pueden editar campos específicos)
+- Las contraseñas de los nuevos super usuarios son números aleatorios de 8 dígitos
+- Se recomienda cambiar las contraseñas después del primer acceso por seguridad 
