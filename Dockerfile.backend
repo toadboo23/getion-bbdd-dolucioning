@@ -11,7 +11,7 @@ RUN npm ci
 # Copy server source code
 COPY server/ ./
 
-# Copy shared files
+# Copy shared directory
 COPY shared/ ./shared/
 
 # Copy drizzle config

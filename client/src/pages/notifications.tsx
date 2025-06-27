@@ -108,20 +108,20 @@ export default function Notifications() {
   // Manejo profesional de errores con useEffect
   useEffect(() => {
     if (notificationsError && isUnauthorizedError(notificationsError)) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
     } else if (notificationsError) {
       toast({
         title: "Error",
         description: "No se pudieron cargar las notificaciones",
         variant: "destructive",
-      });
+  });
     }
   }, [notificationsError, toast]);
 
@@ -728,14 +728,14 @@ export default function Notifications() {
                     className="mt-1"
                   />
                 ) : (
-                  <Input
-                    id="processing-date"
-                    type="date"
-                    value={tramitationModal.processingDate}
-                    onChange={(e) => setTramitationModal(prev => ({ ...prev, processingDate: e.target.value }))}
+                <Input
+                  id="processing-date"
+                  type="date"
+                  value={tramitationModal.processingDate}
+                  onChange={(e) => setTramitationModal(prev => ({ ...prev, processingDate: e.target.value }))}
                     max={new Date().toISOString().split('T')[0]}
-                    className="mt-1"
-                  />
+                  className="mt-1"
+                />
                 )}
               </div>
 

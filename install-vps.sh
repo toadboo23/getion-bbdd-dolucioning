@@ -1,16 +1,9 @@
 #!/bin/bash
 
 # Script de instalación limpia para VPS - Solucioning
-# Ejecutar como root en el VPS
+# Este script instala Docker, clona el proyecto desde GitHub y lo despliega
 
 set -e
-
-echo "🚀 Iniciando instalación limpia de Solucioning en VPS..."
-
-# Variables
-VPS_IP="69.62.107.86"
-PROJECT_DIR="/opt/solucioning"
-DOCKER_COMPOSE_FILE="docker-compose.prod.yml"
 
 # Colores para output
 RED='\033[0;31m'
@@ -36,201 +29,133 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Función para limpiar Docker completamente
-clean_docker() {
-    print_status "Limpiando Docker completamente..."
-    
-    # Detener y eliminar todos los contenedores
-    docker stop $(docker ps -aq) 2>/dev/null || true
-    docker rm $(docker ps -aq) 2>/dev/null || true
-    
-    # Eliminar todas las imágenes
-    docker rmi $(docker images -aq) 2>/dev/null || true
-    
-    # Limpiar sistema Docker
-    docker system prune -af
-    
-    # Eliminar volúmenes no utilizados
-    docker volume prune -f
-    
-    print_success "Docker limpiado completamente"
-}
+# Configuración
+VPS_IP="69.62.107.86"
+PROJECT_DIR="/opt/solucioning"
+GITHUB_REPO="https://github.com/tu-usuario/solucioning.git"  # Cambiar por tu repo
 
-# Función para verificar Docker
-check_docker() {
-    print_status "Verificando instalación de Docker..."
-    
-    if ! command -v docker &> /dev/null; then
-        print_error "Docker no está instalado"
-        exit 1
-    fi
-    
-    if ! command -v docker-compose &> /dev/null; then
-        print_error "Docker Compose no está instalado"
-        exit 1
-    fi
-    
-    print_success "Docker y Docker Compose están instalados"
-    docker --version
-    docker-compose --version
-}
+print_status "=== INSTALACIÓN LIMPIA DE SOLUCIONING ==="
+print_status "VPS IP: $VPS_IP"
+print_status "Directorio: $PROJECT_DIR"
 
-# Función para preparar directorio del proyecto
-prepare_project_directory() {
-    print_status "Preparando directorio del proyecto..."
-    
-    # Eliminar directorio si existe
-    if [ -d "$PROJECT_DIR" ]; then
-        rm -rf "$PROJECT_DIR"
-        print_status "Directorio anterior eliminado"
-    fi
-    
-    # Crear directorio
-    mkdir -p "$PROJECT_DIR"
-    cd "$PROJECT_DIR"
-    
-    print_success "Directorio del proyecto preparado: $PROJECT_DIR"
-}
+# Verificar si estamos como root
+if [ "$EUID" -ne 0 ]; then
+    print_error "Este script debe ejecutarse como root"
+    exit 1
+fi
 
-# Función para crear archivo .env
-create_env_file() {
-    print_status "Creando archivo de configuración .env..."
-    
-    cat > "$PROJECT_DIR/.env" << EOF
-# Variables de Entorno para Producción - Solucioning
-# Configura estos valores según tu VPS
-# Última actualización: $(date)
+# Actualizar sistema
+print_status "Actualizando sistema..."
+apt update && apt upgrade -y
 
-# Base de Datos PostgreSQL
-POSTGRES_PASSWORD=SolucioningSecurePass2024!
-POSTGRES_EXTERNAL_PORT=5432
+# Instalar dependencias
+print_status "Instalando dependencias..."
+apt install -y curl wget git unzip software-properties-common apt-transport-https ca-certificates gnupg lsb-release
 
-# Backend API
-SESSION_SECRET=super-long-random-string-for-solucioning-session-security-2024
-BACKEND_PORT=5173
+# Instalar Docker
+print_status "Instalando Docker..."
+if ! command -v docker &> /dev/null; then
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt update
+    apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    systemctl enable docker
+    systemctl start docker
+    print_success "Docker instalado correctamente"
+else
+    print_warning "Docker ya está instalado"
+fi
 
-# Frontend
-API_URL=http://$VPS_IP:5173
-FRONTEND_PORT=3000
+# Instalar Docker Compose
+print_status "Instalando Docker Compose..."
+if ! command -v docker-compose &> /dev/null; then
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+    print_success "Docker Compose instalado correctamente"
+else
+    print_warning "Docker Compose ya está instalado"
+fi
 
-# Configuración adicional para producción
-NODE_ENV=production
-EOF
-    
-    print_success "Archivo .env creado con configuración para $VPS_IP"
-}
+# Limpiar instalaciones anteriores
+print_status "Limpiando instalaciones anteriores..."
+if [ -d "$PROJECT_DIR" ]; then
+    rm -rf "$PROJECT_DIR"
+    print_success "Directorio anterior eliminado"
+fi
 
-# Función para construir y ejecutar servicios
-build_and_run() {
-    print_status "Construyendo imágenes Docker..."
-    
-    cd "$PROJECT_DIR"
-    
-    # Construir imágenes sin caché
-    docker-compose -f "$DOCKER_COMPOSE_FILE" build --no-cache
-    
-    print_success "Imágenes construidas correctamente"
-    
-    print_status "Iniciando servicios..."
-    
-    # Ejecutar servicios
-    docker-compose -f "$DOCKER_COMPOSE_FILE" up -d
-    
-    print_success "Servicios iniciados"
-}
+# Limpiar Docker
+print_status "Limpiando Docker..."
+docker system prune -af --volumes
 
-# Función para verificar servicios
-verify_services() {
-    print_status "Verificando servicios..."
-    
-    # Esperar a que los servicios se inicialicen
-    sleep 15
-    
-    # Verificar contenedores
-    print_status "Estado de contenedores:"
-    docker ps
-    
-    # Verificar puertos
-    print_status "Verificando puertos..."
-    
-    if netstat -tlnp | grep -q ":3000"; then
-        print_success "Puerto 3000 (Frontend) está abierto"
-    else
-        print_error "Puerto 3000 (Frontend) no está abierto"
-    fi
-    
-    if netstat -tlnp | grep -q ":5173"; then
-        print_success "Puerto 5173 (Backend) está abierto"
-    else
-        print_error "Puerto 5173 (Backend) no está abierto"
-    fi
-    
-    if netstat -tlnp | grep -q ":5432"; then
-        print_success "Puerto 5432 (PostgreSQL) está abierto"
-    else
-        print_error "Puerto 5432 (PostgreSQL) no está abierto"
-    fi
-}
+# Crear directorio del proyecto
+print_status "Creando directorio del proyecto..."
+mkdir -p "$PROJECT_DIR"
+cd "$PROJECT_DIR"
 
-# Función para mostrar información final
-show_final_info() {
-    echo ""
-    echo "🎉 ¡Instalación completada!"
-    echo ""
-    echo "📋 Información del sistema:"
-    echo "   Frontend: http://$VPS_IP:3000"
-    echo "   Backend API: http://$VPS_IP:5173"
-    echo "   PostgreSQL: $VPS_IP:5432"
-    echo ""
-    echo "👥 Usuarios por defecto:"
-    echo "   Super Admin: superadmin@glovo.com / superadmin123"
-    echo "   Admin: admin@glovo.com / admin123"
-    echo "   User: user@glovo.com / user123"
-    echo ""
-    echo "🔧 Comandos útiles:"
-    echo "   Ver logs: docker-compose -f $DOCKER_COMPOSE_FILE logs -f"
-    echo "   Reiniciar: docker-compose -f $DOCKER_COMPOSE_FILE restart"
-    echo "   Detener: docker-compose -f $DOCKER_COMPOSE_FILE down"
-    echo ""
-    echo "📁 Directorio del proyecto: $PROJECT_DIR"
-    echo ""
-}
+# Clonar proyecto desde GitHub
+print_status "Clonando proyecto desde GitHub..."
+if [ -n "$GITHUB_REPO" ] && [ "$GITHUB_REPO" != "https://github.com/tu-usuario/solucioning.git" ]; then
+    git clone "$GITHUB_REPO" .
+    print_success "Proyecto clonado correctamente"
+else
+    print_error "Por favor, configura la URL del repositorio GitHub en el script"
+    exit 1
+fi
 
-# Función principal
-main() {
-    echo "=========================================="
-    echo "   INSTALACIÓN LIMPIA - SOLUCIONING"
-    echo "=========================================="
-    echo ""
-    
-    # Verificar que se ejecute como root
-    if [ "$EUID" -ne 0 ]; then
-        print_error "Este script debe ejecutarse como root"
-        exit 1
-    fi
-    
-    # Ejecutar pasos de instalación
-    check_docker
-    clean_docker
-    prepare_project_directory
-    create_env_file
-    
-    print_warning "IMPORTANTE: Ahora debes subir los archivos del proyecto al VPS"
-    print_warning "Ejecuta desde tu máquina local:"
-    echo "scp -r . root@$VPS_IP:$PROJECT_DIR/"
-    echo ""
-    
-    read -p "¿Has subido los archivos? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        build_and_run
-        verify_services
-        show_final_info
-    else
-        print_warning "Instalación pausada. Sube los archivos y ejecuta el script nuevamente."
-        exit 0
-    fi
-}
+# Configurar variables de entorno
+print_status "Configurando variables de entorno..."
+if [ -f "env.production" ]; then
+    cp env.production .env
+    # Actualizar API_URL con la IP del VPS
+    sed -i "s|API_URL=http://localhost:5173|API_URL=http://$VPS_IP:5173|g" .env
+    sed -i "s|API_URL=http://69.62.107.86:5173|API_URL=http://$VPS_IP:5173|g" .env
+    print_success "Variables de entorno configuradas"
+else
+    print_error "Archivo env.production no encontrado"
+    exit 1
+fi
 
-# Ejecutar función principal
-main "$@" 
+# Dar permisos al script de entrada
+if [ -f "docker-entrypoint.sh" ]; then
+    chmod +x docker-entrypoint.sh
+fi
+
+# Construir y ejecutar contenedores
+print_status "Construyendo contenedores..."
+docker-compose -f docker-compose.prod.yml build --no-cache
+
+print_status "Iniciando servicios..."
+docker-compose -f docker-compose.prod.yml up -d
+
+# Esperar a que los servicios estén listos
+print_status "Esperando a que los servicios estén listos..."
+sleep 30
+
+# Verificar estado de los servicios
+print_status "Verificando estado de los servicios..."
+docker-compose -f docker-compose.prod.yml ps
+
+# Verificar logs
+print_status "Verificando logs del backend..."
+docker logs solucioning_backend --tail 10
+
+print_status "Verificando logs del frontend..."
+docker logs solucioning_frontend --tail 5
+
+# Información final
+print_success "=== INSTALACIÓN COMPLETADA ==="
+print_status "URLs de acceso:"
+print_status "  Frontend: http://$VPS_IP:3000"
+print_status "  Backend API: http://$VPS_IP:5173"
+print_status ""
+print_status "Credenciales de acceso:"
+print_status "  Super Admin: superadmin@glovo.com / superadmin123"
+print_status "  Admin: admin@glovo.com / admin123"
+print_status "  User: user@glovo.com / user123"
+print_status ""
+print_status "Comandos útiles:"
+print_status "  Ver logs: docker-compose -f docker-compose.prod.yml logs -f"
+print_status "  Reiniciar: docker-compose -f docker-compose.prod.yml restart"
+print_status "  Detener: docker-compose -f docker-compose.prod.yml down"
+print_status ""
+print_success "¡Solucioning está listo para usar!" 

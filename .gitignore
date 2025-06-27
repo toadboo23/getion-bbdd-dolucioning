@@ -2,17 +2,17 @@
 node_modules/
 */node_modules/
 
-# Environment files
-.env
-.env.local
-.env.production
-.env.development
-
 # Build outputs
 dist/
 build/
 */dist/
 */build/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
 
 # Logs
 *.log
@@ -28,6 +28,7 @@ pids
 
 # Coverage directory used by tools like istanbul
 coverage/
+*.lcov
 
 # nyc test coverage
 .nyc_output
@@ -41,12 +42,6 @@ jspm_packages/
 # Optional eslint cache
 .eslintcache
 
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
 # Optional REPL history
 .node_repl_history
 
@@ -56,30 +51,36 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
+# dotenv environment variables file
+.env.test
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
 
-# Next.js build output
+# next.js build output
 .next
 
-# Nuxt.js build / generate output
+# nuxt.js build output
 .nuxt
 
-# Storybook build outputs
-.out
-.storybook-out
+# vuepress build output
+.vuepress/dist
 
-# Temporary folders
-tmp/
-temp/
+# Serverless directories
+.serverless
 
-# Editor directories and files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
 
 # OS generated files
 .DS_Store
@@ -90,20 +91,25 @@ temp/
 ehthumbs.db
 Thumbs.db
 
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
 # Docker
 .dockerignore
 
+# Temporary files
+*.tmp
+*.temp
+*.tar.gz
+
 # Database
-*.db
 *.sqlite
+*.db
 
 # Backup files
 *.backup
 *.bak
-
-# Scripts de despliegue (mantener solo los necesarios)
-# deploy-*.sh
-# deploy-*.ps1
-# vps-*.sh
-# update-*.sh
-# update-*.ps1

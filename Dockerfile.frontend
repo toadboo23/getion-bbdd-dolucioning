@@ -11,20 +11,14 @@ RUN npm ci
 # Copy client source code
 COPY client/ ./
 
-# Copy shared files
+# Copy shared directory
 COPY shared/ ./shared/
 
-# Copy vite config
-COPY vite.config.ts ./
-
-# Copy tailwind config
+# Copy configuration files
 COPY tailwind.config.ts ./
-
-# Copy postcss config
 COPY postcss.config.js ./
-
-# Copy tsconfig
 COPY tsconfig.json ./
+COPY vite.config.ts ./
 
 # Build the project
 RUN npm run build

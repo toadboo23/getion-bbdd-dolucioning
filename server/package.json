@@ -7,32 +7,39 @@
   "scripts": {
     "dev:backend": "tsx watch index-clean.ts",
     "build": "tsc",
-    "start": "node dist/index-clean.js"
+    "start": "node dist/index-clean.js",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "cors": "^2.8.5",
     "express-session": "^1.17.3",
-    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "bcrypt": "^5.1.1",
     "postgres": "^3.4.3",
     "drizzle-orm": "^0.29.3",
-    "dotenv": "^16.3.1",
-    "helmet": "^7.1.0",
-    "compression": "^1.7.4",
-    "morgan": "^1.10.0"
+    "zod": "^3.22.4",
+    "multer": "^1.4.5-lts.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
-    "@types/cors": "^2.8.17",
     "@types/express-session": "^1.17.10",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/compression": "^1.7.5",
-    "@types/morgan": "^1.9.9",
+    "@types/cors": "^2.8.17",
+    "@types/bcrypt": "^5.0.2",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.10.5",
     "typescript": "^5.3.3",
-    "tsx": "^4.6.2",
-    "drizzle-kit": "^0.20.9"
+    "tsx": "^4.6.2"
   },
-  "keywords": ["solucioning", "backend", "api", "empleados", "gestión"],
+  "keywords": [
+    "express",
+    "typescript",
+    "postgresql",
+    "drizzle",
+    "api",
+    "employees",
+    "management"
+  ],
   "author": "Solucioning Team",
   "license": "MIT"
 } 
