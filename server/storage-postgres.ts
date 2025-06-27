@@ -36,7 +36,7 @@ export const calculateCDP = (horas: number | null | undefined): number => {
 };
 
 export class PostgresStorage {
-  // User operations (required for Replit Auth)
+  // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;

@@ -85,7 +85,7 @@ Si prefieres ejecutar los servicios individualmente:
 ## Estructura del Proyecto
 
 ```
-employee-management-system/
+solucioning/
 ├── client/                 # Frontend React
 │   ├── src/
 │   │   ├── components/     # Componentes UI reutilizables
@@ -97,8 +97,7 @@ employee-management-system/
 │   ├── routes.ts           # Definición de rutas API
 │   ├── storage.ts          # Almacenamiento en memoria (desarrollo)
 │   ├── storage-postgres.ts # Almacenamiento PostgreSQL (producción)
-│   ├── db.ts               # Configuración de base de datos
-│   └── replitAuth.ts       # Configuración de autenticación
+│   └── db.ts               # Configuración de base de datos
 ├── shared/                 # Esquemas y tipos compartidos
 │   └── schema.ts           # Definiciones de base de datos con Drizzle
 ├── docker-compose.yml      # Orquestación de contenedores
@@ -129,9 +128,7 @@ PGPASSWORD=password123
 SESSION_SECRET=your-super-secret-session-key-change-this-in-production
 
 # Autenticación Local
-REPL_ID=local-development
 ISSUER_URL=http://localhost:5173/oidc
-REPLIT_DOMAINS=localhost:5173
 
 # API
 VITE_API_URL=http://localhost:5173
