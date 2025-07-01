@@ -43,12 +43,18 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
             >
               <Menu className="w-5 h-5" />
             </Button>
+<<<<<<< HEAD
             <div className="flex items-center space-x-2">
               <img src="/logo.png" alt="Logo" className="h-8 w-8" />
               <span className="text-lg font-semibold text-gray-900">
                 Solucioning
               </span>
             </div>
+=======
+            <h1 className="text-xl font-semibold text-gray-900">
+              Solucioning
+            </h1>
+>>>>>>> cambios-2506
           </div>
           
           <div className="flex items-center space-x-4">

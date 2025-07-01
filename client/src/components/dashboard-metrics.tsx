@@ -1,5 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+<<<<<<< HEAD
 import { UserCheck, UserX, AlertTriangle, MapPin } from "lucide-react";
+=======
+import { Users, UserCheck, UserX, AlertTriangle, MapPin, BarChart3 } from "lucide-react";
+>>>>>>> cambios-2506
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 
 interface MetricsData {
@@ -24,6 +28,7 @@ const COLORS = [
 ];
 
 export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
+<<<<<<< HEAD
   if (!metrics) {
     return (
       <div className="space-y-6">
@@ -61,6 +66,22 @@ export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
       </div>
     );
   }
+=======
+  // Validar que los datos estén en el formato correcto
+  if (!metrics || !Array.isArray(metrics.employeesByCity)) {
+    console.error('DashboardMetrics: Datos inválidos', metrics);
+    return (
+      <div className="p-6 text-center">
+        <p className="text-gray-500">No hay datos disponibles para mostrar los gráficos</p>
+      </div>
+    );
+  }
+
+  // Asegurar que employeesByCity tenga al menos un elemento
+  const safeEmployeesByCity = metrics.employeesByCity.length > 0 
+    ? metrics.employeesByCity 
+    : [{ city: 'Sin datos', count: 0 }];
+>>>>>>> cambios-2506
 
   return (
     <div className="space-y-6">
@@ -174,7 +195,7 @@ export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={metrics.employeesByCity}
+                data={safeEmployeesByCity}
                 margin={{ top: 50, right: 30, left: 20, bottom: 80 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -211,6 +232,7 @@ export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
                   radius={[6, 6, 0, 0]}
                   stroke="#fff"
                   strokeWidth={1}
+<<<<<<< HEAD
                 >
                   {metrics.employeesByCity.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -221,6 +243,8 @@ export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
                   dataKey="count" 
                   fill="transparent"
                   radius={[6, 6, 0, 0]}
+=======
+>>>>>>> cambios-2506
                   label={{
                     position: 'top',
                     fill: '#333',
@@ -228,7 +252,11 @@ export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
                     fontWeight: 'bold',
                     formatter: (value: number) => value.toString()
                   }}
-                />
+                >
+                  {safeEmployeesByCity.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -237,16 +265,16 @@ export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
             <div className="bg-blue-50 p-3 rounded-lg">
               <p className="text-xs text-blue-600 font-medium">Ciudad Principal</p>
               <p className="text-lg font-bold text-blue-800">
-                {metrics.employeesByCity[0]?.city || 'N/A'}
+                {safeEmployeesByCity[0]?.city || 'N/A'}
               </p>
               <p className="text-sm text-blue-600">
-                {metrics.employeesByCity[0]?.count || 0} empleados
+                {safeEmployeesByCity[0]?.count || 0} empleados
               </p>
             </div>
             <div className="bg-green-50 p-3 rounded-lg">
               <p className="text-xs text-green-600 font-medium">Total Ciudades</p>
               <p className="text-lg font-bold text-green-800">
-                {metrics.employeesByCity.length}
+                {safeEmployeesByCity.length}
               </p>
               <p className="text-sm text-green-600">
                 con empleados
@@ -255,7 +283,7 @@ export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
             <div className="bg-purple-50 p-3 rounded-lg">
               <p className="text-xs text-purple-600 font-medium">Promedio</p>
               <p className="text-lg font-bold text-purple-800">
-                {Math.round(metrics.totalEmployees / metrics.employeesByCity.length)}
+                {Math.round(metrics.totalEmployees / safeEmployeesByCity.length)}
               </p>
               <p className="text-sm text-purple-600">
                 por ciudad
@@ -264,6 +292,13 @@ export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
           </div>
         </CardContent>
       </Card>
+<<<<<<< HEAD
+=======
+
+
+
+
+>>>>>>> cambios-2506
     </div>
   );
 }

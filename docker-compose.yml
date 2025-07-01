@@ -10,7 +10,7 @@ services:
     environment:
       POSTGRES_DB: employee_management
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_this_secure_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_2025}
       POSTGRES_HOST_AUTH_METHOD: md5
     ports:
       - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"  # Permite acceso externo
@@ -31,8 +31,13 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
+<<<<<<< HEAD
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change_this_secure_password}@postgres:5432/employee_management
       SESSION_SECRET: ${SESSION_SECRET:-change-this-super-secret-key-in-production}
+=======
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev_password_2025}@postgres:5432/employee_management
+      SESSION_SECRET: ${SESSION_SECRET:-solucioning_session_secret_2027_ultra_secure}
+>>>>>>> cambios-2506
       PORT: 5173
     ports:
       - "${BACKEND_PORT:-5173}:5173"
@@ -40,7 +45,10 @@ services:
       - postgres
     networks:
       - employee_network
+<<<<<<< HEAD
     command: npm run dev:backend
+=======
+>>>>>>> cambios-2506
 
   # Frontend
   frontend:
@@ -49,15 +57,16 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: employee_management_frontend
     restart: unless-stopped
-    environment:
-      VITE_API_URL: ${API_URL:-http://localhost:5173}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - backend
     networks:
       - employee_network
+<<<<<<< HEAD
     command: npm run dev:frontend
+=======
+>>>>>>> cambios-2506
 
 volumes:
   postgres_data:

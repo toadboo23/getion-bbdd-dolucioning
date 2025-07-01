@@ -38,18 +38,10 @@ export default function LeaveManagementModal({
   const itLeaveMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!employee) throw new Error("No employee selected");
-      console.log('🚀 [MUTATION] Enviando request baja IT:', {
-        url: `/api/employees/${employee.idGlovo}/it-leave`,
-        data,
-        employeeId: employee.idGlovo
-      });
       const response = await apiRequest("POST", `/api/employees/${employee.idGlovo}/it-leave`, data);
-      console.log('✅ [MUTATION] Response baja IT:', response);
       return response;
     },
     onSuccess: (response) => {
-      console.log('🎉 [MUTATION] Baja IT exitosa, invalidando queries...');
-      
       // Invalidar TODAS las queries relacionadas con empleados
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
@@ -65,12 +57,9 @@ export default function LeaveManagementModal({
         predicate: (query) => query.queryKey[0] === "/api/employees"
       });
       
-      console.log('🔄 [MUTATION] Queries invalidadas y refetch ejecutado');
-      
       // Pequeño delay para asegurar que el backend haya procesado
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ["/api/employees"] });
-        console.log('🔄 [MUTATION] Refetch adicional ejecutado después de delay');
       }, 100);
       
       toast({
@@ -160,8 +149,6 @@ export default function LeaveManagementModal({
         leaveType: itReason,
         leaveDate: new Date(leaveDate),
       };
-      console.log('🚀 [FRONTEND] Enviando datos de baja IT:', itLeaveData);
-      console.log('🚀 [FRONTEND] Empleado ID:', employee?.idGlovo);
       itLeaveMutation.mutate(itLeaveData);
     } else if (leaveType === "company") {
       if (!companyReason) {

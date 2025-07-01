@@ -67,12 +67,18 @@ export const employees = pgTable("employees", {
   faltasNoCheckInEnDias: integer("faltas_no_check_in_en_dias").default(0),
   cruce: text("cruce"),
   status: varchar("status", { 
+<<<<<<< HEAD
     enum: ["active", "it_leave", "company_leave_pending", "company_leave_approved", "pending_laboral", "penalizado"] 
   }).notNull().default("active"),
   penalizationStartDate: date("penalization_start_date"),
   penalizationEndDate: date("penalization_end_date"),
   originalHours: integer("original_hours"),
   flota: varchar("flota", { length: 100 }),
+=======
+    enum: ["active", "it_leave", "company_leave_pending", "pendiente_laboral", "company_leave_approved"] 
+  }).notNull().default("active"),
+  flota: varchar("flota", { length: 100 }).notNull(),
+>>>>>>> cambios-2506
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -114,8 +120,13 @@ export const notifications = pgTable("notifications", {
   title: varchar("title").notNull(),
   message: text("message").notNull(),
   requestedBy: varchar("requested_by").notNull(),
+<<<<<<< HEAD
   status: varchar("status", { enum: ["pending", "pending_laboral", "approved", "rejected", "processed"] }).notNull().default("pending"),
+=======
+  status: varchar("status", { enum: ["pending", "pendiente_laboral", "approved", "rejected", "processed"] }).notNull().default("pending"),
+>>>>>>> cambios-2506
   metadata: jsonb("metadata"),
+  processingDate: timestamp("processing_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -164,6 +175,7 @@ export const insertEmployeeSchema = z.object({
   idGlovo: z.string().min(1, "ID Glovo es requerido"),
   nombre: z.string().min(1, "Nombre es requerido"),
   telefono: z.string().min(1, "Teléfono es requerido"),
+  flota: z.string().min(1, "Flota es requerida"),
   // Campos opcionales simplificados
   emailGlovo: z.string().optional(),
   turno: z.string().optional(),

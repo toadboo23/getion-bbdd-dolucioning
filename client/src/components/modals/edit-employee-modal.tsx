@@ -90,6 +90,7 @@ export default function EditEmployeeModal({
       fechaIncidencia: "",
       faltasNoCheckInEnDias: 0,
       cruce: "",
+      flota: "",
       status: "active",
       flota: "",
     },
@@ -127,6 +128,7 @@ export default function EditEmployeeModal({
         fechaIncidencia: employee.fechaIncidencia || "",
         faltasNoCheckInEnDias: employee.faltasNoCheckInEnDias || 0,
         cruce: employee.cruce || "",
+        flota: employee.flota || "",
         status: employee.status || "active",
         flota: employee.flota || "",
       });
@@ -161,6 +163,7 @@ export default function EditEmployeeModal({
         fechaIncidencia: "",
         faltasNoCheckInEnDias: 0,
         cruce: "",
+        flota: "",
         status: "active",
         flota: "",
       });
@@ -195,7 +198,7 @@ export default function EditEmployeeModal({
     // Para super_admin, enviar todos los campos como antes
     // Convert empty strings to null for optional fields
     const processedData = Object.entries(data).reduce((acc, [key, value]) => {
-      if (value === "" && !["idGlovo", "nombre", "telefono"].includes(key)) {
+      if (value === "" && !["idGlovo", "nombre", "telefono", "flota"].includes(key)) {
         acc[key] = null;
       } else {
         acc[key] = value;
@@ -286,6 +289,30 @@ export default function EditEmployeeModal({
 
                 <FormField
                   control={form.control}
+                  name="flota"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-red-500">Flota *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona flota" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="SOLUCIONING">SOLUCIONING</SelectItem>
+                          <SelectItem value="SOLUCIONING-LM">SOLUCIONING-LM</SelectItem>
+                          <SelectItem value="SOLUCIONING-JJ">SOLUCIONING-JJ</SelectItem>
+                          <SelectItem value="SIN-FLOTA">SIN-FLOTA</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
@@ -361,6 +388,18 @@ export default function EditEmployeeModal({
                     </FormItem>
                   )}
                 />
+
+                <FormItem>
+                  <FormLabel>CDP%</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="text" 
+                      value={form.watch('horas') ? `${Math.round((form.watch('horas') / 38) * 100)}%` : ''}
+                      disabled
+                      placeholder="Calculado automáticamente"
+                    />
+                  </FormControl>
+                </FormItem>
 
                 <FormField
                   control={form.control}

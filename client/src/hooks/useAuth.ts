@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 
-// Get API base URL from environment or default to proxy
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+// Use relative URLs to leverage Vite's proxy
+const API_BASE_URL = "";
 
 export function useAuth() {
   const queryClient = useQueryClient();

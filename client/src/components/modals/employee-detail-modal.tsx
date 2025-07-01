@@ -269,6 +269,11 @@ export default function EmployeeDetailModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InfoItem
                   icon={Clock}
+                  label="Turno"
+                  value={employee.turno}
+                />
+                <InfoItem
+                  icon={Clock}
                   label="Horas de Trabajo"
                   value={employee.status === "penalizado" ? "0 (penalizado)" : `${employee.horas ?? 0} horas`}
                 />
@@ -276,6 +281,11 @@ export default function EmployeeDetailModal({
                   icon={Percent}
                   label="CDP (Cumplimiento)"
                   value={employee.status === "penalizado" ? "0% (penalizado)" : `${employee.cdp ?? 0}%`}
+                />
+                <InfoItem
+                  icon={Clock}
+                  label="CDP%"
+                  value={employee.horas ? `${Math.round((employee.horas / 38) * 100)}%` : undefined}
                 />
                 <InfoItem
                   icon={Users}
@@ -306,6 +316,11 @@ export default function EmployeeDetailModal({
                   icon={AlertTriangle}
                   label="Informado Horario"
                   value={employee.informadoHorario ? "Sí" : "No"}
+                />
+                <InfoItem
+                  icon={Building}
+                  label="Flota"
+                  value={employee.flota}
                 />
               </div>
             </CardContent>

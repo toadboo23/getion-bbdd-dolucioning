@@ -3,12 +3,11 @@ import { registerRoutes } from "./routes-clean.js";
 import { PostgresStorage } from "./storage-postgres.js";
 
 const app = express();
-const PORT = process.env.PORT || 5173;
+const PORT = parseInt(process.env.PORT || "5173");
 
 // Enhanced logging
 console.log("🔥 Starting Solucioning Server...");
 console.log("📍 Port:", PORT);
-console.log("🌍 Environment:", process.env.NODE_ENV || "development");
 
 // Manual CORS configuration (more reliable than cors package)
 app.use((req, res, next) => {

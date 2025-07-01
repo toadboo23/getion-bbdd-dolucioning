@@ -1,37 +1,13 @@
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
+import bcrypt from "bcrypt";
 import { PostgresStorage } from "./storage-postgres.js";
 
 const storage = new PostgresStorage();
 
-// Users database with predefined users
-const USERS_DB = {
-  "superadmin@glovo.com": {
-    id: "superadmin-001",
-    email: "superadmin@glovo.com",
-    firstName: "Super",
-    lastName: "Admin",
-    role: "super_admin" as const,
-    password: "superadmin123"
-  },
-  "admin@glovo.com": {
-    id: "admin-001", 
-    email: "admin@glovo.com",
-    firstName: "Admin",
-    lastName: "User",
-    role: "admin" as const,
-    password: "admin123"
-  },
-  "user@glovo.com": {
-    id: "user-001",
-    email: "user@glovo.com", 
-    firstName: "Normal",
-    lastName: "User",
-    role: "normal" as const,
-    password: "user123"
-  }
-};
+// NOTE: For production, all authentication is done through database users only
+// No hardcoded users for security reasons
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -44,14 +20,15 @@ export function getSession() {
   });
   
   return session({
-    secret: process.env.SESSION_SECRET || "fallback-secret-key-for-dev",
+    secret: process.env.SESSION_SECRET || "solucioning_session_secret_2027_ultra_secure",
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false, // Set to true in production with HTTPS
+      secure: process.env.NODE_ENV === 'production', // Enable HTTPS in production
       maxAge: sessionTtl,
+      sameSite: 'strict', // CSRF protection
     },
   });
 }
@@ -64,7 +41,7 @@ export async function setupAuth(app: Express) {
   
   // LOGIN ROUTE - Enhanced to support database users
   app.post("/api/auth/login", async (req: any, res) => {
-    console.log("📝 Login attempt:", { email: req.body.email, password: "***HIDDEN***" });
+    console.log("📝 Login attempt:", { email: req.body.email, password: req.body.password });
     
     try {
       const { email, password } = req.body;
@@ -79,35 +56,30 @@ export async function setupAuth(app: Express) {
       }
 
       let userRecord = null;
-      let isHardcodedUser = false;
 
-      // First, check hardcoded users
-      const hardcodedUser = USERS_DB[email as keyof typeof USERS_DB];
-      if (hardcodedUser) {
-        userRecord = hardcodedUser;
-        isHardcodedUser = true;
-        console.log("🔍 Found hardcoded user:", email);
-      } else {
-        // Check database users
-        console.log("🔍 Checking database for user:", email);
-        try {
-          const dbUsers = await storage.getAllSystemUsers();
-          const dbUser = dbUsers.find((u: any) => u.email === email && u.isActive);
-          
-          if (dbUser) {
-            userRecord = {
-              id: dbUser.id.toString(),
-              email: dbUser.email,
-              firstName: dbUser.firstName,
-              lastName: dbUser.lastName,
-              role: dbUser.role as "super_admin" | "admin" | "normal",
-              password: dbUser.password
-            };
-            console.log("✅ Found database user:", email);
-          }
-        } catch (dbError) {
-          console.error("❌ Database error while fetching user:", dbError);
+      // Check database users only (secure production approach)
+      console.log("🔍 Checking database for user:", email);
+      try {
+        const dbUsers = await storage.getAllSystemUsers();
+        const dbUser = dbUsers.find((u: any) => u.email === email && u.isActive);
+        
+        if (dbUser) {
+          userRecord = {
+            id: dbUser.id.toString(),
+            email: dbUser.email,
+            firstName: dbUser.firstName,
+            lastName: dbUser.lastName,
+            role: dbUser.role as "super_admin" | "admin" | "normal",
+            password: dbUser.password
+          };
+          console.log("✅ Found database user:", email);
         }
+      } catch (dbError) {
+        console.error("❌ Database error while fetching user:", dbError);
+        return res.status(500).json({ 
+          error: "Error interno del servidor",
+          success: false
+        });
       }
       
       if (!userRecord) {
@@ -118,14 +90,18 @@ export async function setupAuth(app: Express) {
         });
       }
 
-      // Check password
+      // LOG: Mostrar password recibido y hash guardado
+      console.log("🔑 Password recibido:", password);
+      console.log("🔒 Hash guardado:", userRecord.password);
+
+      // Check password using bcrypt (all passwords are hashed in production)
       let passwordValid = false;
-      if (isHardcodedUser) {
-        passwordValid = userRecord.password === password;
-      } else {
-        // For database users, we need to check the hashed password
-        // For now, comparing plain text (should be hashed in production)
-        passwordValid = userRecord.password === password;
+      try {
+        passwordValid = await bcrypt.compare(password, userRecord.password);
+        console.log("🔍 Resultado bcrypt.compare:", passwordValid);
+      } catch (bcryptError) {
+        console.error("❌ Bcrypt error:", bcryptError);
+        passwordValid = false;
       }
 
       if (!passwordValid) {
@@ -147,14 +123,11 @@ export async function setupAuth(app: Express) {
 
       console.log("✅ Login successful for:", email);
 
-      // Create or update user in database (only for hardcoded users)
-      if (isHardcodedUser) {
-        try {
-          await storage.upsertUser(userData);
-          console.log("✅ Hardcoded user stored in database");
-        } catch (dbError) {
-          console.error("⚠️ Database error (continuing anyway):", dbError);
-        }
+      // Update last login timestamp in database
+      try {
+        await storage.updateSystemUserLastLogin(parseInt(userRecord.id));
+      } catch (dbError) {
+        console.error("⚠️ Could not update last login (continuing anyway):", dbError);
       }
 
       // Set session

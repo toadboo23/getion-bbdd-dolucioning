@@ -17,6 +17,7 @@ import EmployeeDetailModal from "@/components/modals/employee-detail-modal";
 import PenalizationModal from "@/components/modals/penalization-modal";
 import { Plus, Search, Download, FileSpreadsheet, Upload, Loader2, Trash2 } from "lucide-react";
 import type { Employee } from "@shared/schema";
+import * as XLSX from 'xlsx';
 
 export default function Employees() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -24,7 +25,11 @@ export default function Employees() {
   const [searchTerm, setSearchTerm] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+<<<<<<< HEAD
   const [fleetFilter, setFleetFilter] = useState("all");
+=======
+  const [flotaFilter, setFlotaFilter] = useState("all");
+>>>>>>> cambios-2506
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
@@ -55,7 +60,11 @@ export default function Employees() {
       search: searchTerm, 
       city: cityFilter === "all" ? "" : cityFilter, 
       status: statusFilter === "all" ? "" : statusFilter,
+<<<<<<< HEAD
       fleet: fleetFilter === "all" ? "" : fleetFilter
+=======
+      flota: flotaFilter === "all" ? "" : flotaFilter
+>>>>>>> cambios-2506
     }],
     retry: false,
   });
@@ -67,25 +76,26 @@ export default function Employees() {
   });
 
   // Obtener flotas únicas para el filtro
+<<<<<<< HEAD
   const { data: fleets } = useQuery<string[]>({
     queryKey: ["/api/fleets"],
+=======
+  const { data: flotas } = useQuery<string[]>({
+    queryKey: ["/api/flotas"],
+>>>>>>> cambios-2506
     retry: false,
   });
 
   const createEmployeeMutation = useMutation({
     mutationFn: async (employeeData: any) => {
-      console.log("🔧 createEmployeeMutation called with data:", employeeData);
       try {
         const response = await apiRequest("POST", "/api/employees", employeeData);
-        console.log("✅ createEmployeeMutation response:", response);
         return response;
       } catch (error) {
-        console.error("❌ createEmployeeMutation error:", error);
         throw error;
       }
     },
     onSuccess: () => {
-      console.log("✅ createEmployeeMutation onSuccess called");
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       toast({
         title: "Empleado creado",
@@ -95,7 +105,6 @@ export default function Employees() {
       setSelectedEmployee(null);
     },
     onError: (error) => {
-      console.error("❌ createEmployeeMutation onError called:", error);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -246,7 +255,11 @@ export default function Employees() {
       'Teléfono': emp.telefono,
       'Email': emp.email,
       'Horas': emp.horas,
+<<<<<<< HEAD
       'CDP (%)': emp.cdp,
+=======
+      'CDP%': emp.horas ? Math.round((emp.horas / 38) * 100) : null,
+>>>>>>> cambios-2506
       'Complementarios': emp.complementaries,
       'Ciudad': emp.ciudad,
       'Código Ciudad': emp.cityCode,
@@ -268,6 +281,7 @@ export default function Employees() {
       'Fecha Incidencia': emp.fechaIncidencia ? new Date(emp.fechaIncidencia).toLocaleDateString('es-ES') : '',
       'Faltas No Check-in (días)': emp.faltasNoCheckInEnDias,
       'Cruce': emp.cruce,
+      'Flota': emp.flota,
       'Estado': emp.status === 'active' ? 'Activo' : 
                emp.status === 'it_leave' ? 'Baja IT' : 
                emp.status === 'company_leave_pending' ? 'Baja Empresa Pendiente' :
@@ -290,12 +304,17 @@ export default function Employees() {
     setSearchTerm("");
     setCityFilter("all");
     setStatusFilter("all");
+<<<<<<< HEAD
     setFleetFilter("all");
+=======
+    setFlotaFilter("all");
+>>>>>>> cambios-2506
   };
 
   // Función para descargar plantilla de carga masiva
   const handleDownloadTemplate = () => {
     const headers = [
+<<<<<<< HEAD
       'ID Glovo',
       'Email Glovo',
       'Turno',
@@ -327,8 +346,41 @@ export default function Employees() {
       'Faltas No Check-in (días)',
       'Cruce',
       'Estado (active/it_leave/company_leave_pending/company_leave_approved)'
+=======
+      'idGlovo',
+      'emailGlovo',
+      'turno',
+      'nombre',
+      'apellido',
+      'telefono',
+      'email',
+      'horas',
+      'cdp',
+      'complementaries',
+      'ciudad',
+      'cityCode',
+      'dniNie',
+      'iban',
+      'direccion',
+      'vehiculo',
+      'naf',
+      'fechaAltaSegSoc',
+      'statusBaja',
+      'estadoSs',
+      'informadoHorario',
+      'cuentaDivilo',
+      'proximaAsignacionSlots',
+      'jefeTrafico',
+      'comentsJefeDeTrafico',
+      'incidencias',
+      'fechaIncidencia',
+      'faltasNoCheckInEnDias',
+      'cruce',
+      'flota',
+      'status'
+>>>>>>> cambios-2506
     ];
-
+    
     createExcelTemplate(headers, 'plantilla_empleados', 'Plantilla Empleados');
     
     toast({
@@ -336,6 +388,8 @@ export default function Employees() {
       description: "La plantilla para carga masiva ha sido descargada",
     });
   };
+
+
 
   if (isLoading || employeesLoading) {
     return (
@@ -493,18 +547,31 @@ export default function Employees() {
             </div>
 
             <div>
+<<<<<<< HEAD
               <label htmlFor="fleet-filter" className="block text-sm font-medium text-gray-700 mb-2">
                 Flota
               </label>
               <Select value={fleetFilter} onValueChange={setFleetFilter}>
+=======
+              <label htmlFor="flota-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                Flota
+              </label>
+              <Select value={flotaFilter} onValueChange={setFlotaFilter}>
+>>>>>>> cambios-2506
                 <SelectTrigger>
                   <SelectValue placeholder="Todas las flotas" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las flotas</SelectItem>
+<<<<<<< HEAD
                   {fleets?.map((fleet) => (
                     <SelectItem key={fleet} value={fleet}>
                       {fleet}
+=======
+                  {flotas?.map((flota) => (
+                    <SelectItem key={flota} value={flota}>
+                      {flota}
+>>>>>>> cambios-2506
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -566,6 +633,7 @@ export default function Employees() {
       <ImportEmployeesModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
+        onImported={() => queryClient.invalidateQueries({ queryKey: ['employees'] })}
       />
 
       <EmployeeDetailModal

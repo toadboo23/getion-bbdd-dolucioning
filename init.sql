@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 -- Initialize PostgreSQL database for Solucioning System
+=======
+-- Initialize PostgreSQL database for Solucioning
+>>>>>>> cambios-2506
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create sessions table for authentication
@@ -52,10 +56,15 @@ CREATE TABLE IF NOT EXISTS employees (
   fecha_incidencia date,
   faltas_no_check_in_en_dias integer DEFAULT 0,
   cruce text,
+<<<<<<< HEAD
   status varchar(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'it_leave', 'company_leave_pending', 'company_leave_approved', 'pending_laboral', 'penalizado')),
   penalization_start_date date,
   penalization_end_date date,
   original_hours integer,
+=======
+  flota varchar(100) NOT NULL,
+  status varchar(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'it_leave', 'company_leave_pending', 'company_leave_approved')),
+>>>>>>> cambios-2506
   created_at timestamp DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
@@ -153,12 +162,12 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type ON audit_logs(entity_type)
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
 
 -- Insert test data only if tables are empty
-INSERT INTO employees (id_glovo, nombre, apellido, telefono, email_glovo, email, status) 
+INSERT INTO employees (id_glovo, nombre, apellido, telefono, email_glovo, email, flota, status) 
 SELECT * FROM (VALUES 
-  ('TEST001', 'Juan', 'García', '+34600123456', 'juan.garcia@glovo.com', 'juan.garcia@personal.com', 'active'),
-  ('TEST002', 'María', 'López', '+34600654321', 'maria.lopez@glovo.com', 'maria.lopez@personal.com', 'active'),
-  ('TEST003', 'Carlos', 'Martín', '+34600789012', 'carlos.martin@glovo.com', 'carlos.martin@personal.com', 'active')
-) AS v(id_glovo, nombre, apellido, telefono, email_glovo, email, status)
+  ('TEST001', 'Juan', 'García', '+34600123456', 'juan.garcia@glovo.com', 'juan.garcia@personal.com', 'FLOTA1', 'active'),
+  ('TEST002', 'María', 'López', '+34600654321', 'maria.lopez@glovo.com', 'maria.lopez@personal.com', 'FLOTA1', 'active'),
+  ('TEST003', 'Carlos', 'Martín', '+34600789012', 'carlos.martin@glovo.com', 'carlos.martin@personal.com', 'FLOTA2', 'active')
+) AS v(id_glovo, nombre, apellido, telefono, email_glovo, email, flota, status)
 WHERE NOT EXISTS (SELECT 1 FROM employees);
 
 -- Migration: Add status column if it doesn't exist (for existing databases)
@@ -217,27 +226,24 @@ END $$;
 INSERT INTO employees (
     ID_GLOVO, EMAIL_GLOVO, TURNO, NOMBRE, APELLIDO, TELEFONO, EMAIL, 
     HORAS, CIUDAD, DNI_NIE, IBAN, DIRECCION, VEHICULO, NAF, 
-    FECHA_ALTA_SEG_SOC, STATUS_BAJA, ESTADO_SS, INFORMADO_HORARIO
+    FECHA_ALTA_SEG_SOC, STATUS_BAJA, ESTADO_SS, INFORMADO_HORARIO, FLOTA
 ) VALUES
 ('GLV001', 'maria.garcia@glovo.com', 'MAÑANA', 'María', 'García', '+34 612 345 678', 'maria.garcia@email.com',
  40, 'Madrid', '12345678A', 'ES91 2100 0418 4502 0005 1332', 'Calle Mayor 123', 'Coche propio', 'NAF001',
- '2020-01-15', 'ACTIVO', 'ALTA', true),
-('GLV002', 'carlos.rodriguez@glovo.com', 'TARDE', 'Carlos', 'Rodríguez', '+34 687 654 321', 'carlos.rodriguez@email.com',
- 35, 'Barcelona', 'X1234567B', 'ES76 0075 0130 4806 0158 1234', 'Passeig de Gràcia 456', 'Transporte público', 'NAF002',
- '2021-03-10', 'ACTIVO', 'ALTA', true);
+ '2022-01-10', NULL, 'ALTA', true, 'FLOTA1');
 
 -- Insert sample notifications
 INSERT INTO notifications (type, title, message, requested_by, status) VALUES
 ('system', 'Sistema Iniciado', 'El sistema Solucioning ha sido iniciado correctamente', 'Sistema', 'processed'),
 ('info', 'Base de Datos Configurada', 'La base de datos PostgreSQL ha sido configurada para el entorno local', 'Sistema', 'processed');
 
--- Insert default super admin user (password: admin123)
--- Note: In production, this should be changed immediately
+-- Insert production super admin users
 INSERT INTO system_users (email, first_name, last_name, password, role, created_by, is_active) 
 SELECT * FROM (VALUES 
-  ('admin@dvv5.com', 'Super', 'Admin', '$2b$10$8R1QkTQZJZGvKb4vJ7QJrOXYR1QkTQZJZGvKb4vJ7QJrOXYR1QkTQ', 'super_admin', 'SYSTEM', true)
+  ('nmartinez@solucioning.net', 'Nicolas', 'Martinez', '$2b$10$DsYjQKJM/dj1Xqm1iPjlG.NhMxW2XY.CsZ1eOwqsX8WP8SwgXZ/5u', 'super_admin', 'SYSTEM', true),
+  ('lvega@solucioning.net', 'Luis', 'Vega', '$2b$10$uXIrjF2pO/CeY./qT825ruTZOocZ0o7BdpOhGASaBGdaUOncUTaF.', 'super_admin', 'SYSTEM', true)
 ) AS v(email, first_name, last_name, password, role, created_by, is_active)
-WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email = 'admin@dvv5.com');
+WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email IN ('nmartinez@solucioning.net', 'lvega@solucioning.net'));
 
 -- Insert additional super admin users
 INSERT INTO system_users (email, first_name, last_name, password, role, created_by, is_active) 
@@ -280,6 +286,7 @@ SELECT * FROM (VALUES
 ) AS v(user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
 WHERE NOT EXISTS (SELECT 1 FROM audit_logs WHERE action = 'system_init');
 
+<<<<<<< HEAD
 -- Migration: Add unique constraint to dni_nie field to prevent duplicates
 DO $$ 
 BEGIN 
@@ -335,4 +342,13 @@ BEGIN
     -- Log the migration
     INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
     VALUES ('SYSTEM', 'super_admin', 'migration', 'database', 'employees', 'Employees Table', 'Añadidos campos de penalización (fechas y horas originales)', '127.0.0.1', 'Migration Script');
+=======
+-- Migration: Add flota column if it doesn't exist (for existing databases)
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'employees' AND column_name = 'flota') THEN
+        ALTER TABLE employees ADD COLUMN flota varchar(100) NOT NULL DEFAULT 'FLOTA1';
+    END IF;
+>>>>>>> cambios-2506
 END $$;

@@ -1,9 +1,14 @@
 version: '3.8'
 
 services:
+<<<<<<< HEAD
   # Base de datos PostgreSQL
   postgres:
     image: postgres:16
+=======
+  postgres:
+    image: postgres:15-alpine
+>>>>>>> cambios-2506
     container_name: solucioning_db
     environment:
       POSTGRES_DB: employee_management
@@ -11,16 +16,26 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+<<<<<<< HEAD
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./postgres.conf:/etc/postgresql/postgresql.conf
     ports:
       - "${POSTGRES_EXTERNAL_PORT}:5432"
+=======
+      - ./postgres.conf:/etc/postgresql/postgresql.conf
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"
+>>>>>>> cambios-2506
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
     restart: unless-stopped
     networks:
       - solucioning_network
 
+<<<<<<< HEAD
   # Backend API
+=======
+>>>>>>> cambios-2506
   backend:
     build:
       context: .
@@ -30,6 +45,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/employee_management
       SESSION_SECRET: ${SESSION_SECRET}
+<<<<<<< HEAD
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: employee_management
@@ -37,25 +53,41 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "${BACKEND_PORT}:5173"
+=======
+      PORT: ${BACKEND_PORT:-5173}
+    ports:
+      - "${BACKEND_PORT:-5173}:${BACKEND_PORT:-5173}"
+>>>>>>> cambios-2506
     depends_on:
       - postgres
     restart: unless-stopped
     networks:
       - solucioning_network
+<<<<<<< HEAD
     volumes:
       - ./server:/app/server
       - ./shared:/app/shared
 
   # Frontend
+=======
+
+>>>>>>> cambios-2506
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
     container_name: solucioning_frontend
     environment:
+<<<<<<< HEAD
       VITE_API_URL: ${API_URL}
     ports:
       - "${FRONTEND_PORT}:3000"
+=======
+      NODE_ENV: production
+      VITE_API_BASE_URL: ${API_URL}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+>>>>>>> cambios-2506
     depends_on:
       - backend
     restart: unless-stopped

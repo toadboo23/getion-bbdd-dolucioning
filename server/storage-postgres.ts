@@ -75,11 +75,48 @@ export class PostgresStorage {
   }
 
   async createEmployee(employeeData: InsertEmployee): Promise<Employee> {
+<<<<<<< HEAD
     // Calcular CDP automáticamente basado en las horas
     const cdp = calculateCDP(employeeData.horas);
     const employeeDataWithCDP = { ...employeeData, cdp };
     
     const [employee] = await db.insert(employees).values(employeeDataWithCDP).returning();
+=======
+    const [employee] = await db.insert(employees).values(employeeData).returning({
+      idGlovo: employees.idGlovo,
+      emailGlovo: employees.emailGlovo,
+      turno: employees.turno,
+      nombre: employees.nombre,
+      apellido: employees.apellido,
+      telefono: employees.telefono,
+      email: employees.email,
+      horas: employees.horas,
+      complementaries: employees.complementaries,
+      ciudad: employees.ciudad,
+      cityCode: employees.cityCode,
+      dniNie: employees.dniNie,
+      iban: employees.iban,
+      direccion: employees.direccion,
+      vehiculo: employees.vehiculo,
+      naf: employees.naf,
+      fechaAltaSegSoc: employees.fechaAltaSegSoc,
+      statusBaja: employees.statusBaja,
+      estadoSs: employees.estadoSs,
+      informadoHorario: employees.informadoHorario,
+      cuentaDivilo: employees.cuentaDivilo,
+      proximaAsignacionSlots: employees.proximaAsignacionSlots,
+      jefeTrafico: employees.jefeTrafico,
+      comentsJefeDeTrafico: employees.comentsJefeDeTrafico,
+      incidencias: employees.incidencias,
+      fechaIncidencia: employees.fechaIncidencia,
+      faltasNoCheckInEnDias: employees.faltasNoCheckInEnDias,
+      cruce: employees.cruce,
+      status: employees.status,
+      flota: employees.flota,
+      createdAt: employees.createdAt,
+      updatedAt: employees.updatedAt
+    });
+>>>>>>> cambios-2506
     return employee;
   }
 
@@ -92,7 +129,40 @@ export class PostgresStorage {
       .update(employees)
       .set(employeeDataWithCDP)
       .where(eq(employees.idGlovo, id))
-      .returning();
+      .returning({
+        idGlovo: employees.idGlovo,
+        emailGlovo: employees.emailGlovo,
+        turno: employees.turno,
+        nombre: employees.nombre,
+        apellido: employees.apellido,
+        telefono: employees.telefono,
+        email: employees.email,
+        horas: employees.horas,
+        complementaries: employees.complementaries,
+        ciudad: employees.ciudad,
+        cityCode: employees.cityCode,
+        dniNie: employees.dniNie,
+        iban: employees.iban,
+        direccion: employees.direccion,
+        vehiculo: employees.vehiculo,
+        naf: employees.naf,
+        fechaAltaSegSoc: employees.fechaAltaSegSoc,
+        statusBaja: employees.statusBaja,
+        estadoSs: employees.estadoSs,
+        informadoHorario: employees.informadoHorario,
+        cuentaDivilo: employees.cuentaDivilo,
+        proximaAsignacionSlots: employees.proximaAsignacionSlots,
+        jefeTrafico: employees.jefeTrafico,
+        comentsJefeDeTrafico: employees.comentsJefeDeTrafico,
+        incidencias: employees.incidencias,
+        fechaIncidencia: employees.fechaIncidencia,
+        faltasNoCheckInEnDias: employees.faltasNoCheckInEnDias,
+        cruce: employees.cruce,
+        status: employees.status,
+        flota: employees.flota,
+        createdAt: employees.createdAt,
+        updatedAt: employees.updatedAt
+      });
     return employee;
   }
 
@@ -126,7 +196,20 @@ export class PostgresStorage {
   }
 
   async createCompanyLeave(leaveData: InsertCompanyLeave): Promise<CompanyLeave> {
-    const [leave] = await db.insert(companyLeaves).values(leaveData).returning();
+    const [leave] = await db.insert(companyLeaves).values(leaveData).returning({
+      id: companyLeaves.id,
+      employeeId: companyLeaves.employeeId,
+      employeeData: companyLeaves.employeeData,
+      leaveType: companyLeaves.leaveType,
+      leaveDate: companyLeaves.leaveDate,
+      leaveRequestedAt: companyLeaves.leaveRequestedAt,
+      leaveRequestedBy: companyLeaves.leaveRequestedBy,
+      approvedBy: companyLeaves.approvedBy,
+      approvedAt: companyLeaves.approvedAt,
+      status: companyLeaves.status,
+      createdAt: companyLeaves.createdAt,
+      updatedAt: companyLeaves.updatedAt
+    });
     return leave;
   }
 
@@ -161,7 +244,18 @@ export class PostgresStorage {
 
       if (process.env.NODE_ENV !== 'production') console.log('📝 [STORAGE] Processed data for insertion:', JSON.stringify(processedData, null, 2));
 
-      const [leave] = await db.insert(itLeaves).values(processedData).returning();
+      const [leave] = await db.insert(itLeaves).values(processedData).returning({
+        id: itLeaves.id,
+        employeeId: itLeaves.employeeId,
+        leaveType: itLeaves.leaveType,
+        leaveDate: itLeaves.leaveDate,
+        requestedAt: itLeaves.requestedAt,
+        requestedBy: itLeaves.requestedBy,
+        approvedAt: itLeaves.approvedAt,
+        approvedBy: itLeaves.approvedBy,
+        status: itLeaves.status,
+        createdAt: itLeaves.createdAt
+      });
       
       if (process.env.NODE_ENV !== 'production') console.log('✅ [STORAGE] IT leave created successfully:', JSON.stringify(leave, null, 2));
       return leave;
@@ -178,16 +272,62 @@ export class PostgresStorage {
   }
 
   async createNotification(notificationData: InsertNotification): Promise<Notification> {
-    const [notification] = await db.insert(notifications).values(notificationData).returning();
+    const [notification] = await db.insert(notifications).values(notificationData).returning({
+      id: notifications.id,
+      type: notifications.type,
+      title: notifications.title,
+      message: notifications.message,
+      requestedBy: notifications.requestedBy,
+      status: notifications.status,
+      metadata: notifications.metadata,
+      processingDate: notifications.processingDate,
+      createdAt: notifications.createdAt,
+      updatedAt: notifications.updatedAt
+    });
     return notification;
   }
 
+<<<<<<< HEAD
   async updateNotificationStatus(id: number, status: "pending" | "pending_laboral" | "approved" | "rejected" | "processed"): Promise<Notification> {
+=======
+  async updateNotificationStatus(id: number, status: "pending" | "pendiente_laboral" | "approved" | "rejected" | "processed"): Promise<Notification> {
+>>>>>>> cambios-2506
     const [notification] = await db
       .update(notifications)
       .set({ status, updatedAt: new Date() })
       .where(eq(notifications.id, id))
-      .returning();
+      .returning({
+        id: notifications.id,
+        type: notifications.type,
+        title: notifications.title,
+        message: notifications.message,
+        requestedBy: notifications.requestedBy,
+        status: notifications.status,
+        metadata: notifications.metadata,
+        processingDate: notifications.processingDate,
+        createdAt: notifications.createdAt,
+        updatedAt: notifications.updatedAt
+      });
+    return notification;
+  }
+
+  async updateNotificationStatusWithDate(id: number, status: "pending" | "pendiente_laboral" | "approved" | "rejected" | "processed", processingDate: Date): Promise<Notification> {
+    const [notification] = await db
+      .update(notifications)
+      .set({ status, processingDate, updatedAt: new Date() })
+      .where(eq(notifications.id, id))
+      .returning({
+        id: notifications.id,
+        type: notifications.type,
+        title: notifications.title,
+        message: notifications.message,
+        requestedBy: notifications.requestedBy,
+        status: notifications.status,
+        metadata: notifications.metadata,
+        processingDate: notifications.processingDate,
+        createdAt: notifications.createdAt,
+        updatedAt: notifications.updatedAt
+      });
     return notification;
   }
 
@@ -266,20 +406,10 @@ export class PostgresStorage {
       pendingLaboral: pendingLaboralEmployees.length, // EMPLEADOS EN PENDIENTE LABORAL
       penalizedEmployees: penalizedEmployees.length,       // EMPLEADOS PENALIZADOS
       pendingActions: pendingNotifications.length, // NOTIFICACIONES PENDIENTES
-      employeesByCity,                         // POR CIUDAD (TODOS)
-      // Métricas adicionales para debugging
-      debug: {
-        employeesInActiveTable: allEmployees.length,
-        employeesInCompanyLeave: allCompanyLeaves.length,
-        employeesByStatus: {
-          active: allEmployees.filter(e => e.status === "active").length,
-          it_leave: allEmployees.filter(e => e.status === "it_leave").length,
-          company_leave_pending: allEmployees.filter(e => e.status === "company_leave_pending").length,
-          company_leave_approved: allEmployees.filter(e => e.status === "company_leave_approved").length,
-        }
-      }
+      employeesByCity                          // POR CIUDAD (TODOS)
     };
 
+<<<<<<< HEAD
     if (process.env.NODE_ENV !== 'production') console.log("📊 [METRICS] Métricas calculadas:", {
       totalEmployees: metrics.totalEmployees,
       activeEmployees: metrics.activeEmployees,
@@ -290,6 +420,9 @@ export class PostgresStorage {
       topCities: metrics.employeesByCity.slice(0, 5),
       debug: metrics.debug
     });
+=======
+
+>>>>>>> cambios-2506
 
     return metrics;
   }
@@ -300,6 +433,7 @@ export class PostgresStorage {
     await db.delete(employees);
   }
 
+<<<<<<< HEAD
   async bulkCreateEmployees(employeeDataList: InsertEmployee[]): Promise<Employee[]> {
     if (process.env.NODE_ENV !== 'production') console.log("Bulk creating employees in PostgreSQL:", employeeDataList.length);
     
@@ -312,6 +446,171 @@ export class PostgresStorage {
     const createdEmployees = await db.insert(employees).values(employeesWithCDP).returning();
     if (process.env.NODE_ENV !== 'production') console.log("Bulk operation completed. Total employees:", createdEmployees.length);
     return createdEmployees;
+=======
+  async bulkCreateEmployees(employees: any[]) {
+    console.log("🚀 Starting bulk import of", employees.length, "employees");
+    if (!Array.isArray(employees) || employees.length === 0) {
+      return {
+        success: false,
+        created: 0,
+        errors: 1,
+        message: "Invalid input: employees must be a non-empty array"
+      };
+    }
+
+    // 1. Obtener todos los empleados actuales para validar duplicados
+    const dbEmployees = await db.select().from(employees);
+    const dbSets = {
+      idGlovo: new Set(dbEmployees.map(e => e.idGlovo?.toLowerCase())),
+      emailGlovo: new Set(dbEmployees.map(e => e.emailGlovo?.toLowerCase())),
+      dniNie: new Set(dbEmployees.map(e => e.dniNie?.toLowerCase())),
+      iban: new Set(dbEmployees.map(e => e.iban?.toLowerCase())),
+      naf: new Set(dbEmployees.map(e => e.naf?.toLowerCase())),
+    };
+    // 2. Validar duplicados en el lote y contra la base de datos
+    const seenExcel = {
+      idGlovo: {},
+      emailGlovo: {},
+      dniNie: {},
+      iban: {},
+      naf: {},
+    };
+    const errors: string[] = [];
+    employees.forEach((emp, idx) => {
+      ["idGlovo", "emailGlovo", "dniNie", "iban", "naf"].forEach((key) => {
+        const val = emp[key]?.toLowerCase();
+        if (val) {
+          // Duplicado en Excel
+          if (seenExcel[key][val]) {
+            errors.push(`Fila ${idx + 2}: El campo ${key} ('${emp[key]}') está duplicado en el Excel (también en fila ${seenExcel[key][val]})`);
+          } else {
+            seenExcel[key][val] = idx + 2;
+          }
+          // Duplicado en base de datos
+          if (dbSets[key].has(val)) {
+            errors.push(`Fila ${idx + 2}: El campo ${key} ('${emp[key]}') ya existe en la base de datos`);
+          }
+        }
+      });
+    });
+    if (errors.length > 0) {
+      return {
+        success: false,
+        created: 0,
+        errors: errors.length,
+        message: `No se importó ningún empleado por duplicados. Corrige los errores e intenta de nuevo.`,
+        details: errors
+      };
+    }
+    // 3. Insertar todos los empleados si no hay errores
+    const results = [];
+    for (let i = 0; i < employees.length; i++) {
+      const emp = employees[i];
+      const processed = {
+        idGlovo: String(emp.idGlovo).trim(),
+        emailGlovo: emp.emailGlovo ? String(emp.emailGlovo).trim() : '',
+        turno: emp.turno ? String(emp.turno).trim() : '',
+        nombre: emp.nombre ? String(emp.nombre).trim() : 'Sin Nombre',
+        apellido: emp.apellido ? String(emp.apellido).trim() : '',
+        telefono: emp.telefono ? String(emp.telefono).trim() : '',
+        email: emp.email ? String(emp.email).trim() : '',
+        horas: emp.horas !== null && emp.horas !== undefined && !isNaN(Number(emp.horas)) ? Number(emp.horas) : null,
+        complementaries: emp.complementaries ? String(emp.complementaries).trim() : '',
+        ciudad: emp.ciudad ? String(emp.ciudad).trim() : '',
+        cityCode: emp.cityCode ? String(emp.cityCode).trim() : '',
+        dniNie: emp.dniNie ? String(emp.dniNie).trim() : '',
+        iban: emp.iban ? String(emp.iban).trim() : '',
+        direccion: emp.direccion ? String(emp.direccion).trim() : '',
+        vehiculo: emp.vehiculo ? String(emp.vehiculo).trim() : '',
+        naf: emp.naf ? String(emp.naf).trim() : '',
+        fechaAltaSegSoc: emp.fechaAltaSegSoc ? this.parseDate(emp.fechaAltaSegSoc) : null,
+        statusBaja: emp.statusBaja ? String(emp.statusBaja).trim() : '',
+        estadoSs: emp.estadoSs ? String(emp.estadoSs).trim() : '',
+        informadoHorario: this.parseBoolean(emp.informadoHorario),
+        cuentaDivilo: emp.cuentaDivilo ? String(emp.cuentaDivilo).trim() : '',
+        proximaAsignacionSlots: emp.proximaAsignacionSlots ? this.parseDate(emp.proximaAsignacionSlots) : null,
+        jefeTrafico: emp.jefeTrafico ? String(emp.jefeTrafico).trim() : '',
+        comentsJefeDeTrafico: emp.comentsJefeDeTrafico ? String(emp.comentsJefeDeTrafico).trim() : '',
+        incidencias: emp.incidencias ? String(emp.incidencias).trim() : '',
+        fechaIncidencia: emp.fechaIncidencia ? this.parseDate(emp.fechaIncidencia) : null,
+        faltasNoCheckInEnDias: emp.faltasNoCheckInEnDias !== null && emp.faltasNoCheckInEnDias !== undefined && !isNaN(Number(emp.faltasNoCheckInEnDias)) ? Number(emp.faltasNoCheckInEnDias) : 0,
+        cruce: emp.cruce ? String(emp.cruce).trim() : '',
+        flota: emp.flota ? String(emp.flota).trim() : 'SIN_FLOTA',
+        status: this.validateStatus(emp.status)
+      };
+      const result = await db.insert(employees).values(processed).returning();
+      if (result && result[0]) {
+        results.push(result[0]);
+      }
+    }
+    return {
+      success: true,
+      created: results.length,
+      employees: results,
+      message: `Importados ${results.length} empleados correctamente.`
+    };
+  }
+
+  // Métodos auxiliares para procesamiento de datos
+  private parseDate(dateValue: any): Date | null {
+    if (!dateValue) return null;
+    
+    try {
+      // Si ya es una fecha válida
+      if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+        return dateValue;
+      }
+      
+      // Si es un string, intentar parsearlo
+      if (typeof dateValue === 'string') {
+        const trimmed = dateValue.trim();
+        if (trimmed === '') return null;
+        
+        // Intentar diferentes formatos de fecha
+        const date = new Date(trimmed);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+        
+        // Si es un número (timestamp), convertirlo
+        const timestamp = Number(trimmed);
+        if (!isNaN(timestamp)) {
+          return new Date(timestamp);
+        }
+      }
+      
+      // Si es un número, tratarlo como timestamp
+      if (typeof dateValue === 'number' && !isNaN(dateValue)) {
+        return new Date(dateValue);
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn("⚠️ Error parsing date:", dateValue, error);
+      return null;
+    }
+  }
+
+  private parseBoolean(value: any): boolean {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const trimmed = value.trim().toLowerCase();
+      return trimmed === 'true' || trimmed === '1' || trimmed === 'yes' || trimmed === 'si';
+    }
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+    return false;
+  }
+
+  private validateStatus(status: any): string {
+    const validStatuses = ['active', 'it_leave', 'company_leave_pending', 'pendiente_laboral', 'company_leave_approved'];
+    if (status && validStatuses.includes(String(status))) {
+      return String(status);
+    }
+    return 'active'; // valor por defecto
+>>>>>>> cambios-2506
   }
 
   // Filter helpers for unique values
@@ -327,11 +626,24 @@ export class PostgresStorage {
 
   async getUniqueFleets(): Promise<string[]> {
     const result = await db
+<<<<<<< HEAD
       .selectDistinct({ flota: employees.flota })
       .from(employees)
       .where(sql`${employees.flota} IS NOT NULL AND ${employees.flota} != ''`)
       .orderBy(employees.flota);
     return result.map(row => row.flota!).filter(Boolean);
+=======
+      .select({ jefeTrafico: employees.jefeTrafico })
+      .from(employees)
+      .where(sql`${employees.jefeTrafico} IS NOT NULL AND ${employees.jefeTrafico} != ''`);
+    
+    return [...new Set(result.map(row => row.jefeTrafico))].sort();
+  }
+
+  async getUniqueFlotas(): Promise<string[]> {
+    // Devolver las 4 opciones específicas de flota
+    return ["SOLUCIONING", "SOLUCIONING-LM", "SOLUCIONING-JJ", "SIN-FLOTA"];
+>>>>>>> cambios-2506
   }
 
   // ============================================
@@ -385,6 +697,20 @@ export class PostgresStorage {
       .update(systemUsers)
       .set({ lastLogin: new Date() })
       .where(eq(systemUsers.id, id));
+  }
+
+  async updateSystemUserPassword(id: number, hashedPassword: string): Promise<SystemUser> {
+    console.log("🔐 [USERS] Updating password for user:", id);
+    const [user] = await db
+      .update(systemUsers)
+      .set({ 
+        password: hashedPassword,
+        updatedAt: new Date() 
+      })
+      .where(eq(systemUsers.id, id))
+      .returning();
+    console.log("✅ [USERS] Password updated successfully for user:", user.email);
+    return user;
   }
 
   // ============================================

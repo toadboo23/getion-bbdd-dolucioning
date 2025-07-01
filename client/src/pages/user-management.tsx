@@ -350,7 +350,11 @@ export default function UserManagement() {
             <Users className="h-8 w-8" />
             Gestión de Usuarios
           </h1>
+<<<<<<< HEAD
           <p className="text-gray-600 mb-6">
+=======
+          <p className="text-gray-600 mt-2">
+>>>>>>> cambios-2506
             Administra los usuarios del sistema Solucioning
           </p>
         </div>
@@ -597,6 +601,40 @@ export default function UserManagement() {
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
+<<<<<<< HEAD
+=======
+                          {userRow.email !== 'superadmin@glovo.com' && ( // No permitir borrar super admin
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. Se eliminará permanentemente 
+                                    el usuario <strong>{userRow.firstName} {userRow.lastName}</strong> del sistema.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteUser(userRow.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+>>>>>>> cambios-2506
                         </div>
                       </TableCell>
                     </TableRow>
