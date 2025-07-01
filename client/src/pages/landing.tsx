@@ -148,7 +148,7 @@ export default function Landing() {
         
         <div className="text-center mt-8">
           <p className="text-sm text-gray-500">
-            © 2024 Solucioning - Sistema de Gestión de Empleados
+            © 2025 Solucioning
           </p>
         </div>
       </div>

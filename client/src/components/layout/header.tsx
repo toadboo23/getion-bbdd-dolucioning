@@ -44,7 +44,7 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
               <Menu className="w-5 h-5" />
             </Button>
             <h1 className="text-xl font-semibold text-gray-900">
-              Sistema de Gestión de Empleados
+              Solucioning
             </h1>
           </div>
           

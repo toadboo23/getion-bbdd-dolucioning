@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertTriangle, Info, Check, X, Filter, Calendar, FileText, Clock, CheckCircle, XCircle, Settings } from "lucide-react";
+import { AlertTriangle, Info, Check, X, Filter, Calendar, FileText, Clock, CheckCircle, XCircle, Settings, Download } from "lucide-react";
 import type { Notification } from "@shared/schema";
+import * as XLSX from 'xlsx';
 
 export default function Notifications() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -49,22 +50,25 @@ export default function Notifications() {
     }, 100);
   };
   
-  // Estados para modal de tramitación
-  const [tramitationModal, setTramitationModal] = useState<{
-    isOpen: boolean;
-    notification: Notification | null;
-    action: "approve" | "reject";
-    processingDate: string;
-  }>({
+  // Estado para el modal de tramitación
+  const [tramitationModal, setTramitationModal] = useState<TramitationModalState>({
+    isOpen: false,
+    action: "approve",
+    notification: null,
+    processingDate: new Date().toISOString().split('T')[0] // Fecha actual por defecto
+  });
+
+  // Estado para el modal de pendiente laboral
+  const [pendienteLaboralModal, setPendienteLaboralModal] = useState<PendienteLaboralModalState>({
     isOpen: false,
     notification: null,
-    action: "approve",
-    processingDate: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
+    processingDate: new Date().toISOString().split('T')[0] // Fecha actual por defecto
   });
 
   // Definir permisos específicos por rol
   const canProcessNotifications = user?.role === "super_admin"; // Solo super admin puede procesar
   const canViewNotifications = user?.role === "admin" || user?.role === "super_admin"; // Admin y super admin pueden ver
+  const canExportNotifications = user?.role === "super_admin"; // Solo super admin puede exportar
   const isReadOnlyUser = user?.role === "normal";
 
   // Redirect if not authenticated or not authorized to view notifications
@@ -141,6 +145,42 @@ export default function Notifications() {
     },
   });
 
+  // Mutación para cambiar a pendiente laboral
+  const pendienteLaboralMutation = useMutation({
+    mutationFn: async ({ notificationId, processingDate }: { notificationId: number, processingDate: string }) => {
+      await apiRequest("POST", `/api/notifications/${notificationId}/pendiente-laboral`, {
+        processingDate: new Date(processingDate).toISOString()
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      
+      toast({
+        title: "Estado actualizado",
+        description: "La solicitud ha sido movida a Pendiente Laboral",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado de la notificación",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Función para abrir modal de tramitación
   const handleTramitar = (notification: Notification, action: "approve" | "reject") => {
     setTramitationModal({
@@ -149,6 +189,67 @@ export default function Notifications() {
       action,
       processingDate: new Date().toISOString().split('T')[0], // Fecha de hoy
       });
+  };
+
+  // Función para exportar notificaciones a Excel
+  const handleExportNotifications = () => {
+    if (!notifications || notifications.length === 0) {
+      toast({
+        title: "Sin datos",
+        description: "No hay notificaciones para exportar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Preparar datos para exportar con nombres de columnas en español
+      const exportData = notifications.map(notif => ({
+        'ID': notif.id,
+        'Tipo': notif.type === 'company_leave_request' ? 'Solicitud de Baja Empresa' : 
+               notif.type === 'employee_update' ? 'Actualización de Empleado' : 
+               notif.type === 'bulk_upload' ? 'Carga Masiva' : notif.type,
+        'Título': notif.title,
+        'Mensaje': notif.message,
+        'Solicitado por': notif.requestedBy,
+        'Estado': notif.status === 'pending' ? 'Pendiente' :
+                 notif.status === 'pendiente_laboral' ? 'Pendiente Laboral' :
+                 notif.status === 'approved' ? 'Tramitada' :
+                 notif.status === 'rejected' ? 'Rechazada' :
+                 notif.status === 'processed' ? 'Procesada' : notif.status,
+        'Fecha de Creación': notif.createdAt ? new Date(notif.createdAt).toLocaleString('es-ES') : 'N/A',
+        'Fecha de Actualización': notif.updatedAt ? new Date(notif.updatedAt).toLocaleString('es-ES') : 'N/A',
+        'Fecha de Procesamiento': notif.processingDate ? new Date(notif.processingDate).toLocaleString('es-ES') : 'N/A',
+        'Empleado': (notif.metadata as any)?.employeeName || 'N/A',
+        'Tipo de Baja': (notif.metadata as any)?.leaveType || 'N/A',
+        'ID Empleado': (notif.metadata as any)?.employeeId || 'N/A',
+        'Metadatos': notif.metadata ? JSON.stringify(notif.metadata, null, 2) : 'N/A'
+      }));
+
+      // Crear el archivo Excel
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Notificaciones");
+
+      // Generar nombre de archivo con fecha
+      const date = new Date().toISOString().split('T')[0];
+      const fileName = `notificaciones_${date}.xlsx`;
+
+      // Descargar el archivo
+      XLSX.writeFile(wb, fileName);
+
+      toast({
+        title: "Exportación exitosa",
+        description: `Se han exportado ${notifications.length} notificaciones a ${fileName}`,
+      });
+    } catch (error) {
+      console.error("Error al exportar notificaciones:", error);
+      toast({
+        title: "Error en la exportación",
+        description: "No se pudo exportar las notificaciones",
+        variant: "destructive",
+      });
+    }
   };
 
   // Función para confirmar tramitación
@@ -167,6 +268,25 @@ export default function Notifications() {
       action: tramitationModal.action,
       processingDate: tramitationModal.processingDate,
     });
+  };
+
+  // Función para cambiar a pendiente laboral
+  const handlePendienteLaboral = (notification: Notification) => {
+    setPendienteLaboralModal({
+      isOpen: true,
+      notification,
+      processingDate: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const handleConfirmPendienteLaboral = () => {
+    if (!pendienteLaboralModal.notification || !pendienteLaboralModal.processingDate) return;
+
+    const notificationId = pendienteLaboralModal.notification.id;
+    const processingDate = pendienteLaboralModal.processingDate;
+
+    pendienteLaboralMutation.mutate({ notificationId, processingDate });
+    setPendienteLaboralModal(prev => ({ ...prev, isOpen: false }));
   };
 
   // Filtrar notificaciones
@@ -211,6 +331,13 @@ export default function Notifications() {
           <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
             <Clock className="w-3 h-3 mr-1" />
             Pendiente
+          </span>
+        );
+      case "pendiente_laboral":
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
+            <Clock className="w-3 h-3 mr-1" />
+            Pendiente Laboral
           </span>
         );
       case "approved":
@@ -277,20 +404,37 @@ export default function Notifications() {
 
   // Obtener estadísticas para los filtros
   const notificationStats = useMemo(() => {
-    if (!notifications) return { pending: 0, approved: 0, rejected: 0, processed: 0 };
+    if (!notifications) return { pending: 0, pendiente_laboral: 0, approved: 0, rejected: 0, processed: 0 };
     
     return notifications.reduce((stats, notif) => {
       stats[notif.status as keyof typeof stats] = (stats[notif.status as keyof typeof stats] || 0) + 1;
       return stats;
-    }, { pending: 0, approved: 0, rejected: 0, processed: 0 });
+    }, { pending: 0, pendiente_laboral: 0, approved: 0, rejected: 0, processed: 0 });
   }, [notifications]);
 
   return (
     <div className="p-6 space-y-6">
       {/* HEADER */}
       <div>
-        <h2 className="text-3xl font-bold text-gray-900">Panel de Notificaciones</h2>
-        <p className="mt-2 text-gray-600">Gestiona y tramita las solicitudes de baja empresa</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900">Panel de Notificaciones</h2>
+            <p className="mt-2 text-gray-600">Gestiona y tramita las solicitudes de baja empresa</p>
+          </div>
+          
+          {/* Botón Exportar Notificaciones - Solo Super Admin */}
+          {canExportNotifications && (
+            <div className="mt-4 sm:mt-0">
+              <Button 
+                onClick={handleExportNotifications}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exportar Notificaciones
+              </Button>
+            </div>
+          )}
+        </div>
         
         {/* Mensaje de permisos según el rol */}
         <div className="mt-3">
@@ -313,7 +457,7 @@ export default function Notifications() {
       </div>
 
       {/* ESTADÍSTICAS RÁPIDAS - CLICABLES */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card 
           className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 cursor-pointer hover:shadow-lg transform hover:scale-105 transition-all duration-200"
           onClick={() => handleMetricCardClick('pending')}
@@ -325,6 +469,22 @@ export default function Notifications() {
                 <p className="text-sm font-medium text-yellow-700">Pendientes</p>
                 <p className="text-2xl font-bold text-yellow-900">{notificationStats.pending}</p>
                 <p className="text-xs text-yellow-600 mt-1">Clic para filtrar</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card 
+          className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 cursor-pointer hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+          onClick={() => handleMetricCardClick('pendiente_laboral')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Clock className="w-8 h-8 text-orange-600" />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-orange-700">Pendiente Laboral</p>
+                <p className="text-2xl font-bold text-orange-900">{notificationStats.pendiente_laboral}</p>
+                <p className="text-xs text-orange-600 mt-1">Clic para filtrar</p>
               </div>
             </div>
           </CardContent>
@@ -407,11 +567,11 @@ export default function Notifications() {
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los estados ({notifications?.length || 0})</SelectItem>
-                  <SelectItem value="pending">Pendientes ({notificationStats.pending})</SelectItem>
-                  <SelectItem value="approved">Tramitadas ({notificationStats.approved})</SelectItem>
-                  <SelectItem value="rejected">Rechazadas ({notificationStats.rejected})</SelectItem>
-                  <SelectItem value="processed">Procesadas ({notificationStats.processed})</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="pending">Pendientes</SelectItem>
+                  <SelectItem value="pendiente_laboral">Pendiente Laboral</SelectItem>
+                  <SelectItem value="approved">Tramitadas</SelectItem>
+                  <SelectItem value="rejected">Rechazadas</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -531,6 +691,43 @@ export default function Notifications() {
                         <>
                           <Button 
                             size="sm" 
+                            onClick={() => handlePendienteLaboral(notification)}
+                            disabled={pendienteLaboralMutation.isPending}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Check className="w-4 h-4 mr-2" />
+                            Pasar a Pendiente Laboral
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => handleTramitar(notification, "reject")}
+                            disabled={processMutation.isPending}
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Rechazar
+                          </Button>
+                        </>
+                      )}
+                      
+                      {/* Mensaje para usuarios sin permisos de procesamiento */}
+                      {!canProcessNotifications && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+                          <p className="text-sm text-blue-700">
+                            👁️ Solo puedes ver - Requiere permisos de Super Admin para tramitar
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {notification.status === "pendiente_laboral" && notification.type === "company_leave_request" && (
+                    <div className="flex space-x-3 pt-3 border-t border-gray-200">
+                      {/* Botones de tramitación - Solo Super Admin */}
+                      {canProcessNotifications && (
+                        <>
+                          <Button 
+                            size="sm" 
                             onClick={() => handleTramitar(notification, "approve")}
                             disabled={processMutation.isPending}
                             className="bg-green-600 hover:bg-green-700 text-white"
@@ -626,7 +823,6 @@ export default function Notifications() {
                   type="date"
                   value={tramitationModal.processingDate}
                   onChange={(e) => setTramitationModal(prev => ({ ...prev, processingDate: e.target.value }))}
-                  max={new Date().toISOString().split('T')[0]} // No permitir fechas futuras
                   className="mt-1"
                 />
               </div>
@@ -668,6 +864,78 @@ export default function Notifications() {
                   {processMutation.isPending ? "Procesando..." : (
                     tramitationModal.action === "approve" ? "Tramitar" : "Rechazar"
                   )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL DE PENDIENTE LABORAL */}
+      <Dialog 
+        open={pendienteLaboralModal.isOpen} 
+        onOpenChange={(open) => !open && setPendienteLaboralModal(prev => ({ ...prev, isOpen: false }))}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Pasar a Pendiente Laboral
+            </DialogTitle>
+          </DialogHeader>
+
+          {pendienteLaboralModal.notification && (
+            <div className="space-y-6">
+              {/* Información de la solicitud */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-medium text-gray-900 mb-2">Detalles de la Solicitud</h4>
+                <div className="space-y-1 text-sm">
+                  <p><strong>Empleado:</strong> {(pendienteLaboralModal.notification.metadata as any)?.employeeName || "N/A"}</p>
+                  <p><strong>Tipo:</strong> {(pendienteLaboralModal.notification.metadata as any)?.leaveType || "N/A"}</p>
+                  <p><strong>Solicitado por:</strong> {pendienteLaboralModal.notification.requestedBy}</p>
+                </div>
+              </div>
+
+              {/* Selector de fecha */}
+              <div>
+                <Label htmlFor="pendiente-laboral-date" className="text-base font-medium">
+                  Fecha de Paso a Pendiente Laboral
+                </Label>
+                <p className="text-sm text-gray-600 mb-2">
+                  Selecciona la fecha en que se pasa esta solicitud a pendiente laboral
+                </p>
+                <Input
+                  id="pendiente-laboral-date"
+                  type="date"
+                  value={pendienteLaboralModal.processingDate}
+                  onChange={(e) => setPendienteLaboralModal(prev => ({ ...prev, processingDate: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+
+              {/* Mensaje de confirmación */}
+              <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  ⚠️ Al pasar esta solicitud a pendiente laboral, se registrará esta acción y estará lista para tramitación final.
+                </p>
+              </div>
+
+              {/* Botones */}
+              <div className="flex justify-end space-x-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPendienteLaboralModal(prev => ({ ...prev, isOpen: false }))}
+                  disabled={pendienteLaboralMutation.isPending}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleConfirmPendienteLaboral}
+                  disabled={pendienteLaboralMutation.isPending || !pendienteLaboralModal.processingDate}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {pendienteLaboralMutation.isPending ? "Procesando..." : "Pasar a Pendiente Laboral"}
                 </Button>
               </div>
             </div>

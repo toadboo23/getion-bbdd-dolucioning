@@ -18,11 +18,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { Download, Search, Filter } from "lucide-react";
+import { Download, Search, Filter, CheckCircle, XCircle, Clock } from "lucide-react";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { CompanyLeave } from "@shared/schema";
+import * as XLSX from 'xlsx';
 
 export default function CompanyLeaves() {
   const { toast } = useToast();
@@ -88,19 +89,47 @@ export default function CompanyLeaves() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "approved":
-        return <Badge variant="default" className="bg-green-100 text-green-800">Aprobado</Badge>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Tramitada
+          </span>
+        );
       case "rejected":
-        return <Badge variant="destructive">Rechazado</Badge>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+            <XCircle className="w-3 h-3 mr-1" />
+            Rechazada
+          </span>
+        );
+      case "pending":
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+            <Clock className="w-3 h-3 mr-1" />
+            Pendiente
+          </span>
+        );
+      case "pendiente_laboral":
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
+            <Clock className="w-3 h-3 mr-1" />
+            Pendiente Laboral
+          </span>
+        );
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+            {status}
+          </span>
+        );
     }
   };
 
 
 
-  // Función para exportar bajas empresa a Excel
+  // Función para exportar bajas empresa a Excel (últimos 90 días)
   const handleExportCompanyLeaves = () => {
-    if (!companyLeaves || companyLeaves.length === 0) {
+    if (!allCompanyLeaves || allCompanyLeaves.length === 0) {
       toast({
         title: "Sin datos",
         description: "No hay bajas empresa para exportar",
@@ -109,37 +138,79 @@ export default function CompanyLeaves() {
       return;
     }
 
-    // Preparar datos para export
-    const exportData = companyLeaves.map(leave => {
+    // Calcular fecha límite (90 días atrás)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    // Filtrar bajas de los últimos 90 días
+    const recentLeaves = allCompanyLeaves.filter(leave => {
+      const leaveDate = new Date(leave.leaveDate);
+      return leaveDate >= ninetyDaysAgo;
+    });
+
+    if (recentLeaves.length === 0) {
+      toast({
+        title: "Sin datos recientes",
+        description: "No hay bajas empresa en los últimos 90 días para exportar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Preparar datos para exportar con nombres de columnas en español
+    const exportData = recentLeaves.map(leave => {
       const employeeData = leave.employeeData as any;
       return {
+        'ID': leave.id,
         'ID Empleado': leave.employeeId,
-        'ID Glovo': employeeData?.idGlovo || '',
-        'Nombre': employeeData?.nombre || '',
-        'Apellido': employeeData?.apellido || '',
-        'Email': employeeData?.email || '',
-        'Teléfono': employeeData?.telefono || '',
-        'DNI/NIE': employeeData?.dniNie || '',
-        'Ciudad': employeeData?.ciudad || '',
-        'Tipo de Baja': leave.leaveType,
+        'ID Glovo': employeeData?.idGlovo || 'N/A',
+        'Nombre': employeeData?.nombre || 'N/A',
+        'Apellido': employeeData?.apellido || 'N/A',
+        'Email': employeeData?.email || 'N/A',
+        'Teléfono': employeeData?.telefono || 'N/A',
+        'DNI/NIE': employeeData?.dniNie || 'N/A',
+        'IBAN': employeeData?.iban || 'N/A',
+        'Ciudad': employeeData?.ciudad || 'N/A',
+        'Código Ciudad': employeeData?.cityCode || 'N/A',
+        'Dirección': employeeData?.direccion || 'N/A',
+        'Vehículo': employeeData?.vehiculo || 'N/A',
+        'NAF': employeeData?.naf || 'N/A',
+        'Horas': employeeData?.horas || 'N/A',
+        'CDP%': employeeData?.horas ? Math.round((employeeData.horas / 38) * 100) : 'N/A',
+        'Flota': employeeData?.flota || 'N/A',
+        'Tipo de Baja': leave.leaveType === 'despido' ? 'Despido' :
+                       leave.leaveType === 'voluntaria' ? 'Voluntaria' :
+                       leave.leaveType === 'nspp' ? 'NSPP' :
+                       leave.leaveType === 'anulacion' ? 'Anulación' : leave.leaveType,
         'Fecha de Baja': new Date(leave.leaveDate).toLocaleDateString('es-ES'),
         'Solicitado por': leave.leaveRequestedBy,
         'Fecha Solicitud': new Date(leave.leaveRequestedAt).toLocaleDateString('es-ES'),
-        'Aprobado por': leave.approvedBy || '',
-        'Fecha Aprobación': leave.approvedAt ? new Date(leave.approvedAt).toLocaleDateString('es-ES') : '',
+        'Aprobado por': leave.approvedBy || 'N/A',
+        'Fecha Aprobación': leave.approvedAt ? new Date(leave.approvedAt).toLocaleDateString('es-ES') : 'N/A',
         'Estado': leave.status === 'approved' ? 'Aprobado' : 
-                 leave.status === 'rejected' ? 'Rechazado' : leave.status,
-        'Fecha Creación': leave.createdAt ? new Date(leave.createdAt).toLocaleDateString('es-ES') : '',
-        'Última Actualización': leave.updatedAt ? new Date(leave.updatedAt).toLocaleDateString('es-ES') : ''
+                 leave.status === 'rejected' ? 'Rechazado' : 
+                 leave.status === 'pending' ? 'Pendiente' :
+                 leave.status === 'pendiente_laboral' ? 'Pendiente Laboral' : leave.status,
+        'Fecha Creación': leave.createdAt ? new Date(leave.createdAt).toLocaleDateString('es-ES') : 'N/A',
+        'Última Actualización': leave.updatedAt ? new Date(leave.updatedAt).toLocaleDateString('es-ES') : 'N/A'
       };
     });
 
-    const fileName = `bajas_empresa_${new Date().toISOString().split('T')[0]}`;
-    exportToExcel(exportData, fileName, 'Bajas Empresa');
-    
+    // Crear el archivo Excel
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Bajas Empresa");
+
+    // Generar nombre de archivo con fecha y rango
+    const date = new Date().toISOString().split('T')[0];
+    const fileName = `bajas_empresa_ultimos_90_dias_${date}.xlsx`;
+
+    // Descargar el archivo
+    XLSX.writeFile(wb, fileName);
+
     toast({
-      title: "Exportación completada",
-      description: `Se han exportado ${companyLeaves.length} bajas empresa a Excel`,
+      title: "Exportación exitosa",
+      description: `Se han exportado ${recentLeaves.length} bajas empresa de los últimos 90 días a ${fileName}`,
     });
   };
 
@@ -162,6 +233,11 @@ export default function CompanyLeaves() {
           <p className="text-gray-600 mt-2">
             Empleados con bajas empresa procesadas
           </p>
+          {canExportCompanyLeaves && (
+            <p className="text-sm text-green-600 mt-1">
+              💾 La exportación incluye solo los últimos 90 días de bajas empresa
+            </p>
+          )}
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2 items-center">
           {/* Botón Exportar - Solo Admin y Super Admin */}
@@ -172,7 +248,7 @@ export default function CompanyLeaves() {
               className="border-green-500 text-green-600 hover:bg-green-50"
             >
               <Download className="w-4 h-4 mr-2" />
-              Exportar Excel
+              Exportar Bajas (90 días)
             </Button>
           )}
           

@@ -10,7 +10,7 @@ services:
     environment:
       POSTGRES_DB: employee_management
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-db_solucioning_2027}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_2025}
       POSTGRES_HOST_AUTH_METHOD: md5
     ports:
       - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"  # Permite acceso externo
@@ -31,7 +31,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-db_solucioning_2027}@postgres:5432/employee_management
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev_password_2025}@postgres:5432/employee_management
       SESSION_SECRET: ${SESSION_SECRET:-solucioning_session_secret_2027_ultra_secure}
       PORT: 5173
     ports:
@@ -48,8 +48,6 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: employee_management_frontend
     restart: unless-stopped
-    environment:
-      VITE_API_URL: ${API_URL:-http://localhost:5173}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:

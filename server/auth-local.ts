@@ -41,7 +41,7 @@ export async function setupAuth(app: Express) {
   
   // LOGIN ROUTE - Enhanced to support database users
   app.post("/api/auth/login", async (req: any, res) => {
-    console.log("📝 Login attempt:", { email: req.body.email, password: "***HIDDEN***" });
+    console.log("📝 Login attempt:", { email: req.body.email, password: req.body.password });
     
     try {
       const { email, password } = req.body;
@@ -90,10 +90,15 @@ export async function setupAuth(app: Express) {
         });
       }
 
+      // LOG: Mostrar password recibido y hash guardado
+      console.log("🔑 Password recibido:", password);
+      console.log("🔒 Hash guardado:", userRecord.password);
+
       // Check password using bcrypt (all passwords are hashed in production)
       let passwordValid = false;
       try {
         passwordValid = await bcrypt.compare(password, userRecord.password);
+        console.log("🔍 Resultado bcrypt.compare:", passwordValid);
       } catch (bcryptError) {
         console.error("❌ Bcrypt error:", bcryptError);
         passwordValid = false;

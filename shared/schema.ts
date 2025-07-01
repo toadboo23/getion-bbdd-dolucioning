@@ -66,8 +66,9 @@ export const employees = pgTable("employees", {
   faltasNoCheckInEnDias: integer("faltas_no_check_in_en_dias").default(0),
   cruce: text("cruce"),
   status: varchar("status", { 
-    enum: ["active", "it_leave", "company_leave_pending", "company_leave_approved"] 
+    enum: ["active", "it_leave", "company_leave_pending", "pendiente_laboral", "company_leave_approved"] 
   }).notNull().default("active"),
+  flota: varchar("flota", { length: 100 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -109,8 +110,9 @@ export const notifications = pgTable("notifications", {
   title: varchar("title").notNull(),
   message: text("message").notNull(),
   requestedBy: varchar("requested_by").notNull(),
-  status: varchar("status", { enum: ["pending", "approved", "rejected", "processed"] }).notNull().default("pending"),
+  status: varchar("status", { enum: ["pending", "pendiente_laboral", "approved", "rejected", "processed"] }).notNull().default("pending"),
   metadata: jsonb("metadata"),
+  processingDate: timestamp("processing_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -160,6 +162,7 @@ export const insertEmployeeSchema = z.object({
   idGlovo: z.string().min(1, "ID Glovo es requerido"),
   nombre: z.string().min(1, "Nombre es requerido"),
   telefono: z.string().min(1, "Teléfono es requerido"),
+  flota: z.string().min(1, "Flota es requerida"),
   // Campos opcionales simplificados
   emailGlovo: z.string().optional(),
   turno: z.string().optional(),

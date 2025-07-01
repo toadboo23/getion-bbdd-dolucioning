@@ -240,6 +240,24 @@ export class AuditService {
     });
   }
 
+  static async logPasswordChange(userId: string, userRole: "super_admin", targetUserEmail: string, req?: any) {
+    await this.logAction({
+      userId,
+      userRole,
+      action: "change_user_password",
+      entityType: "user",
+      entityId: targetUserEmail,
+      entityName: targetUserEmail,
+      description: `Contraseña cambiada para usuario: ${targetUserEmail}`,
+      newData: { 
+        targetUserEmail,
+        changedBy: userId,
+        changedAt: new Date().toISOString()
+      },
+      req
+    });
+  }
+
   static async logLogin(userId: string, userRole: "super_admin" | "admin" | "normal", req?: any) {
     await this.logAction({
       userId,

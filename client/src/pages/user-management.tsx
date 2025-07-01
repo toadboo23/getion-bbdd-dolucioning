@@ -292,7 +292,7 @@ export default function UserManagement() {
             Gestión de Usuarios
           </h1>
           <p className="text-gray-600 mt-2">
-            Administra los usuarios del sistema DVV5
+            Administra los usuarios del sistema Solucioning
           </p>
         </div>
         <div className="mt-4 sm:mt-0">
@@ -511,7 +511,7 @@ export default function UserManagement() {
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          {userRow.email !== 'admin@dvv5.com' && ( // No permitir borrar super admin
+                          {userRow.email !== 'superadmin@glovo.com' && ( // No permitir borrar super admin
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button

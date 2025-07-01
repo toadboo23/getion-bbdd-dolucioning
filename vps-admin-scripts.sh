@@ -2,7 +2,7 @@
 # Scripts de Administración para VPS
 # Comandos útiles para gestionar el proyecto en producción
 
-echo "=== Scripts de Administración DVV5 ==="
+echo "=== Scripts de Administración Solucioning ==="
 
 # 1. DESPLIEGUE EN PRODUCCIÓN
 deploy_production() {
@@ -140,7 +140,7 @@ setup_firewall() {
 monitor() {
     while true; do
         clear
-        echo "=== MONITOR DVV5 ==="
+        echo "=== MONITOR SOLUCIONING ==="
         echo "$(date)"
         echo ""
         

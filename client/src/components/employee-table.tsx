@@ -61,9 +61,12 @@ export default function EmployeeTable({
                 <TableHead>Empleado</TableHead>
                 <TableHead>Contacto</TableHead>
                 <TableHead>Ciudad</TableHead>
+                <TableHead>Flota</TableHead>
                 <TableHead>DNI/NIE</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Turno</TableHead>
+                <TableHead>Horas</TableHead>
+                <TableHead>CDP%</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -86,11 +89,20 @@ export default function EmployeeTable({
                     {employee.ciudad || 'N/A'}
                   </TableCell>
                   <TableCell className="text-sm text-gray-900">
+                    {employee.flota || 'N/A'}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-900">
                     {employee.dniNie || 'N/A'}
                   </TableCell>
                   <TableCell>{getStatusBadge(employee.status)}</TableCell>
                   <TableCell className="text-sm text-gray-900">
                     {employee.turno || 'N/A'}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-900">
+                    {employee.horas ? `${employee.horas} h` : 'N/A'}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-900">
+                    {employee.horas ? `${Math.round((employee.horas / 38) * 100)}%` : 'N/A'}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">

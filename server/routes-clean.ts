@@ -7,86 +7,104 @@ import { AuditService } from "./audit-service.js";
 const storage = new PostgresStorage();
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  console.log("🚀 Setting up routes...");
-
   // Setup authentication first
   await setupAuth(app);
 
   // Health check
   app.get("/api/health", (req, res) => {
-    console.log("❤️ Health check");
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Create test employees (development only)
-  app.post("/api/create-test-employees", isAuthenticated, async (req: any, res) => {
-    console.log("🧪 Creating test employees");
-    try {
-      const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can create test employees" });
-      }
 
-      // Create test employees
-      const testEmployees = [
-        {
-          idGlovo: "TEST001",
-          nombre: "Juan Pérez",
-          telefono: "+34 666 777 888",
-          emailGlovo: "juan@glovo.com",
-          apellido: "Pérez",
-          ciudad: "madrid"
-        },
-        {
-          idGlovo: "TEST002", 
-          nombre: "María García",
-          telefono: "+34 666 777 889",
-          emailGlovo: "maria@glovo.com",
-          apellido: "García",
-          ciudad: "barcelona"
-        }
-      ];
 
-      const createdEmployees = [];
-      for (const emp of testEmployees) {
-        try {
-          const created = await storage.createEmployee(emp);
-          createdEmployees.push(created);
-        } catch (error) {
-          console.log(`Employee ${emp.idGlovo} already exists or error:`, error);
-        }
-      }
-
-      console.log("✅ Test employees processed");
-      res.json({ message: "Test employees created", employees: createdEmployees });
-    } catch (error) {
-      console.error("❌ Error creating test employees:", error);
-      res.status(500).json({ message: "Failed to create test employees" });
-    }
-  });
-
-  // Dashboard metrics (protected)
+  // Dashboard metrics
   app.get("/api/dashboard/metrics", isAuthenticated, async (req: any, res) => {
-    console.log("📊 Dashboard metrics request");
     try {
       const user = req.user;
-      const metrics = await storage.getDashboardMetrics();
-      
-      // Solo el super admin puede ver las notificaciones pendientes
-      if (user?.role !== 'super_admin') {
-        metrics.pendingActions = 0; // Ocultar notificaciones pendientes para otros roles
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
       }
+      
+      // Get all employees
+      const employees = await storage.getAllEmployees();
+      
+      // Get all company leaves
+      const companyLeaves = await storage.getAllCompanyLeaves();
+      
+      // Get all notifications
+      const notifications = await storage.getAllNotifications();
+      
+      // Calculate metrics
+      const employeesInActiveTable = employees.length;
+      const employeesInCompanyLeave = companyLeaves.length;
+      const totalEmployees = employeesInActiveTable + employeesInCompanyLeave;
+      
+      // Count employees by status
+      const employeesByStatus = employees.reduce((acc: any, emp) => {
+        acc[emp.status] = (acc[emp.status] || 0) + 1;
+        return acc;
+      }, {});
+      
+      // Count notifications by status
+      const notificationsByStatus = notifications.reduce((acc: any, notif) => {
+        acc[notif.status] = (acc[notif.status] || 0) + 1;
+        return acc;
+      }, {});
+      
+      // Count employees by city
+      const employeesByCity = employees.reduce((acc: any[], emp) => {
+        const city = emp.ciudad || "Sin ciudad";
+        const existingCity = acc.find(c => c.city === city);
+        if (existingCity) {
+          existingCity.count += 1;
+        } else {
+          acc.push({ city, count: 1 });
+        }
+        return acc;
+      }, []).sort((a, b) => b.count - a.count);
+      
+      // Filter out empty cities and ensure we have at least some data
+      const filteredEmployeesByCity = employeesByCity.filter(city => city.city !== "Sin ciudad" && city.city.trim() !== "");
+      
+      // If no cities with data, create a default entry
+      const finalEmployeesByCity = filteredEmployeesByCity.length > 0 
+        ? filteredEmployeesByCity 
+        : [{ city: "Sin datos", count: 0 }];
+      
+      // Count employees by flota
+      const employeesByFlota = employees.reduce((acc: any[], emp) => {
+        const flota = emp.flota || "Sin flota";
+        const existingFlota = acc.find(f => f.flota === flota);
+        if (existingFlota) {
+          existingFlota.count += 1;
+        } else {
+          acc.push({ flota, count: 1 });
+        }
+        return acc;
+      }, []).sort((a, b) => b.count - a.count);
+      
+      // Prepare response
+      const metrics = {
+        totalEmployees,
+        activeEmployees: employeesByStatus.active || 0,
+        itLeaves: employeesByStatus.it_leave || 0,
+        pendingActions: notificationsByStatus.pending || 0,
+        pendingNotifications: notificationsByStatus.pending || 0,
+        pendingLaboralNotifications: notificationsByStatus.pendiente_laboral || 0,
+        topCities: finalEmployeesByCity.slice(0, 5),
+        employeesByCity: finalEmployeesByCity,
+        employeesByFlota
+      };
       
       res.json(metrics);
     } catch (error) {
-      console.error("❌ Error fetching dashboard metrics:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard metrics" });
+      console.error("❌ Error getting dashboard metrics:", error);
+      res.status(500).json({ message: "Failed to get dashboard metrics" });
     }
   });
 
   // Get unique cities for filters (protected)
   app.get("/api/cities", isAuthenticated, async (req, res) => {
-    console.log("🏙️ Unique cities request");
     try {
       const cities = await storage.getUniqueCities();
       res.json(cities);
@@ -98,7 +116,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get unique traffic managers for filters (protected)
   app.get("/api/traffic-managers", isAuthenticated, async (req, res) => {
-    console.log("👔 Unique traffic managers request");
     try {
       const trafficManagers = await storage.getUniqueTrafficManagers();
       res.json(trafficManagers);
@@ -108,11 +125,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para obtener jefes de tráfico únicos
+  app.get("/api/traffic-managers", async (req, res) => {
+    try {
+      const trafficManagers = await storage.getUniqueTrafficManagers();
+      res.json(trafficManagers);
+    } catch (error) {
+      console.error("Error fetching traffic managers:", error);
+      res.status(500).json({ message: "Error interno del servidor" });
+    }
+  });
+
+  // Endpoint para obtener flotas únicas
+  app.get("/api/flotas", async (req, res) => {
+    try {
+      const flotas = await storage.getUniqueFlotas();
+      res.json(flotas);
+    } catch (error) {
+      console.error("Error fetching flotas:", error);
+      res.status(500).json({ message: "Error interno del servidor" });
+    }
+  });
+
   // Employees list (protected)
   app.get("/api/employees", isAuthenticated, async (req, res) => {
     console.log("👥 Employees list request with filters:", req.query);
     try {
-      const { city, status, search, trafficManager } = req.query;
+      const { city, status, search, trafficManager, flota } = req.query;
       
       // Get all employees first
       let employees = await storage.getAllEmployees();
@@ -147,6 +186,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         employees = employees.filter(emp => 
           emp.jefeTrafico?.toLowerCase() === trafficManager.toLowerCase()
         );
+      }
+      
+      // Apply flota filter
+      if (flota && typeof flota === 'string' && flota.trim() !== '') {
+        employees = employees.filter(emp => emp.flota?.toLowerCase() === flota.toLowerCase());
       }
       
       console.log(`✅ Filtered employees: ${employees.length} results`);
@@ -191,14 +235,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employeeData = req.body;
       
       // Validate required fields
-      if (!employeeData.idGlovo || !employeeData.nombre || !employeeData.telefono) {
+      if (!employeeData.idGlovo || !employeeData.nombre || !employeeData.telefono || !employeeData.flota) {
         console.log("❌ Missing required fields:", {
           idGlovo: employeeData.idGlovo,
           nombre: employeeData.nombre,
-          telefono: employeeData.telefono
+          telefono: employeeData.telefono,
+          flota: employeeData.flota
         });
         return res.status(400).json({ 
-          message: "Campos requeridos: ID Glovo, Nombre y Teléfono" 
+          message: "Campos requeridos: ID Glovo, Nombre, Teléfono y Flota" 
         });
       }
 
@@ -219,188 +264,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Bulk import employees (protected - super_admin only)
+  // Bulk import employees
   app.post("/api/employees/bulk-import", isAuthenticated, async (req: any, res) => {
-    console.log("📦 Bulk import employees request from user:", req.user?.email, req.user?.role);
+    console.log("📤 Bulk import employees request");
     try {
       const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        console.log("❌ Permission denied for bulk import. User role:", user?.role);
-        return res.status(403).json({ message: "Only super admin can import employees" });
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
       }
 
       const { employees } = req.body;
-      
-      if (!employees || !Array.isArray(employees) || employees.length === 0) {
-        return res.status(400).json({ message: "Se requiere un array de empleados" });
+      console.log(`📤 Importing ${employees?.length || 0} employees`);
+
+      if (!Array.isArray(employees) || employees.length === 0) {
+        return res.status(400).json({ message: "Invalid request: employees must be a non-empty array" });
       }
 
-      console.log(`🔧 Processing ${employees.length} employees for bulk import...`);
-      
-      // Helper function to process strings
-      const processString = (stringValue: any): string | undefined => {
-        if (!stringValue || stringValue === "" || stringValue === "null" || stringValue === "undefined") {
-          return undefined;
-        }
-        return String(stringValue).trim();
-      };
-
-      // Helper function to process numbers
-      const processNumber = (numberValue: any): number | undefined => {
-        if (!numberValue || numberValue === "" || numberValue === "null" || numberValue === "undefined") {
-          return undefined;
-        }
-        
-        const parsed = Number(numberValue);
-        return !isNaN(parsed) ? parsed : undefined;
-      };
-
-      // Helper function to process dates
-      const processDate = (dateValue: any): string | undefined => {
-        if (!dateValue || dateValue === "" || dateValue === "null" || dateValue === "undefined") {
-          return undefined;
-        }
-        
-        try {
-          // If it's already a valid date string, return it
-          if (typeof dateValue === 'string') {
-            const trimmed = dateValue.trim();
-            if (trimmed === "") return undefined;
-            
-            // Try to parse the date
-            const parsed = Date.parse(trimmed);
-            if (!isNaN(parsed)) {
-              return new Date(parsed).toISOString().split('T')[0]; // Return YYYY-MM-DD format
-            }
-            
-            // Try manual parsing for different formats
-            if (trimmed.match(/^\d{4}-\d{2}-\d{2}$/)) {
-              return trimmed; // Already in YYYY-MM-DD format
-            }
-            
-            if (trimmed.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-              // DD/MM/YYYY format
-              const parts = trimmed.split('/');
-              const date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-              if (!isNaN(date.getTime())) {
-                return date.toISOString().split('T')[0];
-              }
-            }
-          }
-          
-          // If it's a number (Excel date serial)
-          if (typeof dateValue === 'number') {
-            // Excel dates are days since 1900-01-01 (with leap year bug)
-            const excelEpoch = new Date(1900, 0, 1);
-            const days = dateValue - 2; // Account for Excel's leap year bug
-            const date = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000);
-            if (!isNaN(date.getTime())) {
-              return date.toISOString().split('T')[0];
-            }
-          }
-        } catch (error) {
-          console.warn(`Error parsing date "${dateValue}":`, error);
-        }
-        
-        return undefined;
-      };
-
-      // Helper function to process boolean
-      const processBoolean = (boolValue: any): boolean => {
-        if (typeof boolValue === 'boolean') return boolValue;
-        if (typeof boolValue === 'string') {
-          const lower = boolValue.toLowerCase();
-          return lower === 'true' || lower === '1' || lower === 'yes' || lower === 'sí';
-        }
-        return false;
-      };
-
-      // Validate and process each employee
+      // Validate data before importing
+      const validationErrors = [];
       const validEmployees = [];
-      const errors = [];
 
       for (let i = 0; i < employees.length; i++) {
         const emp = employees[i];
-        
-        // Check required fields
-        if (!emp.idGlovo || !emp.nombre || !emp.telefono) {
-          errors.push(`Empleado ${i + 1}: Faltan campos requeridos (ID Glovo, Nombre, Teléfono)`);
+        if (!emp.idGlovo) {
+          validationErrors.push(`Employee at index ${i} is missing required field: idGlovo`);
           continue;
         }
-        
-        // Process all fields with proper type conversion
-        const processedEmployee = {
-          idGlovo: String(emp.idGlovo).trim(),
-          nombre: String(emp.nombre).trim(),
-          telefono: String(emp.telefono).trim(),
-          emailGlovo: processString(emp.emailGlovo),
-          turno: processString(emp.turno),
-          apellido: processString(emp.apellido),
-          email: processString(emp.email),
-          horas: processNumber(emp.horas),
-          complementaries: processString(emp.complementaries),
-          ciudad: processString(emp.ciudad),
-          cityCode: processString(emp.cityCode),
-          dniNie: processString(emp.dniNie),
-          iban: processString(emp.iban),
-          direccion: processString(emp.direccion),
-          vehiculo: processString(emp.vehiculo),
-          naf: processString(emp.naf),
-          fechaAltaSegSoc: processDate(emp.fechaAltaSegSoc),
-          statusBaja: processString(emp.statusBaja),
-          estadoSs: processString(emp.estadoSs),
-          informadoHorario: processBoolean(emp.informadoHorario),
-          cuentaDivilo: processString(emp.cuentaDivilo),
-          proximaAsignacionSlots: processDate(emp.proximaAsignacionSlots),
-          jefeTrafico: processString(emp.jefeTrafico),
-          comentsJefeDeTrafico: processString(emp.comentsJefeDeTrafico),
-          incidencias: processString(emp.incidencias),
-          fechaIncidencia: processDate(emp.fechaIncidencia),
-          faltasNoCheckInEnDias: processNumber(emp.faltasNoCheckInEnDias),
-          cruce: processString(emp.cruce),
-          status: emp.status || "active"
-        } as any;
-
-        console.log(`📝 Processed employee ${i + 1}:`, {
-          idGlovo: processedEmployee.idGlovo,
-          nombre: processedEmployee.nombre,
-          fechas: {
-            fechaAltaSegSoc: processedEmployee.fechaAltaSegSoc,
-            proximaAsignacionSlots: processedEmployee.proximaAsignacionSlots,
-            fechaIncidencia: processedEmployee.fechaIncidencia
-          }
-        });
-
-        validEmployees.push(processedEmployee);
+        if (!emp.flota) {
+          validationErrors.push(`Employee at index ${i} is missing required field: flota`);
+          continue;
+        }
+        validEmployees.push(emp);
       }
 
-      if (validEmployees.length === 0) {
+      if (validationErrors.length > 0) {
         return res.status(400).json({ 
-          message: "No hay empleados válidos para importar",
-          errors 
+          message: "Validation errors in employee data",
+          errors: validationErrors.slice(0, 10),
+          totalErrors: validationErrors.length
         });
       }
 
-      console.log(`✅ Ready to import ${validEmployees.length} valid employees`);
+      console.log(`📤 Processing ${validEmployees.length} valid employees for import`);
+      
+      const result = await storage.bulkCreateEmployees(validEmployees);
+      console.log("📤 Bulk import completed", result);
 
-      // Clear existing employees and bulk create new ones
-      await storage.clearAllEmployees();
-      const createdEmployees = await storage.bulkCreateEmployees(validEmployees);
-      
-      console.log(`✅ Bulk import completed: ${createdEmployees.length} employees created`);
-      
       // Log audit trail
-      await AuditService.logBulkImport(user.email, user.role, createdEmployees.length, req);
-      
-      res.status(201).json({ 
-        message: `${createdEmployees.length} empleados importados correctamente`,
-        imported: createdEmployees.length,
-        errors: errors.length > 0 ? errors : undefined
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: "bulk_import_employees",
+        entityType: "employees",
+        entityId: "bulk_import",
+        entityName: `Bulk import of ${result.created} employees`,
+        description: `Bulk import of ${result.created} employees completed successfully`,
+        newData: {
+          importedCount: result.created,
+          totalProcessed: validEmployees.length
+        },
+        req
       });
-    } catch (error) {
-      console.error("❌ Error in bulk import:", error);
-      console.error("❌ Full error details:", error instanceof Error ? error.stack : String(error));
-      res.status(500).json({ message: "Failed to import employees", error: error instanceof Error ? error.message : String(error) });
+
+      res.json(result);
+    } catch (error: unknown) {
+      console.error("❌ Error importing employees:", error);
+      
+      // Proporcionar mensajes de error más específicos
+      let errorMessage = "Failed to import employees";
+      let errorDetails = "";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        errorDetails = error.stack || 'No stack trace available';
+        
+        // Manejar errores específicos de PostgreSQL
+        if (error.message.includes('invalid input syntax for type date')) {
+          errorMessage = "Error en el formato de fechas. Asegúrate de que las fechas estén en formato válido (YYYY-MM-DD)";
+        } else if (error.message.includes('duplicate key value')) {
+          errorMessage = "Error: Algunos empleados ya existen en la base de datos";
+        } else if (error.message.includes('violates not-null constraint')) {
+          errorMessage = "Error: Faltan campos requeridos en algunos empleados";
+        }
+      }
+      
+      res.status(500).json({ 
+        message: errorMessage, 
+        error: error instanceof Error ? error.message : String(error),
+        details: errorDetails
+      });
     }
   });
 
@@ -481,14 +433,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log("✅ Company leave notification created:", notification.id);
-      
+
       // Log audit trail
-      await AuditService.logCompanyLeaveRequest(user.email, user.role, employee, leaveType, leaveDate, req);
-      
-      res.status(201).json({ message: "Solicitud de baja empresa enviada para aprobación", notificationId: notification.id });
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: "request_company_leave",
+        entityType: "company_leave",
+        entityId: employeeId,
+        entityName: `${employee.nombre} ${employee.apellido || ""}`,
+        description: `Solicitud de baja empresa: ${employee.nombre} ${employee.apellido || ""} - Tipo: ${leaveType} - Fecha: ${leaveDate}`,
+        newData: {
+          leaveType,
+          leaveDate,
+          employeeId
+        },
+        req
+      });
+
+      res.json({ success: true, notification });
     } catch (error) {
-      console.error("❌ Error creating company leave request:", error);
-      res.status(500).json({ message: "Failed to create company leave request" });
+      console.error("❌ Error requesting company leave:", error);
+      res.status(500).json({ message: "Failed to request company leave" });
     }
   });
 
@@ -615,7 +581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create new system user (super_admin only)
   app.post("/api/system-users", isAuthenticated, async (req: any, res) => {
-    console.log("➕ Create system user request");
+    console.log("➕ Create system user request:", req.body.email, req.body.role);
     try {
       const user = req.user;
       if (!user || user.role !== 'super_admin') {
@@ -624,23 +590,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { email, firstName, lastName, password, role } = req.body;
 
-      // Validations
       if (!email || !firstName || !lastName || !password || !role) {
         return res.status(400).json({ message: "All fields are required" });
       }
 
-      if (!['admin', 'normal'].includes(role)) {
-        return res.status(400).json({ message: "Invalid role. Must be 'admin' or 'normal'" });
+      if (!['super_admin', 'admin', 'normal'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
       }
 
       // Check if user already exists
       const existingUser = await storage.getSystemUserByEmail(email);
       if (existingUser) {
-        return res.status(400).json({ message: "User with this email already exists" });
+        return res.status(400).json({ message: "User already exists" });
       }
 
-      // Hash password (in a real app, use bcrypt)
-      const hashedPassword = password; // Simplified for demo
+      // Hash password con bcrypt
+      const bcrypt = require('bcrypt');
+      const hashedPassword = await bcrypt.hash(password, 10);
 
       const newUser = await storage.createSystemUser({
         email,
@@ -648,16 +614,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName,
         password: hashedPassword,
         role,
-        isActive: true,
         createdBy: user.email
       });
 
       // Log audit trail
       await AuditService.logUserCreation(user.email, user.role, newUser, req);
 
-      // Don't return password
-      const { password: _, ...userResponse } = newUser;
-      res.status(201).json(userResponse);
+      // Remove password from response
+      const safeUser = { ...newUser, password: undefined };
+      res.status(201).json(safeUser);
     } catch (error) {
       console.error("❌ Error creating system user:", error);
       res.status(500).json({ message: "Failed to create system user" });
@@ -726,7 +691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Prevent deleting super admin
-      if (existingUser.email === 'admin@dvv5.com') {
+              if (existingUser.email === 'superadmin@glovo.com') {
         return res.status(400).json({ message: "Cannot delete super admin user" });
       }
 
@@ -833,6 +798,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Nuevo endpoint para cambiar el estado a pendiente_laboral (super_admin only)
+  app.post("/api/notifications/:id/pendiente-laboral", isAuthenticated, async (req: any, res) => {
+    console.log("📋 Cambio a pendiente laboral:", req.params.id, req.body);
+    try {
+      const user = req.user;
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super admin can process notifications" });
+      }
+
+      const notificationId = parseInt(req.params.id);
+      const { processingDate } = req.body;
+
+      // Validar fecha de procesamiento
+      const processDate = processingDate ? new Date(processingDate) : new Date();
+      if (isNaN(processDate.getTime())) {
+        return res.status(400).json({ message: "Invalid processing date" });
+      }
+
+      console.log(`📋 Moving notification ${notificationId} to pendiente_laboral with date "${processDate.toISOString()}"`);
+
+      // Get notification
+      const allNotifications = await storage.getAllNotifications();
+      const notification = allNotifications.find(n => n.id === notificationId);
+      
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+
+      if (notification.status !== "pending") {
+        return res.status(400).json({ message: "Only pending notifications can be moved to pendiente_laboral" });
+      }
+
+      // Update notification status and processing date
+      await storage.updateNotificationStatusWithDate(notificationId, "pendiente_laboral", processDate);
+
+      // Log audit trail
+      if (notification.type === "company_leave_request") {
+        const metadata = notification.metadata as any;
+        const employee = await storage.getEmployee(metadata.employeeId);
+        if (employee) {
+          await AuditService.logAction({
+            userId: user.email,
+            userRole: user.role,
+            action: "update_notification_status",
+            entityType: "notification",
+            entityId: notificationId.toString(),
+            entityName: `Notificación ${notificationId}`,
+            description: `Cambio de estado de notificación a Pendiente Laboral para ${metadata.employeeName || employee.nombre}`,
+            oldData: { status: notification.status },
+            newData: { status: "pendiente_laboral" },
+            req
+          });
+        }
+      }
+
+      console.log(`✅ Notification moved to pendiente_laboral:`, notificationId);
+      res.json({ message: `Notification moved to pendiente_laboral successfully` });
+    } catch (error) {
+      console.error("❌ Error updating notification:", error);
+      res.status(500).json({ message: "Failed to update notification" });
+    }
+  });
+
   // Approve/reject company leave notification (super admin only)
   app.post("/api/notifications/:id/process", isAuthenticated, async (req: any, res) => {
     console.log("📋 Process notification:", req.params.id, req.body);
@@ -865,21 +893,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Notification not found" });
       }
 
-      if (notification.status !== "pending") {
-        return res.status(400).json({ message: "Notification already processed" });
+      // Solo se pueden procesar notificaciones en estado pendiente_laboral (nuevo flujo)
+      if (notification.status !== "pendiente_laboral") {
+        return res.status(400).json({ message: "Only pendiente_laboral notifications can be processed" });
       }
 
       if (action === "approve" && notification.type === "company_leave_request") {
         const metadata = notification.metadata as any;
-        
         // Get complete employee data before creating the leave record
         const employee = await storage.getEmployee(metadata.employeeId);
         if (!employee) {
           return res.status(404).json({ message: "Employee not found" });
         }
-        
-        // Create company leave record with complete employee data
-          const companyLeave = await storage.createCompanyLeave({
+        // Limpiar leaveData para que solo tenga los campos válidos
+        const leaveData = {
           employeeId: metadata.employeeId,
           employeeData: employee, // Store complete employee data as JSON
           leaveType: metadata.leaveType,
@@ -888,39 +915,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           leaveRequestedBy: notification.requestedBy,
           approvedBy: user.email,
           approvedAt: processDate, // Usar fecha personalizada
-          status: "approved",
-        });
-
+          status: "approved"
+        };
+        // Create company leave record
+        const companyLeave = await storage.createCompanyLeave(leaveData);
         // Remove employee from active employees table
         await storage.deleteEmployee(metadata.employeeId);
-
         console.log(`✅ Company leave approved with date ${processDate.toISOString()}, employee moved to company_leaves table`);
       } else if (action === "reject" && notification.type === "company_leave_request") {
         const metadata = notification.metadata as any;
         
-        // Get complete employee data before creating the leave record
+        // Get employee data
         const employee = await storage.getEmployee(metadata.employeeId);
         if (!employee) {
           return res.status(404).json({ message: "Employee not found" });
         }
         
-        // Create company leave record with complete employee data (but as rejected)
-        const companyLeave = await storage.createCompanyLeave({
-          employeeId: metadata.employeeId,
-          employeeData: employee, // Store complete employee data as JSON
-          leaveType: metadata.leaveType,
-          leaveDate: metadata.leaveDate,
-          leaveRequestedAt: notification.createdAt || new Date(),
-          leaveRequestedBy: notification.requestedBy,
-          approvedBy: user.email,
-          approvedAt: processDate, // Usar fecha personalizada
-          status: "rejected",
+        // Update employee status back to active
+        await storage.updateEmployee(metadata.employeeId, { 
+          status: "active"
         });
 
-        // Remove employee from active employees table
-        await storage.deleteEmployee(metadata.employeeId);
-
-        console.log(`✅ Company leave rejected with date ${processDate.toISOString()}, employee moved to company_leaves table`);
+        console.log(`✅ Company leave rejected, employee status set back to active`);
       }
 
       // Update notification status
@@ -954,8 +970,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch company leaves" });
     }
   });
-
-
 
   // Notifications (protected - admin and super_admin can view)
   app.get("/api/notifications", isAuthenticated, async (req: any, res) => {
@@ -1026,8 +1040,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User already exists" });
       }
 
-      // Hash password (in production, use bcrypt or similar)
-      const hashedPassword = password; // TODO: Implement proper password hashing
+      // Hash password con bcrypt
+      const bcrypt = require('bcrypt');
+      const hashedPassword = await bcrypt.hash(password, 10);
 
       const newUser = await storage.createSystemUser({
         email,
@@ -1070,7 +1085,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Hash password if provided
       if (updateData.password) {
-        updateData.password = updateData.password; // TODO: Implement proper password hashing
+        // Password hashing is handled in the storage layer
+        updateData.password = updateData.password;
       }
 
       const updatedUser = await storage.updateSystemUser(userId, updateData);
@@ -1118,6 +1134,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ Error deleting system user:", error);
       res.status(500).json({ message: "Failed to delete system user" });
+    }
+  });
+
+  // Change user password (Super Admin only)
+  app.post("/api/system-users/:id/change-password", isAuthenticated, async (req: any, res) => {
+    console.log("🔐 Change password request for user:", req.params.id);
+    try {
+      const user = req.user;
+      if (!user || user.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only super admin can change user passwords" });
+      }
+
+      const userId = parseInt(req.params.id);
+      const { newPassword } = req.body;
+
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ message: "New password is required and must be at least 6 characters long" });
+      }
+
+      // Get user data for audit log
+      const targetUser = await storage.getSystemUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Hash the new password
+      const bcrypt = require('bcrypt');
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update the password
+      const updatedUser = await storage.updateSystemUserPassword(userId, hashedPassword);
+
+      // Log audit trail
+      await AuditService.logPasswordChange(user.email, user.role, targetUser.email, req);
+
+      console.log("✅ Password changed successfully for user:", targetUser.email);
+      res.json({ 
+        message: "Password changed successfully",
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          role: updatedUser.role
+        }
+      });
+    } catch (error) {
+      console.error("❌ Error changing password:", error);
+      res.status(500).json({ message: "Failed to change password" });
     }
   });
 
