@@ -2,26 +2,14 @@ import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
-<<<<<<< HEAD
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Info, XCircle } from "lucide-react";
-=======
->>>>>>> cambios-2506
 
 interface ImportEmployeesModalProps {
   isOpen: boolean;

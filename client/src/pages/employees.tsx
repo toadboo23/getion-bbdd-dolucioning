@@ -25,11 +25,7 @@ export default function Employees() {
   const [searchTerm, setSearchTerm] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-<<<<<<< HEAD
-  const [fleetFilter, setFleetFilter] = useState("all");
-=======
   const [flotaFilter, setFlotaFilter] = useState("all");
->>>>>>> cambios-2506
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
@@ -60,11 +56,7 @@ export default function Employees() {
       search: searchTerm, 
       city: cityFilter === "all" ? "" : cityFilter, 
       status: statusFilter === "all" ? "" : statusFilter,
-<<<<<<< HEAD
-      fleet: fleetFilter === "all" ? "" : fleetFilter
-=======
       flota: flotaFilter === "all" ? "" : flotaFilter
->>>>>>> cambios-2506
     }],
     retry: false,
   });
@@ -76,13 +68,8 @@ export default function Employees() {
   });
 
   // Obtener flotas únicas para el filtro
-<<<<<<< HEAD
-  const { data: fleets } = useQuery<string[]>({
-    queryKey: ["/api/fleets"],
-=======
   const { data: flotas } = useQuery<string[]>({
     queryKey: ["/api/flotas"],
->>>>>>> cambios-2506
     retry: false,
   });
 
@@ -255,11 +242,7 @@ export default function Employees() {
       'Teléfono': emp.telefono,
       'Email': emp.email,
       'Horas': emp.horas,
-<<<<<<< HEAD
-      'CDP (%)': emp.cdp,
-=======
       'CDP%': emp.horas ? Math.round((emp.horas / 38) * 100) : null,
->>>>>>> cambios-2506
       'Complementarios': emp.complementaries,
       'Ciudad': emp.ciudad,
       'Código Ciudad': emp.cityCode,
@@ -281,7 +264,6 @@ export default function Employees() {
       'Fecha Incidencia': emp.fechaIncidencia ? new Date(emp.fechaIncidencia).toLocaleDateString('es-ES') : '',
       'Faltas No Check-in (días)': emp.faltasNoCheckInEnDias,
       'Cruce': emp.cruce,
-      'Flota': emp.flota,
       'Estado': emp.status === 'active' ? 'Activo' : 
                emp.status === 'it_leave' ? 'Baja IT' : 
                emp.status === 'company_leave_pending' ? 'Baja Empresa Pendiente' :
@@ -304,49 +286,12 @@ export default function Employees() {
     setSearchTerm("");
     setCityFilter("all");
     setStatusFilter("all");
-<<<<<<< HEAD
-    setFleetFilter("all");
-=======
     setFlotaFilter("all");
->>>>>>> cambios-2506
   };
 
   // Función para descargar plantilla de carga masiva
   const handleDownloadTemplate = () => {
     const headers = [
-<<<<<<< HEAD
-      'ID Glovo',
-      'Email Glovo',
-      'Turno',
-      'Nombre', 
-      'Apellido',
-      'Teléfono',
-      'Email',
-      'Horas',
-      'CDP (%)',
-      'Complementarios',
-      'Ciudad',
-      'Código Ciudad',
-      'DNI/NIE',
-      'IBAN',
-      'Dirección',
-      'Vehículo',
-      'NAF',
-      'Fecha Alta Seg. Social (AAAA-MM-DD)',
-      'Status Baja',
-      'Estado SS',
-      'Informado Horario (true/false)',
-      'Cuenta Divilo',
-      'Próxima Asignación Slots (AAAA-MM-DD)',
-      'Jefe de Tráfico',
-      'Flota',
-      'Comentarios Jefe Tráfico',
-      'Incidencias',
-      'Fecha Incidencia (AAAA-MM-DD)',
-      'Faltas No Check-in (días)',
-      'Cruce',
-      'Estado (active/it_leave/company_leave_pending/company_leave_approved)'
-=======
       'idGlovo',
       'emailGlovo',
       'turno',
@@ -378,7 +323,6 @@ export default function Employees() {
       'cruce',
       'flota',
       'status'
->>>>>>> cambios-2506
     ];
     
     createExcelTemplate(headers, 'plantilla_empleados', 'Plantilla Empleados');
@@ -547,31 +491,18 @@ export default function Employees() {
             </div>
 
             <div>
-<<<<<<< HEAD
-              <label htmlFor="fleet-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                Flota
-              </label>
-              <Select value={fleetFilter} onValueChange={setFleetFilter}>
-=======
               <label htmlFor="flota-filter" className="block text-sm font-medium text-gray-700 mb-2">
                 Flota
               </label>
               <Select value={flotaFilter} onValueChange={setFlotaFilter}>
->>>>>>> cambios-2506
                 <SelectTrigger>
                   <SelectValue placeholder="Todas las flotas" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las flotas</SelectItem>
-<<<<<<< HEAD
-                  {fleets?.map((fleet) => (
-                    <SelectItem key={fleet} value={fleet}>
-                      {fleet}
-=======
                   {flotas?.map((flota) => (
                     <SelectItem key={flota} value={flota}>
                       {flota}
->>>>>>> cambios-2506
                     </SelectItem>
                   ))}
                 </SelectContent>
