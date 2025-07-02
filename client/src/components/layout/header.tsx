@@ -1,30 +1,30 @@
-import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Menu, Bell } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Menu, Bell } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   onMobileMenuToggle?: () => void;
 }
 
-export default function Header({ onMobileMenuToggle }: HeaderProps) {
+export default function Header ({ onMobileMenuToggle }: HeaderProps) {
   const { user } = useAuth();
 
   const getRoleBadge = (role: string) => {
     const roleColors = {
-      super_admin: "bg-blue-100 text-blue-800",
-      admin: "bg-green-100 text-green-800", 
-      normal: "bg-gray-100 text-gray-800",
+      super_admin: 'bg-blue-100 text-blue-800',
+      admin: 'bg-green-100 text-green-800',
+      normal: 'bg-gray-100 text-gray-800',
     };
-    
+
     const roleLabels = {
-      super_admin: "Super Admin",
-      admin: "Admin",
-      normal: "Usuario",
+      super_admin: 'Super Admin',
+      admin: 'Admin',
+      normal: 'Usuario',
     };
 
     return (
-      <span className={cn("inline-flex items-center px-2 py-1 rounded-full text-xs font-medium", roleColors[role as keyof typeof roleColors])}>
+      <span className={cn('inline-flex items-center px-2 py-1 rounded-full text-xs font-medium', roleColors[role as keyof typeof roleColors])}>
         {roleLabels[role as keyof typeof roleLabels]}
       </span>
     );
@@ -43,23 +43,17 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
             >
               <Menu className="w-5 h-5" />
             </Button>
-<<<<<<< HEAD
             <div className="flex items-center space-x-2">
               <img src="/logo.png" alt="Logo" className="h-8 w-8" />
               <span className="text-lg font-semibold text-gray-900">
                 Solucioning
               </span>
             </div>
-=======
-            <h1 className="text-xl font-semibold text-gray-900">
-              Solucioning
-            </h1>
->>>>>>> cambios-2506
           </div>
-          
+
           <div className="flex items-center space-x-4">
             {/* Notifications */}
-            {user?.role === "super_admin" && (
+            {user?.role === 'super_admin' && (
               <div className="relative">
                 <Button variant="ghost" size="sm" className="relative">
                   <Bell className="w-5 h-5" />
@@ -69,7 +63,7 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
                 </Button>
               </div>
             )}
-            
+
             {/* User Profile */}
             <div className="flex items-center space-x-3">
               <div className="text-right">

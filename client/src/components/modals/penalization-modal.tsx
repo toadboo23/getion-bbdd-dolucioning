@@ -1,72 +1,72 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertTriangle, Calendar, Clock } from "lucide-react";
-import type { Employee } from "@shared/schema";
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertTriangle, Clock } from 'lucide-react';
+import type { Employee } from '@shared/schema';
 
 interface PenalizationModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
-  action: "penalize" | "remove";
+  action: 'penalize' | 'remove';
 }
 
-export default function PenalizationModal({ isOpen, onClose, employee, action }: PenalizationModalProps) {
+export default function PenalizationModal ({ isOpen, onClose, employee, action }: PenalizationModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [observations, setObservations] = useState("");
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [observations, setObservations] = useState('');
 
   const penalizeMutation = useMutation({
     mutationFn: async ({ employeeId, startDate, endDate, observations }: { employeeId: string; startDate: string; endDate: string; observations: string }) => {
-      await apiRequest("POST", `/api/employees/${employeeId}/penalize`, { startDate, endDate, observations });
+      await apiRequest('POST', `/api/employees/${employeeId}/penalize`, { startDate, endDate, observations });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
       toast({
-        title: "Empleado penalizado",
-        description: "El empleado ha sido penalizado correctamente",
+        title: 'Empleado penalizado',
+        description: 'El empleado ha sido penalizado correctamente',
       });
       onClose();
-      setStartDate("");
-      setEndDate("");
-      setObservations("");
+      setStartDate('');
+      setEndDate('');
+      setObservations('');
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.response?.data?.message || "No se pudo penalizar al empleado",
-        variant: "destructive",
+        title: 'Error',
+        description: error.response?.data?.message || 'No se pudo penalizar al empleado',
+        variant: 'destructive',
       });
     },
   });
 
   const removePenalizationMutation = useMutation({
     mutationFn: async (employeeId: string) => {
-      await apiRequest("POST", `/api/employees/${employeeId}/remove-penalization`);
+      await apiRequest('POST', `/api/employees/${employeeId}/remove-penalization`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
       toast({
-        title: "Penalización removida",
-        description: "La penalización ha sido removida y las horas restauradas",
+        title: 'Penalización removida',
+        description: 'La penalización ha sido removida y las horas restauradas',
       });
       onClose();
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.response?.data?.message || "No se pudo remover la penalización",
-        variant: "destructive",
+        title: 'Error',
+        description: error.response?.data?.message || 'No se pudo remover la penalización',
+        variant: 'destructive',
       });
     },
   });
@@ -74,21 +74,21 @@ export default function PenalizationModal({ isOpen, onClose, employee, action }:
   const handleSubmit = () => {
     if (!employee) return;
 
-    if (action === "penalize") {
+    if (action === 'penalize') {
       if (!startDate || !endDate) {
         toast({
-          title: "Error",
-          description: "Por favor completa las fechas de inicio y fin",
-          variant: "destructive",
+          title: 'Error',
+          description: 'Por favor completa las fechas de inicio y fin',
+          variant: 'destructive',
         });
         return;
       }
 
       if (!observations.trim()) {
         toast({
-          title: "Error",
-          description: "Por favor ingrese las observaciones del motivo de la penalización",
-          variant: "destructive",
+          title: 'Error',
+          description: 'Por favor ingrese las observaciones del motivo de la penalización',
+          variant: 'destructive',
         });
         return;
       }
@@ -104,7 +104,7 @@ export default function PenalizationModal({ isOpen, onClose, employee, action }:
     }
   };
 
-  const isPenalize = action === "penalize";
+  const isPenalize = action === 'penalize';
   const isLoading = penalizeMutation.isPending || removePenalizationMutation.isPending;
 
   return (
@@ -113,7 +113,7 @@ export default function PenalizationModal({ isOpen, onClose, employee, action }:
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-orange-600" />
-            {isPenalize ? "Penalizar Empleado" : "Remover Penalización"}
+            {isPenalize ? 'Penalizar Empleado' : 'Remover Penalización'}
           </DialogTitle>
         </DialogHeader>
 
@@ -123,7 +123,7 @@ export default function PenalizationModal({ isOpen, onClose, employee, action }:
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-medium text-gray-900 mb-2">Empleado</h4>
               <div className="space-y-1 text-sm">
-                <p><strong>Nombre:</strong> {employee.nombre} {employee.apellido || ""}</p>
+                <p><strong>Nombre:</strong> {employee.nombre} {employee.apellido || ''}</p>
                 <p><strong>ID Glovo:</strong> {employee.idGlovo}</p>
                 <p><strong>Horas actuales:</strong> {employee.horas || 0}</p>
                 {employee.originalHours && (
@@ -200,7 +200,7 @@ export default function PenalizationModal({ isOpen, onClose, employee, action }:
                     <div>
                       <h5 className="font-medium text-orange-800">Efectos de la penalización:</h5>
                       <ul className="text-sm text-orange-700 mt-2 space-y-1">
-                        <li>• El estado del empleado cambiará a "Penalizado"</li>
+                        <li>• El estado del empleado cambiará a &quot;Penalizado&quot;</li>
                         <li>• Las horas se pondrán a 0 durante la penalización</li>
                         <li>• Las horas originales se guardarán para restaurarlas después</li>
                         <li>• La penalización se puede remover manualmente en cualquier momento</li>
@@ -218,7 +218,7 @@ export default function PenalizationModal({ isOpen, onClose, employee, action }:
                   <div>
                     <h5 className="font-medium text-green-800">Efectos de remover la penalización:</h5>
                     <ul className="text-sm text-green-700 mt-2 space-y-1">
-                      <li>• El estado del empleado volverá a "Activo"</li>
+                                              <li>• El estado del empleado volverá a &quot;Activo&quot;</li>
                       <li>• Las horas originales serán restauradas</li>
                       <li>• Se eliminarán las fechas de penalización</li>
                     </ul>
@@ -242,14 +242,14 @@ export default function PenalizationModal({ isOpen, onClose, employee, action }:
           <Button
             onClick={handleSubmit}
             disabled={isLoading || (isPenalize && (!startDate || !endDate || !observations.trim()))}
-            className={isPenalize ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700"}
+            className={isPenalize ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700'}
           >
-            {isLoading ? "Procesando..." : (
-              isPenalize ? "Penalizar Empleado" : "Remover Penalización"
+            {isLoading ? 'Procesando...' : (
+              isPenalize ? 'Penalizar Empleado' : 'Remover Penalización'
             )}
           </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
-} 
+}

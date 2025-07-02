@@ -1,31 +1,31 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
-import { isUnauthorizedError } from "@/lib/authUtils";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { exportToExcel, createExcelTemplate } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
-import EmployeeTable from "@/components/employee-table";
-import EditEmployeeModal from "@/components/modals/edit-employee-modal";
-import LeaveManagementModal from "@/components/modals/leave-management-modal";
-import ImportEmployeesModal from "@/components/modals/import-employees-modal";
-import EmployeeDetailModal from "@/components/modals/employee-detail-modal";
-import PenalizationModal from "@/components/modals/penalization-modal";
-import { Plus, Search, Download, FileSpreadsheet, Upload, Loader2, Trash2 } from "lucide-react";
-import type { Employee } from "@shared/schema";
-import * as XLSX from 'xlsx';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { isUnauthorizedError } from '@/lib/authUtils';
+import { queryClient, apiRequest } from '@/lib/queryClient';
+import { exportToExcel, createEmployeeTemplate } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
+import EmployeeTable from '@/components/employee-table';
+import EditEmployeeModal from '@/components/modals/edit-employee-modal';
+import LeaveManagementModal from '@/components/modals/leave-management-modal';
+import ImportEmployeesModal from '@/components/modals/import-employees-modal';
+import EmployeeDetailModal from '@/components/modals/employee-detail-modal';
+import PenalizationModal from '@/components/modals/penalization-modal';
+import { Plus, Search, Download, FileSpreadsheet, Upload, Loader2, Trash2 } from 'lucide-react';
+import type { Employee } from '@shared/schema';
+// XLSX import removed as it's not used in this file
 
-export default function Employees() {
+export default function Employees () {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [cityFilter, setCityFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [flotaFilter, setFlotaFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [cityFilter, setCityFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [flotaFilter, setFlotaFilter] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
@@ -33,113 +33,111 @@ export default function Employees() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailEmployee, setDetailEmployee] = useState<Employee | null>(null);
   const [isPenalizationModalOpen, setIsPenalizationModalOpen] = useState(false);
-  const [penalizationAction, setPenalizationAction] = useState<"penalize" | "remove">("penalize");
+  const [penalizationAction, setPenalizationAction] = useState<'penalize' | 'remove'>('penalize');
   const [penalizationEmployee, setPenalizationEmployee] = useState<Employee | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
+        title: 'Unauthorized',
+        description: 'You are logged out. Logging in again...',
+        variant: 'destructive',
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = '/api/login';
       }, 500);
       return;
     }
   }, [isAuthenticated, isLoading, toast]);
 
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
-    queryKey: ["/api/employees", { 
-      search: searchTerm, 
-      city: cityFilter === "all" ? "" : cityFilter, 
-      status: statusFilter === "all" ? "" : statusFilter,
-      flota: flotaFilter === "all" ? "" : flotaFilter
+    queryKey: ['/api/employees', {
+      search: searchTerm,
+      city: cityFilter === 'all' ? '' : cityFilter,
+      status: statusFilter === 'all' ? '' : statusFilter,
+      flota: flotaFilter === 'all' ? '' : flotaFilter,
     }],
     retry: false,
   });
 
   // Obtener ciudades únicas para el filtro
   const { data: cities } = useQuery<string[]>({
-    queryKey: ["/api/cities"],
+    queryKey: ['/api/cities'],
     retry: false,
   });
 
   // Obtener flotas únicas para el filtro
   const { data: flotas } = useQuery<string[]>({
-    queryKey: ["/api/flotas"],
+    queryKey: ['/api/flotas'],
     retry: false,
   });
 
   const createEmployeeMutation = useMutation({
     mutationFn: async (employeeData: any) => {
-      try {
-        const response = await apiRequest("POST", "/api/employees", employeeData);
-        return response;
-      } catch (error) {
-        throw error;
-      }
+      const response = await apiRequest('POST', '/api/employees', employeeData);
+      return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
       toast({
-        title: "Empleado creado",
-        description: "El empleado ha sido agregado correctamente",
+        title: 'Empleado creado',
+        description: 'El empleado ha sido agregado correctamente',
       });
       setIsEditModalOpen(false);
       setSelectedEmployee(null);
     },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
+    onError: (_error) => {
+      if (isUnauthorizedError(_error)) {
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
+          title: 'Error de autorización',
+          description: 'Tu sesión ha expirado. Redirigiendo al login...',
+          variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = '/api/login';
         }, 500);
         return;
       }
       toast({
-        title: "Error",
-        description: "No se pudo crear el empleado",
-        variant: "destructive",
+        title: 'Error al eliminar empleado',
+        description: _error instanceof Error ? _error.message : 'Error desconocido',
+        variant: 'destructive',
       });
     },
   });
 
   const updateEmployeeMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      await apiRequest("PUT", `/api/employees/${id}`, data);
+      await apiRequest('PUT', `/api/employees/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
       toast({
-        title: "Empleado actualizado",
-        description: "Los datos del empleado han sido actualizados",
+        title: 'Empleado actualizado',
+        description: 'Los datos del empleado han sido actualizados',
       });
       setIsEditModalOpen(false);
       setSelectedEmployee(null);
     },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
+    onError: (_error) => {
+      if (isUnauthorizedError(_error)) {
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
+          title: 'Error de autorización',
+          description: 'Tu sesión ha expirado. Redirigiendo al login...',
+          variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = '/api/login';
         }, 500);
         return;
       }
       toast({
-        title: "Error",
-        description: "No se pudo actualizar el empleado",
-        variant: "destructive",
+        title: 'Error al eliminar empleado',
+        description: _error instanceof Error ? _error.message : 'Error desconocido',
+        variant: 'destructive',
       });
     },
   });
@@ -147,20 +145,32 @@ export default function Employees() {
   // Mutación para eliminar todos los empleados (solo super admin)
   const deleteAllEmployeesMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("DELETE", "/api/employees/all");
+      await apiRequest('DELETE', '/api/employees/all');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
       toast({
-        title: "Empleados eliminados",
-        description: "Todos los empleados han sido eliminados exitosamente",
+        title: 'Empleados eliminados',
+        description: 'Todos los empleados han sido eliminados exitosamente',
       });
     },
-    onError: (error) => {
+    onError: (_error) => {
+      if (isUnauthorizedError(_error)) {
+        toast({
+          title: 'Error de autorización',
+          description: 'Tu sesión ha expirado. Redirigiendo al login...',
+          variant: 'destructive',
+        });
+        setTimeout(() => {
+          window.location.href = '/api/login';
+        }, 500);
+        return;
+      }
       toast({
-        title: "Error",
-        description: "No se pudieron eliminar todos los empleados",
-        variant: "destructive",
+        title: 'Error al eliminar empleados',
+        description: _error instanceof Error ? _error.message : 'Error desconocido',
+        variant: 'destructive',
       });
     },
   });
@@ -169,9 +179,9 @@ export default function Employees() {
   const handleDeleteAllEmployees = () => {
     if (!employees || employees.length === 0) {
       toast({
-        title: "Sin empleados",
-        description: "No hay empleados para eliminar",
-        variant: "destructive",
+        title: 'Sin empleados',
+        description: 'No hay empleados para eliminar',
+        variant: 'destructive',
       });
       return;
     }
@@ -183,11 +193,11 @@ export default function Employees() {
   };
 
   // Definir permisos específicos por rol
-  const canEditEmployees = user?.role === "admin" || user?.role === "super_admin";
-  const canImportEmployees = user?.role === "super_admin"; // Solo super admin puede importar
-  const canExportEmployees = user?.role === "super_admin"; // Solo super admin puede exportar
-  const canDownloadTemplate = user?.role === "super_admin"; // Solo super admin puede descargar plantillas
-  const isReadOnlyUser = user?.role === "normal"; // Usuario normal solo puede consultar
+  const canEditEmployees = user?.role === 'admin' || user?.role === 'super_admin';
+  const canImportEmployees = user?.role === 'super_admin'; // Solo super admin puede importar
+  const canExportEmployees = user?.role === 'super_admin'; // Solo super admin puede exportar
+  const canDownloadTemplate = user?.role === 'super_admin'; // Solo super admin puede descargar plantillas
+  const isReadOnlyUser = user?.role === 'normal'; // Usuario normal solo puede consultar
 
   const handleEditEmployee = (employee: Employee) => {
     setSelectedEmployee(employee);
@@ -211,13 +221,13 @@ export default function Employees() {
 
   const handlePenalize = (employee: Employee) => {
     setPenalizationEmployee(employee);
-    setPenalizationAction("penalize");
+    setPenalizationAction('penalize');
     setIsPenalizationModalOpen(true);
   };
 
   const handleRemovePenalization = (employee: Employee) => {
     setPenalizationEmployee(employee);
-    setPenalizationAction("remove");
+    setPenalizationAction('remove');
     setIsPenalizationModalOpen(true);
   };
 
@@ -225,9 +235,9 @@ export default function Employees() {
   const handleExportEmployees = () => {
     if (!employees || employees.length === 0) {
       toast({
-        title: "Sin datos",
-        description: "No hay empleados para exportar",
-        variant: "destructive",
+        title: 'Sin datos',
+        description: 'No hay empleados para exportar',
+        variant: 'destructive',
       });
       return;
     }
@@ -240,7 +250,7 @@ export default function Employees() {
       'Nombre': emp.nombre,
       'Apellido': emp.apellido,
       'Teléfono': emp.telefono,
-      'Email': emp.email,
+      'Email Personal': emp.email,
       'Horas': emp.horas,
       'CDP%': emp.horas ? Math.round((emp.horas / 38) * 100) : null,
       'Complementarios': emp.complementaries,
@@ -264,75 +274,40 @@ export default function Employees() {
       'Fecha Incidencia': emp.fechaIncidencia ? new Date(emp.fechaIncidencia).toLocaleDateString('es-ES') : '',
       'Faltas No Check-in (días)': emp.faltasNoCheckInEnDias,
       'Cruce': emp.cruce,
-      'Estado': emp.status === 'active' ? 'Activo' : 
-               emp.status === 'it_leave' ? 'Baja IT' : 
-               emp.status === 'company_leave_pending' ? 'Baja Empresa Pendiente' :
-               emp.status === 'company_leave_approved' ? 'Baja Empresa Aprobada' : emp.status,
+      'Estado': emp.status === 'active' ? 'Activo' :
+        emp.status === 'it_leave' ? 'Baja IT' :
+          emp.status === 'company_leave_pending' ? 'Baja Empresa Pendiente' :
+            emp.status === 'company_leave_approved' ? 'Baja Empresa Aprobada' : emp.status,
       'Fecha Creación': emp.createdAt ? new Date(emp.createdAt).toLocaleDateString('es-ES') : '',
-      'Última Actualización': emp.updatedAt ? new Date(emp.updatedAt).toLocaleDateString('es-ES') : ''
+      'Última Actualización': emp.updatedAt ? new Date(emp.updatedAt).toLocaleDateString('es-ES') : '',
     }));
 
     const fileName = `empleados_${new Date().toISOString().split('T')[0]}`;
     exportToExcel(exportData, fileName, 'Empleados');
-    
+
     toast({
-      title: "Exportación completada",
+      title: 'Exportación completada',
       description: `Se han exportado ${employees.length} empleados a Excel`,
     });
   };
 
   // Función para limpiar todos los filtros
   const handleClearFilters = () => {
-    setSearchTerm("");
-    setCityFilter("all");
-    setStatusFilter("all");
-    setFlotaFilter("all");
+    setSearchTerm('');
+    setCityFilter('all');
+    setStatusFilter('all');
+    setFlotaFilter('all');
   };
 
   // Función para descargar plantilla de carga masiva
   const handleDownloadTemplate = () => {
-    const headers = [
-      'idGlovo',
-      'emailGlovo',
-      'turno',
-      'nombre',
-      'apellido',
-      'telefono',
-      'email',
-      'horas',
-      'cdp',
-      'complementaries',
-      'ciudad',
-      'cityCode',
-      'dniNie',
-      'iban',
-      'direccion',
-      'vehiculo',
-      'naf',
-      'fechaAltaSegSoc',
-      'statusBaja',
-      'estadoSs',
-      'informadoHorario',
-      'cuentaDivilo',
-      'proximaAsignacionSlots',
-      'jefeTrafico',
-      'comentsJefeDeTrafico',
-      'incidencias',
-      'fechaIncidencia',
-      'faltasNoCheckInEnDias',
-      'cruce',
-      'flota',
-      'status'
-    ];
-    
-    createExcelTemplate(headers, 'plantilla_empleados', 'Plantilla Empleados');
-    
+    createEmployeeTemplate('plantilla_empleados');
+
     toast({
-      title: "Plantilla descargada",
-      description: "La plantilla para carga masiva ha sido descargada",
+      title: 'Plantilla descargada',
+      description: 'La plantilla para carga masiva ha sido descargada',
     });
   };
-
 
 
   if (isLoading || employeesLoading) {
@@ -360,8 +335,8 @@ export default function Employees() {
           <div className="mt-4 sm:mt-0 flex flex-wrap gap-2">
             {/* Botón Descargar Plantilla - Solo Admin y Super Admin */}
             {canDownloadTemplate && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={handleDownloadTemplate}
                 className="border-blue-500 text-blue-600 hover:bg-blue-50"
               >
@@ -369,11 +344,11 @@ export default function Employees() {
                 Plantilla Excel
               </Button>
             )}
-            
+
             {/* Botón Importar Empleados - Solo Super Admin */}
             {canImportEmployees && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setIsImportModalOpen(true)}
                 className="border-purple-500 text-purple-600 hover:bg-purple-50"
               >
@@ -381,11 +356,11 @@ export default function Employees() {
                 Importar Excel
               </Button>
             )}
-            
+
             {/* Botón Eliminar Todos los Empleados - Solo Super Admin */}
-            {user?.role === "super_admin" && (
-              <Button 
-                variant="destructive" 
+            {user?.role === 'super_admin' && (
+              <Button
+                variant="destructive"
                 onClick={handleDeleteAllEmployees}
                 disabled={deleteAllEmployeesMutation.isPending}
                 className="bg-red-600 hover:bg-red-700 text-white"
@@ -398,11 +373,11 @@ export default function Employees() {
                 Eliminar Todos
               </Button>
             )}
-            
+
             {/* Botón Exportar - Solo Admin y Super Admin */}
             {canExportEmployees && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={handleExportEmployees}
                 className="border-green-500 text-green-600 hover:bg-green-50"
               >
@@ -410,7 +385,7 @@ export default function Employees() {
                 Exportar Excel
               </Button>
             )}
-            
+
             {/* Botón Agregar Empleado - Solo Admin y Super Admin */}
             {canEditEmployees && (
               <Button onClick={handleAddEmployee}>
@@ -418,7 +393,7 @@ export default function Employees() {
                 Agregar Empleado
               </Button>
             )}
-            
+
             {/* Mensaje para usuario de solo consulta */}
             {isReadOnlyUser && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
@@ -442,7 +417,7 @@ export default function Employees() {
               <div className="relative">
                 <Input
                   id="search"
-                  placeholder="Nombre, apellido, teléfono o email..."
+                  placeholder="Nombre, apellido, teléfono, email personal o email Glovo..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -509,11 +484,11 @@ export default function Employees() {
               </Select>
             </div>
           </div>
-          
+
           {/* Botón para limpiar filtros */}
           <div className="mt-4 flex justify-end">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleClearFilters}
               size="sm"
               className="text-gray-600 hover:text-gray-800"

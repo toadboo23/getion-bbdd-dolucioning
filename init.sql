@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 -- Initialize PostgreSQL database for Solucioning System
-=======
--- Initialize PostgreSQL database for Solucioning
->>>>>>> cambios-2506
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create sessions table for authentication
@@ -56,15 +52,11 @@ CREATE TABLE IF NOT EXISTS employees (
   fecha_incidencia date,
   faltas_no_check_in_en_dias integer DEFAULT 0,
   cruce text,
-<<<<<<< HEAD
   status varchar(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'it_leave', 'company_leave_pending', 'company_leave_approved', 'pending_laboral', 'penalizado')),
   penalization_start_date date,
   penalization_end_date date,
   original_hours integer,
-=======
-  flota varchar(100) NOT NULL,
-  status varchar(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'it_leave', 'company_leave_pending', 'company_leave_approved')),
->>>>>>> cambios-2506
+  flota varchar(100),
   created_at timestamp DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
@@ -108,6 +100,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   requested_by varchar(255) NOT NULL,
   status varchar(50) DEFAULT 'pending',
   metadata jsonb,
+  processing_date timestamp,
   created_at timestamp DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
@@ -239,23 +232,21 @@ INSERT INTO notifications (type, title, message, requested_by, status) VALUES
 
 -- Insert production super admin users
 INSERT INTO system_users (email, first_name, last_name, password, role, created_by, is_active) 
-SELECT * FROM (VALUES 
+VALUES 
   ('nmartinez@solucioning.net', 'Nicolas', 'Martinez', '$2b$10$DsYjQKJM/dj1Xqm1iPjlG.NhMxW2XY.CsZ1eOwqsX8WP8SwgXZ/5u', 'super_admin', 'SYSTEM', true),
-  ('lvega@solucioning.net', 'Luis', 'Vega', '$2b$10$uXIrjF2pO/CeY./qT825ruTZOocZ0o7BdpOhGASaBGdaUOncUTaF.', 'super_admin', 'SYSTEM', true)
-) AS v(email, first_name, last_name, password, role, created_by, is_active)
-WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email IN ('nmartinez@solucioning.net', 'lvega@solucioning.net'));
+  ('lvega@solucioning.net', 'Luciana', 'Vega', '$2b$10$uXIrjF2pO/CeY./qT825ruTZOocZ0o7BdpOhGASaBGdaUOncUTaF.', 'super_admin', 'SYSTEM', true)
+ON CONFLICT (email) DO NOTHING;
 
 -- Insert additional super admin users
 INSERT INTO system_users (email, first_name, last_name, password, role, created_by, is_active) 
-SELECT * FROM (VALUES 
-  ('lvega@solucioning.net', 'Luis', 'Vega', '84739265', 'super_admin', 'SYSTEM', true),
+VALUES 
+  ('lvega@solucioning.net', 'Luciana', 'Vega', '84739265', 'super_admin', 'SYSTEM', true),
   ('superadmin@solucioning.net', 'Super', 'Admin', '39284756', 'super_admin', 'SYSTEM', true)
-) AS v(email, first_name, last_name, password, role, created_by, is_active)
-WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email = v.email);
+ON CONFLICT (email) DO NOTHING;
 
 -- Insert admin users for traffic management
 INSERT INTO system_users (email, first_name, last_name, password, role, created_by, is_active) 
-SELECT * FROM (VALUES 
+VALUES 
   ('trafico1@solucioning.net', 'trafico1', 'Admin', '83931493', 'admin', 'SYSTEM', true),
   ('trafico2@solucioning.net', 'trafico2', 'Admin', '69243740', 'admin', 'SYSTEM', true),
   ('trafico3@solucioning.net', 'trafico3', 'Admin', '57442923', 'admin', 'SYSTEM', true),
@@ -276,8 +267,7 @@ SELECT * FROM (VALUES
   ('trafico18@solucioning.net', 'trafico18', 'Admin', '74772716', 'admin', 'SYSTEM', true),
   ('trafico19@solucioning.net', 'trafico19', 'Admin', '14516355', 'admin', 'SYSTEM', true),
   ('trafico20@solucioning.net', 'trafico20', 'Admin', '98167078', 'admin', 'SYSTEM', true)
-) AS v(email, first_name, last_name, password, role, created_by, is_active)
-WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email = v.email);
+ON CONFLICT (email) DO NOTHING;
 
 -- Insert initial audit log for system setup
 INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
@@ -286,7 +276,6 @@ SELECT * FROM (VALUES
 ) AS v(user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
 WHERE NOT EXISTS (SELECT 1 FROM audit_logs WHERE action = 'system_init');
 
-<<<<<<< HEAD
 -- Migration: Add unique constraint to dni_nie field to prevent duplicates
 DO $$ 
 BEGIN 
@@ -342,13 +331,4 @@ BEGIN
     -- Log the migration
     INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
     VALUES ('SYSTEM', 'super_admin', 'migration', 'database', 'employees', 'Employees Table', 'Añadidos campos de penalización (fechas y horas originales)', '127.0.0.1', 'Migration Script');
-=======
--- Migration: Add flota column if it doesn't exist (for existing databases)
-DO $$ 
-BEGIN 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'employees' AND column_name = 'flota') THEN
-        ALTER TABLE employees ADD COLUMN flota varchar(100) NOT NULL DEFAULT 'FLOTA1';
-    END IF;
->>>>>>> cambios-2506
 END $$;

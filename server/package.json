@@ -5,7 +5,7 @@
   "main": "index-clean.ts",
   "type": "module",
   "scripts": {
-    "dev:backend": "tsx watch index-clean.ts",
+    "dev:backend": "tsconfig-paths -p ../tsconfig.json tsx watch index-clean.ts",
     "build": "tsc",
     "start": "node dist/index-clean.js",
     "check": "tsc --noEmit"
@@ -29,7 +29,8 @@
     "@types/multer": "^1.4.11",
     "@types/node": "^20.10.5",
     "typescript": "^5.3.3",
-    "tsx": "^4.6.2"
+    "tsx": "^4.6.2",
+    "tsconfig-paths": "^4.2.0"
   },
   "keywords": [
     "express",

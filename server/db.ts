@@ -1,9 +1,9 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import * as schema from "../shared/schema.js";
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import * as schema from '../shared/schema.js';
 
 // Database connection for local development
-const databaseUrl = process.env.DATABASE_URL || "postgresql://postgres:password123@localhost:5432/employee_management";
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://postgres:password123@localhost:5432/employee_management';
 
 // Create postgres client
 const client = postgres(databaseUrl, {

@@ -3,9 +3,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { AlertTriangle } from "lucide-react";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle } from 'lucide-react';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -15,18 +15,18 @@ interface ConfirmationModalProps {
   onCancel: () => void;
   confirmText?: string;
   cancelText?: string;
-  variant?: "default" | "destructive";
+  variant?: 'default' | 'destructive';
 }
 
-export default function ConfirmationModal({
+export default function ConfirmationModal ({
   isOpen,
   title,
   message,
   onConfirm,
   onCancel,
-  confirmText = "Confirmar",
-  cancelText = "Cancelar",
-  variant = "destructive",
+  confirmText = 'Confirmar',
+  cancelText = 'Cancelar',
+  variant = 'destructive',
 }: ConfirmationModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>

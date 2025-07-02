@@ -5,12 +5,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Eye, Edit, UserX, AlertTriangle } from "lucide-react";
-import type { Employee } from "@shared/schema";
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Eye, Edit, UserX, AlertTriangle } from 'lucide-react';
+import type { Employee } from '@shared/schema';
 
 interface EmployeeTableProps {
   employees: Employee[];
@@ -23,7 +23,7 @@ interface EmployeeTableProps {
   isReadOnlyUser?: boolean;
 }
 
-export default function EmployeeTable({
+export default function EmployeeTable ({
   employees,
   onEditEmployee,
   onManageLeave,
@@ -35,17 +35,17 @@ export default function EmployeeTable({
 }: EmployeeTableProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "active":
+      case 'active':
         return <Badge className="bg-green-100 text-green-800">Activo</Badge>;
-      case "it_leave":
+      case 'it_leave':
         return <Badge className="bg-orange-100 text-orange-800">Baja IT</Badge>;
-      case "company_leave_pending":
+      case 'company_leave_pending':
         return <Badge className="bg-yellow-100 text-yellow-800">Baja Empresa Pendiente</Badge>;
-      case "company_leave_approved":
+      case 'company_leave_approved':
         return <Badge className="bg-red-100 text-red-800">Baja Empresa Aprobada</Badge>;
-      case "pending_laboral":
+      case 'pending_laboral':
         return <Badge className="bg-purple-100 text-purple-800">Pendiente Laboral</Badge>;
-      case "penalizado":
+      case 'penalizado':
         return <Badge className="bg-orange-100 text-orange-800">Penalizado</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
@@ -53,16 +53,16 @@ export default function EmployeeTable({
   };
 
   const getRowClassName = (status: string) => {
-    if (status === "it_leave") {
-      return "bg-orange-50 border-l-4 border-l-orange-400";
+    if (status === 'it_leave') {
+      return 'bg-orange-50 border-l-4 border-l-orange-400';
     }
-    if (status === "penalizado") {
-      return "bg-orange-50 border-l-4 border-l-orange-400";
+    if (status === 'penalizado') {
+      return 'bg-orange-50 border-l-4 border-l-orange-400';
     }
-    if (status === "pending_laboral") {
-      return "bg-purple-50 border-l-4 border-l-purple-400";
+    if (status === 'pending_laboral') {
+      return 'bg-purple-50 border-l-4 border-l-purple-400';
     }
-    return "";
+    return '';
   };
 
   return (
@@ -73,16 +73,14 @@ export default function EmployeeTable({
             <TableHeader>
               <TableRow>
                 <TableHead>Empleado</TableHead>
-                <TableHead>Contacto</TableHead>
+                <TableHead>Emails & Teléfono</TableHead>
                 <TableHead>Ciudad</TableHead>
                 <TableHead>Flota</TableHead>
                 <TableHead>DNI/NIE</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Horas</TableHead>
-                <TableHead>CDP</TableHead>
-                <TableHead>Turno</TableHead>
-                <TableHead>Horas</TableHead>
                 <TableHead>CDP%</TableHead>
+                <TableHead>Turno</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -99,7 +97,8 @@ export default function EmployeeTable({
                   </TableCell>
                   <TableCell>
                     <div className="text-sm text-gray-900">{employee.email || 'N/A'}</div>
-                    <div className="text-sm text-gray-500">{employee.telefono || 'N/A'}</div>
+                    <div className="text-sm text-gray-500">{employee.emailGlovo || 'N/A'}</div>
+                    <div className="text-xs text-gray-400">{employee.telefono || 'N/A'}</div>
                   </TableCell>
                   <TableCell className="text-sm text-gray-900 capitalize">
                     {employee.ciudad || 'N/A'}
@@ -112,14 +111,14 @@ export default function EmployeeTable({
                   </TableCell>
                   <TableCell>{getStatusBadge(employee.status)}</TableCell>
                   <TableCell>
-                    {employee.status === "penalizado" ? (
+                    {employee.status === 'penalizado' ? (
                       <span className="inline-block px-2 py-1 rounded bg-red-100 text-red-700 font-semibold text-xs">
                         0 <span className="ml-1">(penalizado)</span>
                       </span>
                     ) : (
                       <span className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
-                        (employee.horas ?? 0) > 0 
-                          ? 'bg-green-100 text-green-700' 
+                        (employee.horas ?? 0) > 0
+                          ? 'bg-green-100 text-green-700'
                           : 'bg-red-100 text-red-700'
                       }`}>
                         {employee.horas ?? 0}
@@ -127,17 +126,17 @@ export default function EmployeeTable({
                     )}
                   </TableCell>
                   <TableCell>
-                    {employee.status === "penalizado" ? (
+                    {employee.status === 'penalizado' ? (
                       <span className="inline-block px-2 py-1 rounded bg-red-100 text-red-700 font-semibold text-xs">
                         0%
                       </span>
                     ) : (
                       <span className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
-                        (employee.cdp ?? 0) >= 80 
-                          ? 'bg-green-100 text-green-700' 
+                        (employee.cdp ?? 0) >= 80
+                          ? 'bg-green-100 text-green-700'
                           : (employee.cdp ?? 0) >= 50
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
                       }`}>
                         {employee.cdp ?? 0}%
                       </span>
@@ -145,12 +144,6 @@ export default function EmployeeTable({
                   </TableCell>
                   <TableCell className="text-sm text-gray-900">
                     {employee.turno || 'N/A'}
-                  </TableCell>
-                  <TableCell className="text-sm text-gray-900">
-                    {employee.horas ? `${employee.horas} h` : 'N/A'}
-                  </TableCell>
-                  <TableCell className="text-sm text-gray-900">
-                    {employee.horas ? `${Math.round((employee.horas / 38) * 100)}%` : 'N/A'}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
@@ -163,7 +156,7 @@ export default function EmployeeTable({
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
-                      
+
                       {/* Botones de edición - Solo para Admin y Super Admin */}
                       {canEdit && !isReadOnlyUser && (
                         <>
@@ -183,9 +176,9 @@ export default function EmployeeTable({
                           >
                             <UserX className="w-4 h-4" />
                           </Button>
-                          
+
                           {/* Botón de penalización */}
-                          {employee.status !== "penalizado" && (
+                          {employee.status !== 'penalizado' && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -196,9 +189,9 @@ export default function EmployeeTable({
                               <AlertTriangle className="w-4 h-4" />
                             </Button>
                           )}
-                          
+
                           {/* Botón para remover penalización */}
-                          {employee.status === "penalizado" && (
+                          {employee.status === 'penalizado' && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -211,7 +204,7 @@ export default function EmployeeTable({
                           )}
                         </>
                       )}
-                      
+
                       {/* Mensaje para usuario de solo consulta */}
                       {isReadOnlyUser && (
                         <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">
@@ -246,8 +239,8 @@ export default function EmployeeTable({
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700">
-                  Mostrando <span className="font-medium">1</span> a{" "}
-                  <span className="font-medium">{employees.length}</span> de{" "}
+                  Mostrando <span className="font-medium">1</span> a{' '}
+                  <span className="font-medium">{employees.length}</span> de{' '}
                   <span className="font-medium">{employees.length}</span> empleados
                 </p>
               </div>

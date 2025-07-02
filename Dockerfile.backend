@@ -2,14 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files from server directory
-COPY server/package*.json ./
+# Copy package files from root directory
+COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy server source code
-COPY server/ ./
+COPY server/ ./server/
 
 # Copy shared directory
 COPY shared/ ./shared/

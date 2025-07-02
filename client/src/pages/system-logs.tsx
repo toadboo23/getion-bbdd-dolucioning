@@ -35,7 +35,7 @@ interface AuditStats {
   dailyActivity: Array<{ date: string; count: number }>;
 }
 
-export default function SystemLogsPage() {
+export default function SystemLogsPage () {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<AuditStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,18 +46,18 @@ export default function SystemLogsPage() {
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [limit, setLimit] = useState(100);
-  const [showStats, setShowStats] = useState(true);
+  const [showStats] = useState(true);
 
   const actionTypes = [
     'CREATE_EMPLOYEE', 'UPDATE_EMPLOYEE', 'DELETE_EMPLOYEE', 'BULK_IMPORT', 'REACTIVATE_EMPLOYEE',
     'CREATE_IT_LEAVE', 'APPROVE_IT_LEAVE', 'REJECT_IT_LEAVE',
     'CREATE_COMPANY_LEAVE', 'APPROVE_COMPANY_LEAVE', 'REJECT_COMPANY_LEAVE',
     'PROCESS_NOTIFICATION', 'CREATE_USER', 'UPDATE_USER', 'DELETE_USER',
-    'LOGIN', 'LOGOUT'
+    'LOGIN', 'LOGOUT',
   ];
 
   const entityTypes = [
-    'employee', 'it_leave', 'company_leave', 'notification', 'system_user', 'session'
+    'employee', 'it_leave', 'company_leave', 'notification', 'system_user', 'session',
   ];
 
   const actionColors: Record<string, string> = {
@@ -77,7 +77,7 @@ export default function SystemLogsPage() {
     'UPDATE_USER': 'bg-cyan-100 text-cyan-800',
     'DELETE_USER': 'bg-red-100 text-red-800',
     'LOGIN': 'bg-slate-100 text-slate-800',
-    'LOGOUT': 'bg-gray-100 text-gray-800'
+    'LOGOUT': 'bg-gray-100 text-gray-800',
   };
 
   const fetchLogs = async () => {
@@ -93,7 +93,7 @@ export default function SystemLogsPage() {
       params.append('limit', limit.toString());
 
       const response = await fetch(`/api/audit-logs?${params.toString()}`, {
-        credentials: 'include'
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -112,7 +112,7 @@ export default function SystemLogsPage() {
   const fetchStats = async () => {
     try {
       const response = await fetch('/api/audit-logs/stats', {
-        credentials: 'include'
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -152,7 +152,7 @@ export default function SystemLogsPage() {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     });
   };
 
@@ -184,7 +184,7 @@ export default function SystemLogsPage() {
       'ID de Entidad',
       'Nombre de Entidad',
       'Descripción',
-      'User Agent'
+      'User Agent',
     ];
 
     const csvData = logs.map(log => [
@@ -197,7 +197,7 @@ export default function SystemLogsPage() {
       log.entityId || '',
       log.entityName || '',
       log.description,
-      log.userAgent || ''
+      log.userAgent || '',
     ]);
 
     const csvContent = [headers, ...csvData]
@@ -232,7 +232,7 @@ export default function SystemLogsPage() {
       'ID de Entidad': log.entityId || '',
       'Nombre de Entidad': log.entityName || '',
       'Descripción': log.description,
-      'User Agent': log.userAgent || ''
+      'User Agent': log.userAgent || '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(excelData);
@@ -241,16 +241,16 @@ export default function SystemLogsPage() {
 
     // Auto-size columns
     const colWidths = [
-      { wch: 8 },   // ID
-      { wch: 20 },  // Fecha/Hora
-      { wch: 25 },  // Usuario
-      { wch: 12 },  // Rol
-      { wch: 20 },  // Acción
-      { wch: 15 },  // Tipo de Entidad
-      { wch: 15 },  // ID de Entidad
-      { wch: 25 },  // Nombre de Entidad
-      { wch: 50 },  // Descripción
-      { wch: 30 }   // User Agent
+      { wch: 8 }, // ID
+      { wch: 20 }, // Fecha/Hora
+      { wch: 25 }, // Usuario
+      { wch: 12 }, // Rol
+      { wch: 20 }, // Acción
+      { wch: 15 }, // Tipo de Entidad
+      { wch: 15 }, // ID de Entidad
+      { wch: 25 }, // Nombre de Entidad
+      { wch: 50 }, // Descripción
+      { wch: 30 }, // User Agent
     ];
     ws['!cols'] = colWidths;
 
@@ -271,7 +271,7 @@ export default function SystemLogsPage() {
       { 'Métrica': 'Total de Acciones', 'Valor': stats.totalActions },
       { 'Métrica': 'Usuarios Activos', 'Valor': stats.userActivity?.length || 0 },
       { 'Métrica': 'Tipos de Acción', 'Valor': Object.keys(stats.actionsByType || {}).length },
-      { 'Métrica': 'Acciones Hoy', 'Valor': stats.dailyActivity?.find(d => d.date === new Date().toISOString().split('T')[0])?.count || 0 }
+      { 'Métrica': 'Acciones Hoy', 'Valor': stats.dailyActivity?.find(d => d.date === new Date().toISOString().split('T')[0])?.count || 0 },
     ];
     const ws1 = XLSX.utils.json_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(wb, ws1, 'Resumen General');
@@ -280,7 +280,7 @@ export default function SystemLogsPage() {
     if (stats.actionsByType) {
       const actionsData = Object.entries(stats.actionsByType).map(([action, count]) => ({
         'Tipo de Acción': action,
-        'Cantidad': count
+        'Cantidad': count,
       }));
       const ws2 = XLSX.utils.json_to_sheet(actionsData);
       XLSX.utils.book_append_sheet(wb, ws2, 'Acciones por Tipo');
@@ -291,7 +291,7 @@ export default function SystemLogsPage() {
       const userData = stats.userActivity.map(user => ({
         'Usuario': user.userId,
         'Cantidad de Acciones': user.count,
-        'Última Acción': formatDate(user.lastAction)
+        'Última Acción': formatDate(user.lastAction),
       }));
       const ws3 = XLSX.utils.json_to_sheet(userData);
       XLSX.utils.book_append_sheet(wb, ws3, 'Actividad de Usuarios');
@@ -301,7 +301,7 @@ export default function SystemLogsPage() {
     if (stats.dailyActivity) {
       const dailyData = stats.dailyActivity.map(day => ({
         'Fecha': day.date,
-        'Cantidad de Acciones': day.count
+        'Cantidad de Acciones': day.count,
       }));
       const ws4 = XLSX.utils.json_to_sheet(dailyData);
       XLSX.utils.book_append_sheet(wb, ws4, 'Actividad Diaria');
@@ -382,8 +382,8 @@ export default function SystemLogsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button 
-                onClick={exportStatsToExcel} 
+              <Button
+                onClick={exportStatsToExcel}
                 className="flex items-center gap-2"
                 variant="outline"
               >
@@ -482,20 +482,20 @@ export default function SystemLogsPage() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !startDate && "text-muted-foreground"
+                      'w-full justify-start text-left font-normal',
+                      !startDate && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {startDate ? (
                       (() => {
                         try {
-                          return format(startDate, "dd/MM/yyyy");
+                          return format(startDate, 'dd/MM/yyyy');
                         } catch {
                           return startDate.toLocaleDateString('es-ES');
                         }
                       })()
-                    ) : "Seleccionar fecha"}
+                    ) : 'Seleccionar fecha'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -516,20 +516,20 @@ export default function SystemLogsPage() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !endDate && "text-muted-foreground"
+                      'w-full justify-start text-left font-normal',
+                      !endDate && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {endDate ? (
                       (() => {
                         try {
-                          return format(endDate, "dd/MM/yyyy");
+                          return format(endDate, 'dd/MM/yyyy');
                         } catch {
                           return endDate.toLocaleDateString('es-ES');
                         }
                       })()
-                    ) : "Seleccionar fecha"}
+                    ) : 'Seleccionar fecha'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -575,18 +575,18 @@ export default function SystemLogsPage() {
             </div>
             {logs.length > 0 && (
               <div className="flex gap-2">
-                <Button 
-                  onClick={exportToCSV} 
-                  variant="outline" 
+                <Button
+                  onClick={exportToCSV}
+                  variant="outline"
                   size="sm"
                   className="flex items-center gap-2"
                 >
                   <FileTextIcon className="h-4 w-4" />
                   Exportar CSV
                 </Button>
-                <Button 
-                  onClick={exportToExcel} 
-                  variant="outline" 
+                <Button
+                  onClick={exportToExcel}
+                  variant="outline"
                   size="sm"
                   className="flex items-center gap-2"
                 >
@@ -625,8 +625,8 @@ export default function SystemLogsPage() {
                     <TableCell>
                       <Badge variant="outline" className={
                         log.userRole === 'super_admin' ? 'bg-red-50 text-red-700' :
-                        log.userRole === 'admin' ? 'bg-yellow-50 text-yellow-700' :
-                        'bg-green-50 text-green-700'
+                          log.userRole === 'admin' ? 'bg-yellow-50 text-yellow-700' :
+                            'bg-green-50 text-green-700'
                       }>
                         {log.userRole}
                       </Badge>
@@ -678,4 +678,4 @@ export default function SystemLogsPage() {
       </Card>
     </div>
   );
-} 
+}
