@@ -4,6 +4,17 @@ import type { User } from '@shared/schema';
 // Use relative URLs for Docker/production, absolute URLs only for local development
 const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:5173' : '';
 
+// Definir interfaz para notificaciones
+interface Notification {
+  id: number;
+  status: string;
+  type: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export function useAuth () {
   const queryClient = useQueryClient();
 
@@ -87,7 +98,7 @@ export function useAuth () {
 
 // Hook para obtener el contador de notificaciones
 export function useNotificationCount () {
-  const { data: notifications } = useQuery({
+  const { data: notifications } = useQuery<Notification[]>({
     queryKey: ['/api/notifications'],
     queryFn: async () => {
       const response = await fetch(`${API_BASE_URL}/api/notifications`, {
@@ -104,7 +115,7 @@ export function useNotificationCount () {
     retry: false,
   });
 
-  const pendingCount = notifications?.filter((notification: any) =>
+  const pendingCount = notifications?.filter((notification: Notification) =>
     notification.status === 'pending',
   ).length || 0;
 

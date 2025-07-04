@@ -116,11 +116,13 @@ export default function EmployeeTable ({
                         0 <span className="ml-1">(penalizado)</span>
                       </span>
                     ) : (
-                      <span className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
-                        (employee.horas ?? 0) > 0
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}>
+                      <span
+                        className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
+                          (employee.horas ?? 0) > 0
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}
+                      >
                         {employee.horas ?? 0}
                       </span>
                     )}
@@ -131,14 +133,16 @@ export default function EmployeeTable ({
                         0%
                       </span>
                     ) : (
-                      <span className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
-                        (employee.cdp ?? 0) >= 80
-                          ? 'bg-green-100 text-green-700'
-                          : (employee.cdp ?? 0) >= 50
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-700'
-                      }`}>
-                        {employee.cdp ?? 0}%
+                      <span
+                        className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
+                          (employee.cdp ?? 0) >= 80
+                            ? 'bg-green-100 text-green-700'
+                            : (employee.cdp ?? 0) >= 50
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {(employee.cdp ?? 0).toFixed(2)}%
                       </span>
                     )}
                   </TableCell>

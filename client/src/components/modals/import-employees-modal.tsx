@@ -41,7 +41,11 @@ interface ValidationError {
   message: string;
 }
 
-export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: ImportEmployeesModalProps) {
+export default function ImportEmployeesModal ({
+  isOpen,
+  onClose,
+  onImported,
+}: ImportEmployeesModalProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,7 +61,7 @@ export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: I
       // Procesar en lotes si hay muchos empleados
       const batchSize = 100;
       const employees = data.employees;
-      
+
       if (employees.length <= batchSize) {
         // Lote pequeño, procesar directamente
         const response = await apiRequest('POST', '/api/employees/bulk-import', data);
@@ -65,39 +69,39 @@ export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: I
       } else {
         // Archivo grande, procesar en lotes
         console.log(`📦 Procesando ${employees.length} empleados en lotes de ${batchSize}`);
-        
+
         const batches = [];
         for (let i = 0; i < employees.length; i += batchSize) {
           batches.push(employees.slice(i, i + batchSize));
         }
-        
+
         const results = [];
         for (let i = 0; i < batches.length; i++) {
           const batch = batches[i];
           console.log(`📦 Procesando lote ${i + 1}/${batches.length} (${batch.length} empleados)`);
-          
+
           try {
             const response = await apiRequest('POST', '/api/employees/bulk-import', {
               employees: batch,
               dryRun: data.dryRun,
             });
             results.push(response);
-            
+
             // Actualizar progreso
             const progress = Math.round(((i + 1) / batches.length) * 100);
             setUploadProgress(progress);
-            
+
           } catch (error) {
             console.error(`❌ Error en lote ${i + 1}:`, error);
             throw new Error(`Error en lote ${i + 1}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
           }
         }
-        
+
         // Combinar resultados
-        const totalImported = results.reduce((sum, result: any) => {
+        const totalImported = results.reduce((sum, result: { importedCount?: number }) => {
           return sum + (result.importedCount || 0);
         }, 0);
-        
+
         return {
           success: true,
           message: `Se importaron ${totalImported} empleados en ${batches.length} lotes`,
@@ -112,7 +116,9 @@ export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: I
         const responseData = data as { validEmployees?: EmployeeData[]; invalidEmployees?: EmployeeData[] };
         toast({
           title: 'Vista previa completada',
-          description: `Se encontraron ${responseData.validEmployees?.length || 0} empleados válidos y ${responseData.invalidEmployees?.length || 0} con errores`,
+          description: `Se encontraron ${responseData.validEmployees?.length || 0} empleados válidos y ${
+            responseData.invalidEmployees?.length || 0
+          } con errores`,
         });
       } else {
         // Actual upload
@@ -166,13 +172,17 @@ export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: I
     if (selectedFile.size > maxSize) {
       toast({
         title: 'Archivo demasiado grande',
-        description: `El archivo excede el límite de 50MB. Tamaño actual: ${(selectedFile.size / 1024 / 1024).toFixed(1)}MB`,
+        description: `El archivo excede el límite de 50MB. Tamaño actual: ${
+          (selectedFile.size / 1024 / 1024).toFixed(1)
+        }MB`,
         variant: 'destructive',
       });
       return;
     }
 
-    console.log(`📁 Archivo seleccionado: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(1)}MB)`);
+    console.log(`📁 Archivo seleccionado: ${selectedFile.name} (${
+      (selectedFile.size / 1024 / 1024).toFixed(1)
+    }MB)`);
     setFile(selectedFile);
     processFile(selectedFile);
   };
@@ -183,7 +193,7 @@ export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: I
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
-        
+
         if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
           toast({
             title: 'Error en el archivo',
@@ -192,10 +202,10 @@ export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: I
           });
           return;
         }
-        
+
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        
+
         if (!worksheet) {
           toast({
             title: 'Error en el archivo',
@@ -204,7 +214,7 @@ export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: I
           });
           return;
         }
-        
+
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
         if (jsonData.length < 2) {
@@ -331,7 +341,7 @@ export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: I
         });
       }
     };
-    
+
     reader.onerror = () => {
       toast({
         title: 'Error al leer archivo',
@@ -339,7 +349,7 @@ export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: I
         variant: 'destructive',
       });
     };
-    
+
     reader.readAsArrayBuffer(selectedFile);
   };
 
@@ -578,7 +588,7 @@ export default function ImportEmployeesModal ({ isOpen, onClose, onImported }: I
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>
-                        {employees.length > 100 
+                        {employees.length > 100
                           ? `Procesando ${employees.length} empleados en lotes...`
                           : 'Procesando importación...'
                         }

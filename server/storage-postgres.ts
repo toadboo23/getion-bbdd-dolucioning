@@ -1,30 +1,27 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, desc } from 'drizzle-orm';
 import {
-  employees,
-  companyLeaves,
-  notifications,
   systemUsers,
   auditLogs,
-  users,
+  employees,
+  companyLeaves,
   itLeaves,
-  type Employee,
-  type CompanyLeave,
-  type Notification,
+  notifications,
   type SystemUser,
   type AuditLog,
-  type User,
-  type UpsertUser,
-  type InsertEmployee,
-  type UpdateEmployee,
-  type InsertCompanyLeave,
-  type ItLeave,
-  type InsertItLeave,
-  type InsertNotification,
   type InsertSystemUser,
   type UpdateSystemUser,
   type InsertAuditLog,
+  type Employee,
+  type InsertEmployee,
+  type UpdateEmployee,
+  type CompanyLeave,
+  type InsertCompanyLeave,
+  type ItLeave,
+  type InsertItLeave,
+  type Notification,
+  type InsertNotification,
 } from '../shared/schema.js';
 // import { IStorage } from "./storage.js";
 
@@ -38,33 +35,36 @@ export const db = drizzle(pool);
 // Helper function to calculate CDP
 export const calculateCDP = (horas: number | null | undefined): number => {
   if (!horas || horas <= 0) return 0;
-  return Math.round((horas / 38) * 100);
+  return Number(((horas / 38) * 100).toFixed(2));
 };
+
+// Type for upsert user operation
+type UpsertUser = InsertSystemUser & { id: number };
 
 export class PostgresStorage {
   // User operations
-  async getUser (id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+  async getUser (id: number): Promise<SystemUser | undefined> {
+    const [user] = await db.select().from(systemUsers).where(eq(systemUsers.id, id));
     return user;
   }
 
-  async upsertUser (userData: UpsertUser): Promise<User> {
+  async upsertUser (userData: UpsertUser): Promise<SystemUser> {
     try {
       // Try to insert first
       const [user] = await db
-        .insert(users)
+        .insert(systemUsers)
         .values(userData)
         .returning();
       return user;
     } catch {
       // If insert fails (user exists), update instead
       const [user] = await db
-        .update(users)
+        .update(systemUsers)
         .set({
           ...userData,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, userData.id))
+        .where(eq(systemUsers.id, userData.id))
         .returning();
       return user;
     }
@@ -85,7 +85,7 @@ export class PostgresStorage {
     const cdp = calculateCDP(employeeData.horas);
     const employeeDataWithCDP = { ...employeeData, cdp };
 
-    const [employee] = await db.insert(employees).values(employeeDataWithCDP as any).returning();
+    const [employee] = await db.insert(employees).values(employeeDataWithCDP as InsertEmployee).returning();
     return employee;
   }
 
@@ -96,7 +96,7 @@ export class PostgresStorage {
 
     const [employee] = await db
       .update(employees)
-      .set(employeeDataWithCDP as any)
+      .set(employeeDataWithCDP as UpdateEmployee)
       .where(eq(employees.idGlovo, id))
       .returning();
     return employee;
@@ -134,6 +134,30 @@ export class PostgresStorage {
   async createCompanyLeave (leaveData: InsertCompanyLeave): Promise<CompanyLeave> {
     const [leave] = await db.insert(companyLeaves).values(leaveData).returning();
     return leave;
+  }
+
+  async getNotification (id: number): Promise<Notification | undefined> {
+    const [notification] = await db.select().from(notifications).where(eq(notifications.id, id));
+    return notification;
+  }
+
+  async createNotification (notificationData: InsertNotification): Promise<Notification> {
+    const [notification] = await db.insert(notifications).values(notificationData).returning();
+    return notification;
+  }
+
+  async updateCompanyLeaveStatus (id: number, status: string, approvedBy: string, approvedAt: Date): Promise<CompanyLeave> {
+    const [companyLeave] = await db
+      .update(companyLeaves)
+      .set({
+        status,
+        approvedBy,
+        approvedAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(companyLeaves.id, id))
+      .returning();
+    return companyLeave;
   }
 
   // IT leave operations
@@ -177,7 +201,7 @@ export class PostgresStorage {
           status: 'it_leave',
           fechaIncidencia: processedData.leaveDate,
           updatedAt: now,
-        } as any)
+        } as Record<string, unknown>)
         .where(eq(employees.idGlovo, leaveData.employeeId));
 
       if (process.env.NODE_ENV !== 'production') console.log('✅ [STORAGE] IT leave created and employee updated:', JSON.stringify(leave, null, 2));
@@ -191,23 +215,7 @@ export class PostgresStorage {
 
   // Notification operations
   async getAllNotifications (): Promise<Notification[]> {
-    return await db.select({
-      id: notifications.id,
-      type: notifications.type,
-      title: notifications.title,
-      message: notifications.message,
-      requestedBy: notifications.requestedBy,
-      status: notifications.status,
-      metadata: notifications.metadata,
-      processingDate: notifications.processingDate,
-      createdAt: notifications.createdAt,
-      updatedAt: notifications.updatedAt,
-    }).from(notifications).orderBy(notifications.createdAt);
-  }
-
-  async createNotification (notificationData: InsertNotification): Promise<Notification> {
-    const [notification] = await db.insert(notifications).values(notificationData).returning();
-    return notification;
+    return await db.select().from(notifications).orderBy(desc(notifications.createdAt));
   }
 
   async updateNotificationStatus (id: number, status: 'pending' | 'pending_laboral' | 'pendiente_laboral' | 'approved' | 'rejected' | 'processed'): Promise<Notification> {
@@ -275,11 +283,11 @@ export class PostgresStorage {
     // Agregar empleados de baja empresa (extraer de employeeData JSON)
     allCompanyLeaves.forEach(leave => {
       if (leave.employeeData) {
-        const empData = leave.employeeData as any;
+        const empData = leave.employeeData as Record<string, unknown>;
         allEmployeesForCities.push({
           ...empData,
           status: `company_leave_${leave.status}`, // para identificación
-        });
+        } as any);
       }
     });
 
@@ -294,7 +302,7 @@ export class PostgresStorage {
     // Convertir a array y ordenar por cantidad (mayor a menor)
     const employeesByCity = Object.entries(cityGroups)
       .map(([city, count]) => ({ city, count }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => (b.count as number) - (a.count as number));
 
     const metrics = {
       totalEmployees, // TODOS: activos + baja IT + baja empresa
@@ -334,13 +342,13 @@ export class PostgresStorage {
       cdp: calculateCDP(employee.horas),
     }));
 
-    const createdEmployees = await db.insert(employees).values(employeesWithCDP as any).returning();
+    const createdEmployees = await db.insert(employees).values(employeesWithCDP as InsertEmployee[]).returning();
     if (process.env.NODE_ENV !== 'production') console.log('Bulk operation completed. Total employees:', createdEmployees.length);
     return createdEmployees;
   }
 
   // Utility methods for data validation and parsing
-  private parseDate (dateValue: any): Date | null {
+  private parseDate (dateValue: string | Date | null | undefined): Date | null {
     if (!dateValue) return null;
     if (dateValue instanceof Date) return dateValue;
     if (typeof dateValue === 'string') {
@@ -350,25 +358,19 @@ export class PostgresStorage {
     return null;
   }
 
-  private parseBoolean (value: any): boolean {
+  private parseBoolean (value: string | boolean | null | undefined): boolean {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') {
-      const lower = value.toLowerCase();
-      return lower === 'true' || lower === '1' || lower === 'yes' || lower === 'sí';
+      const lowerValue = value.toLowerCase();
+      return lowerValue === 'true' || lowerValue === '1' || lowerValue === 'yes';
     }
-    if (typeof value === 'number') return value !== 0;
     return false;
   }
 
-  private validateStatus (status: any): string {
-    const validStatuses = [
-      'active', 'it_leave', 'company_leave_pending', 'company_leave_approved',
-      'pending_laboral', 'pendiente_laboral', 'penalizado',
-    ];
-    if (typeof status === 'string' && validStatuses.includes(status)) {
-      return status;
-    }
-    return 'active'; // default
+  private validateStatus (status: string | null | undefined): string {
+    if (!status) return 'active';
+    const validStatuses = ['it_leave', 'active', 'company_leave_pending', 'company_leave_approved', 'pending_laboral', 'pendiente_laboral', 'penalizado'];
+    return validStatuses.includes(status) ? status : 'active';
   }
 
   // City and fleet operations
@@ -547,7 +549,7 @@ export class PostgresStorage {
           originalHours: originalHours,
           horas: 0, // Set hours to 0 during penalization
           updatedAt: new Date(),
-        } as any)
+        } as Record<string, unknown>)
         .where(eq(employees.idGlovo, employeeId))
         .returning();
 
@@ -599,7 +601,7 @@ export class PostgresStorage {
           horas: hoursToRestore, // Restore original hours
           originalHours: null, // Clear original hours
           updatedAt: new Date(),
-        } as any)
+        } as Record<string, unknown>)
         .where(eq(employees.idGlovo, employeeId))
         .returning();
 
@@ -623,7 +625,7 @@ export class PostgresStorage {
     }
   }
 
-  async setEmployeeItLeave(employeeId: string, fechaIncidencia: string | Date): Promise<Employee> {
+  async setEmployeeItLeave (employeeId: string, fechaIncidencia: string | Date): Promise<Employee> {
     const now = new Date();
     const [updatedEmployee] = await db
       .update(employees)
@@ -631,7 +633,7 @@ export class PostgresStorage {
         status: 'it_leave',
         fechaIncidencia: fechaIncidencia || now,
         updatedAt: now,
-      } as any)
+      } as Record<string, unknown>)
       .where(eq(employees.idGlovo, employeeId))
       .returning();
     return updatedEmployee;

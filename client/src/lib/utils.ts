@@ -7,7 +7,7 @@ export function cn (...inputs: ClassValue[]) {
 }
 
 // Funciones para exportación a Excel
-export function exportToExcel (data: any[], fileName: string, sheetName: string = 'Datos') {
+export function exportToExcel (data: Record<string, unknown>[], fileName: string, sheetName: string = 'Datos') {
   // Crear un nuevo workbook
   const wb = XLSX.utils.book_new();
 

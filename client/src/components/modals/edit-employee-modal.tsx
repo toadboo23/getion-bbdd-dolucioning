@@ -2,6 +2,10 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { insertEmployeeSchema, type Employee } from '@shared/schema';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -17,10 +21,6 @@ import {
   FormMessage,
   FormDescription,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -29,13 +29,24 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+// Definir interfaz para el usuario
+interface User {
+  role: 'super_admin' | 'admin' | 'normal';
+  email: string;
+}
+
+// Definir interfaz para los datos del formulario
+interface FormData {
+  [key: string]: string | number | boolean | null;
+}
+
 interface EditEmployeeModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
-  onSave: (data: any) => void;
+  onSave: (data: FormData) => void;
   isLoading: boolean;
-  user: any;
+  user: User | null;
 }
 
 export default function EditEmployeeModal ({
@@ -166,7 +177,7 @@ export default function EditEmployeeModal ({
     }
   }, [employee, form]);
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: FormData) => {
     // Si el usuario es admin, solo permitir editar campos específicos
     if (user?.role === 'admin' && employee) {
       // Solo enviar los campos que el admin puede editar
@@ -185,7 +196,7 @@ export default function EditEmployeeModal ({
           acc[key] = value;
         }
         return acc;
-      }, {} as any);
+      }, {} as FormData);
 
       onSave(processedData);
       return;
@@ -200,7 +211,7 @@ export default function EditEmployeeModal ({
         acc[key] = value;
       }
       return acc;
-    }, {} as any);
+    }, {} as FormData);
 
     onSave(processedData);
   };
@@ -215,7 +226,8 @@ export default function EditEmployeeModal ({
           {user?.role === 'admin' && employee && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mt-2">
               <p className="text-sm text-blue-700">
-                <strong>Permisos de Admin:</strong> Solo puedes editar Teléfono, Email, Ciudad y Horas Complementarias.
+                <strong>Permisos de Admin:</strong> Solo puedes editar Teléfono, Email,
+                Ciudad y Horas Complementarias.
               </p>
             </div>
           )}

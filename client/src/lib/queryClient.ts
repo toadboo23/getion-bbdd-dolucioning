@@ -33,7 +33,7 @@ export const getQueryFn: <T>(options: {
 
       // If there are query parameters, append them to the URL
       if (queryKey.length > 1 && queryKey[1]) {
-        const params = queryKey[1] as Record<string, any>;
+        const params = queryKey[1] as Record<string, string | number | boolean>;
         const urlParams = new URLSearchParams();
 
         Object.entries(params).forEach(([key, value]) => {

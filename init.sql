@@ -1,4 +1,7 @@
 -- Initialize PostgreSQL database for Solucioning System
+-- IMPORTANTE: Este script debe ejecutarse en la base de datos 'employee_management'
+-- NO en la base de datos 'postgres' por defecto
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create sessions table for authentication
@@ -9,17 +12,6 @@ CREATE TABLE IF NOT EXISTS session (
 );
 
 CREATE INDEX IF NOT EXISTS idx_session_expire ON session(expire);
-
--- Create users table
-CREATE TABLE IF NOT EXISTS users (
-  id varchar(255) PRIMARY KEY,
-  email varchar(255) UNIQUE NOT NULL,
-  "firstName" varchar(255) NOT NULL,
-  "lastName" varchar(255) NOT NULL,
-  role varchar(50) NOT NULL CHECK (role IN ('super_admin', 'admin', 'normal')),
-  created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-  updated_at timestamp DEFAULT CURRENT_TIMESTAMP
-);
 
 -- Create employees table
 CREATE TABLE IF NOT EXISTS employees (
@@ -155,13 +147,14 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type ON audit_logs(entity_type)
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
 
 -- Insert test data only if tables are empty
-INSERT INTO employees (id_glovo, nombre, apellido, telefono, email_glovo, email, flota, status) 
-SELECT * FROM (VALUES 
-  ('TEST001', 'Juan', 'García', '+34600123456', 'juan.garcia@glovo.com', 'juan.garcia@personal.com', 'FLOTA1', 'active'),
-  ('TEST002', 'María', 'López', '+34600654321', 'maria.lopez@glovo.com', 'maria.lopez@personal.com', 'FLOTA1', 'active'),
-  ('TEST003', 'Carlos', 'Martín', '+34600789012', 'carlos.martin@glovo.com', 'carlos.martin@personal.com', 'FLOTA2', 'active')
-) AS v(id_glovo, nombre, apellido, telefono, email_glovo, email, flota, status)
-WHERE NOT EXISTS (SELECT 1 FROM employees);
+-- ELIMINADO PARA PRODUCCION: No insertar usuarios de prueba
+-- INSERT INTO employees (id_glovo, nombre, apellido, telefono, email_glovo, email, flota, status) 
+-- SELECT * FROM (VALUES 
+--   ('TEST001', 'Juan', 'García', '+34600123456', 'juan.garcia@glovo.com', 'juan.garcia@personal.com', 'FLOTA1', 'active'),
+--   ('TEST002', 'María', 'López', '+34600654321', 'maria.lopez@glovo.com', 'maria.lopez@personal.com', 'FLOTA1', 'active'),
+--   ('TEST003', 'Carlos', 'Martín', '+34600789012', 'carlos.martin@glovo.com', 'carlos.martin@personal.com', 'FLOTA2', 'active')
+-- ) AS v(id_glovo, nombre, apellido, telefono, email_glovo, email, flota, status)
+-- WHERE NOT EXISTS (SELECT 1 FROM employees);
 
 -- Migration: Add status column if it doesn't exist (for existing databases)
 DO $$ 

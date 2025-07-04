@@ -20,10 +20,10 @@ export async function registerRoutes (app: Express): Promise<Server> {
   });
 
   // Dashboard metrics (protected)
-  app.get('/api/dashboard/metrics', isAuthenticated, async (req: any, res) => {
+  app.get('/api/dashboard/metrics', isAuthenticated, async (req, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('📊 Dashboard metrics request');
     try {
-      const user = req.user;
+      const user = req.user as { role?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para ver el dashboard' });
       }
@@ -116,21 +116,21 @@ export async function registerRoutes (app: Express): Promise<Server> {
   });
 
   // Create employee (protected - admin/super_admin only)
-  app.post('/api/employees', isAuthenticated, async (req: any, res) => {
+  app.post('/api/employees', isAuthenticated, async (req, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('➕ Create employee request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para crear empleados' });
       }
 
-      const employeeData = req.body;
-      const employee = await storage.createEmployee(employeeData);
+      const employeeData = req.body as Record<string, unknown>;
+      const employee = await storage.createEmployee(employeeData as any);
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: user.role as 'super_admin' | 'admin',
         action: 'create_employee',
         entityType: 'employee',
         entityId: employee.idGlovo,
@@ -147,26 +147,26 @@ export async function registerRoutes (app: Express): Promise<Server> {
   });
 
   // Update employee (protected - admin/super_admin only)
-  app.put('/api/employees/:id', isAuthenticated, async (req: any, res) => {
+  app.put('/api/employees/:id', isAuthenticated, async (req, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('✏️ Update employee request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para editar empleados' });
       }
 
       const { id } = req.params;
-      const employeeData = req.body;
+      const employeeData = req.body as Record<string, unknown>;
 
       // Get old data for audit
       const oldEmployee = await storage.getEmployee(id);
 
-      const employee = await storage.updateEmployee(id, employeeData);
+      const employee = await storage.updateEmployee(id, employeeData as Record<string, unknown>);
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: user.role as 'super_admin' | 'admin',
         action: 'update_employee',
         entityType: 'employee',
         entityId: employee.idGlovo,
@@ -184,10 +184,10 @@ export async function registerRoutes (app: Express): Promise<Server> {
   });
 
   // Delete employee (protected - super_admin only)
-  app.delete('/api/employees/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/employees/:id', isAuthenticated, async (req, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('🗑️ Delete employee request');
     try {
-      const user = req.user;
+      const user = req.user as { role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede eliminar empleados' });
       }
@@ -222,7 +222,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   });
 
   // Delete all employees (protected - super_admin only)
-  app.delete('/api/employees/all', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/employees/all', isAuthenticated, async (req: { user?: { email?: string; role?: string } }, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('🗑️ Delete all employees request');
     try {
       const user = req.user;
@@ -253,7 +253,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   });
 
   // Bulk import employees (protected - super_admin only)
-  app.post('/api/employees/bulk-import', isAuthenticated, async (req: any, res) => {
+  app.post('/api/employees/bulk-import', isAuthenticated, async (req: { user?: { email?: string; role?: string }; body: { employees: Record<string, unknown>[]; dryRun?: boolean } }, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('📥 Bulk import employees request');
     try {
       const user = req.user;
@@ -271,23 +271,23 @@ export async function registerRoutes (app: Express): Promise<Server> {
       }
 
       // Process and validate employees
-      const processedEmployees = employees.map((emp: any, index: number) => {
-        const processString = (stringValue: any): string | undefined => {
+      const processedEmployees = employees.map((emp: Record<string, unknown>, index: number) => {
+        const processString = (stringValue: unknown): string | undefined => {
           if (!stringValue) return undefined;
           const processed = String(stringValue).trim();
           return processed === '' ? undefined : processed;
         };
 
-        const processNumber = (numberValue: any): number | undefined => {
+        const processNumber = (numberValue: unknown): number | undefined => {
           if (numberValue === null || numberValue === undefined || numberValue === '') return undefined;
           const num = Number(numberValue);
           return isNaN(num) ? undefined : num;
         };
 
-        const processDate = (dateValue: any): string | undefined => {
+        const processDate = (dateValue: unknown): string | undefined => {
           if (!dateValue) return undefined;
           try {
-            const date = new Date(dateValue);
+            const date = new Date(dateValue as string | number | Date);
             if (isNaN(date.getTime())) return undefined;
             return date.toISOString().split('T')[0]; // YYYY-MM-DD format
           } catch {
@@ -295,7 +295,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
           }
         };
 
-        const processBoolean = (boolValue: any): boolean => {
+        const processBoolean = (boolValue: unknown): boolean => {
           if (typeof boolValue === 'boolean') return boolValue;
           if (typeof boolValue === 'string') {
             const lower = boolValue.toLowerCase();
@@ -305,7 +305,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
         };
 
         const horas = processNumber(emp.horas);
-        const cdp = horas ? Math.round((horas / 38) * 100) : 0;
+        const cdp = horas ? Number(((horas / 38) * 100).toFixed(2)) : 0;
 
         return {
           idGlovo: processString(emp.idGlovo) || `TEMP_${index}`,
@@ -509,6 +509,23 @@ export async function registerRoutes (app: Express): Promise<Server> {
       const leaveData = req.body;
       const leave = await storage.createCompanyLeave(leaveData);
 
+      // Crear notificación automáticamente
+      const notificationData = {
+        type: 'company_leave_request' as const,
+        title: 'Solicitud de Baja Empresa',
+        message: `Se ha solicitado una baja empresa para el empleado ${leaveData.employeeId}`,
+        requestedBy: user.email,
+        status: 'pending' as const,
+        metadata: {
+          employeeId: leaveData.employeeId,
+          leaveType: leaveData.leaveType,
+          leaveDate: leaveData.leaveDate,
+          companyLeaveId: leave.id,
+        },
+      };
+
+      const notification = await storage.createNotification(notificationData);
+
       // Log audit
       await AuditService.logAction({
         userId: user.email,
@@ -520,7 +537,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
         newData: leave,
       });
 
-      res.status(201).json(leave);
+      res.status(201).json({ leave, notification });
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') console.error('❌ Error creating company leave:', error);
       res.status(500).json({ message: 'Failed to create company leave' });
@@ -634,6 +651,127 @@ export async function registerRoutes (app: Express): Promise<Server> {
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') console.error('❌ Error updating notification status:', error);
       res.status(500).json({ message: 'Failed to update notification status' });
+    }
+  });
+
+  // Process notification (protected - super_admin only)
+  app.post('/api/notifications/:id/process', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('⚙️ Process notification request');
+    try {
+      const user = req.user;
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede procesar notificaciones' });
+      }
+
+      const { id } = req.params;
+      const { action, processingDate } = req.body;
+
+      if (!action || !['approve', 'reject', 'pending_laboral', 'processed'].includes(action)) {
+        return res.status(400).json({ message: 'Acción inválida. Debe ser: approve, reject, pending_laboral, o processed' });
+      }
+
+      // Get the notification
+      const notification = await storage.getNotification(parseInt(id));
+      if (!notification) {
+        return res.status(404).json({ message: 'Notificación no encontrada' });
+      }
+
+      // If this is a company leave request, update the employee status and company leave record
+      if (notification.type === 'company_leave_request' && notification.metadata) {
+        const metadata = notification.metadata as any;
+        const employeeId = metadata.employeeId;
+        const companyLeaveId = metadata.companyLeaveId;
+
+        if (employeeId) {
+          let newEmployeeStatus: string;
+          let newCompanyLeaveStatus: string;
+
+          switch (action) {
+            case 'approve':
+              newEmployeeStatus = 'company_leave_approved';
+              newCompanyLeaveStatus = 'approved';
+              break;
+            case 'reject':
+              newEmployeeStatus = 'active'; // Return to active status
+              newCompanyLeaveStatus = 'rejected';
+              break;
+            case 'pending_laboral':
+              newEmployeeStatus = 'pending_laboral';
+              newCompanyLeaveStatus = 'pending';
+              break;
+            default:
+              newEmployeeStatus = 'company_leave_pending';
+              newCompanyLeaveStatus = 'pending';
+          }
+
+          // Update employee status
+          await storage.updateEmployee(employeeId, { status: newEmployeeStatus });
+
+          // Update company leave status if it exists
+          if (companyLeaveId) {
+            await storage.updateCompanyLeaveStatus(parseInt(companyLeaveId), newCompanyLeaveStatus, user.email, new Date(processingDate));
+          }
+
+          // If action is pending_laboral, create a new notification for pending laboral
+          if (action === 'pending_laboral') {
+            // Create a new notification for pending laboral
+            await storage.createNotification({
+              type: 'company_leave_request',
+              title: 'Baja Empresa - Pendiente Laboral',
+              message: `El empleado ${employeeId} ha sido movido a pendiente laboral. Requiere tramitación.`,
+              status: 'pending_laboral',
+              requestedBy: user.email,
+              metadata: {
+                employeeId,
+                companyLeaveId,
+                originalNotificationId: notification.id,
+                action: 'pending_laboral',
+              },
+            });
+          }
+
+          // Log audit for employee status change
+          await AuditService.logAction({
+            userId: user.email,
+            userRole: user.role,
+            action: 'process_company_leave_notification',
+            entityType: 'employee',
+            entityId: employeeId,
+            description: `Notificación de baja empresa procesada: ${action} - Empleado ${employeeId} - Estado: ${newEmployeeStatus}`,
+            newData: {
+              action,
+              employeeId,
+              newEmployeeStatus,
+              newCompanyLeaveStatus,
+              processingDate,
+            },
+          });
+        }
+      }
+
+      // Update notification status with processing date
+      const updatedNotification = await storage.updateNotificationStatusWithDate(
+        parseInt(id),
+        action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : action === 'pending_laboral' ? 'approved' : 'processed',
+        new Date(processingDate),
+      );
+
+      // Log audit for notification processing
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'process_notification',
+        entityType: 'notification',
+        entityId: notification.id.toString(),
+        description: `Notificación procesada: ${notification.title} - Acción: ${action}`,
+        oldData: { status: notification.status },
+        newData: { action, processingDate, newStatus: updatedNotification.status },
+      });
+
+      res.json(updatedNotification);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error processing notification:', error);
+      res.status(500).json({ message: 'Failed to process notification' });
     }
   });
 
@@ -813,7 +951,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   });
 
   // Audit logs (protected - super_admin only)
-  app.get('/api/audit-logs', isAuthenticated, async (req: any, res) => {
+  app.get('/api/audit-logs', isAuthenticated, async (req: { user?: { role?: string }; query: { limit?: string } }, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('📋 Audit logs request');
     try {
       const user = req.user;
@@ -830,7 +968,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/audit-logs/stats', isAuthenticated, async (req: any, res) => {
+  app.get('/api/audit-logs/stats', isAuthenticated, async (req: { user?: { role?: string } }, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('📊 Audit logs stats request');
     try {
       const user = req.user;

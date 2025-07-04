@@ -34,7 +34,7 @@ export default function LeaveManagementModal ({
   const [leaveDate, setLeaveDate] = useState('');
 
   const itLeaveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: { leaveType: string; leaveDate: Date }) => {
       if (!employee) throw new Error('No employee selected');
       const response = await apiRequest('POST', `/api/employees/${employee.idGlovo}/it-leave`, data);
       return response;
@@ -67,7 +67,7 @@ export default function LeaveManagementModal ({
       onClose();
       resetForm();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       console.error('❌ [MUTATION] Error en baja IT:', error);
 
       if (isUnauthorizedError(error)) {
@@ -82,7 +82,7 @@ export default function LeaveManagementModal ({
         return;
       }
 
-      const errorMessage = error?.message || error?.data?.message || 'Error desconocido';
+      const errorMessage = error.message || 'Error desconocido';
       toast({
         title: '❌ Error al procesar baja IT',
         description: `No se pudo procesar la baja IT: ${errorMessage}`,
@@ -92,9 +92,14 @@ export default function LeaveManagementModal ({
   });
 
   const companyLeaveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: { leaveType: string; leaveDate: string }) => {
       if (!employee) throw new Error('No employee selected');
-      await apiRequest('POST', `/api/employees/${employee.idGlovo}/company-leave`, data);
+      await apiRequest('POST', '/api/company-leaves', {
+        ...data,
+        employeeId: employee.idGlovo,
+        employeeData: employee,
+        requestedBy: 'system', // Esto se puede mejorar para usar el usuario actual
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });

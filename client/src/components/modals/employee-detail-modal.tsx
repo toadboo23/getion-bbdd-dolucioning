@@ -195,7 +195,8 @@ export default function EmployeeDetailModal ({
                         Empleado en Baja IT
                       </p>
                       <p className="text-sm text-orange-700 mt-1">
-                        Este empleado está actualmente en baja IT. Como Super Admin, puedes reactivarlo usando el botón &quot;Reactivar Empleado&quot; arriba.
+                        Este empleado está actualmente en baja IT. Como Super Admin,
+                        puedes reactivarlo usando el botón &quot;Reactivar Empleado&quot; arriba.
                       </p>
                     </div>
                   </div>
@@ -271,7 +272,7 @@ export default function EmployeeDetailModal ({
                 <InfoItem
                   icon={Clock}
                   label="CDP%"
-                  value={employee.horas ? `${Math.round((employee.horas / 38) * 100)}%` : undefined}
+                  value={employee.horas ? `${((employee.horas / 38) * 100).toFixed(2)}%` : undefined}
                 />
                 <InfoItem
                   icon={User}
@@ -442,12 +443,25 @@ export default function EmployeeDetailModal ({
                 <div>
                   <h4 className="font-bold text-red-800 mb-1">Empleado penalizado</h4>
                   <p className="text-red-700 text-sm mb-2">
-                    Este empleado está penalizado. Sus horas actuales están en <b>0</b> y no podrá trabajar hasta que finalice la penalización o se reactive manualmente.
+                    Este empleado está penalizado. Sus horas actuales están en <b>0</b> y no podrá
+                    trabajar hasta que finalice la penalización o se reactive manualmente.
                   </p>
                   <ul className="text-sm text-red-700 space-y-1">
                     <li><b>Horas originales:</b> {employee.originalHours ?? 'No registradas'}</li>
-                    <li><b>Fecha inicio penalización:</b> {employee.penalizationStartDate ? new Date(employee.penalizationStartDate).toLocaleDateString('es-ES') : 'No especificada'}</li>
-                    <li><b>Fecha fin penalización:</b> {employee.penalizationEndDate ? new Date(employee.penalizationEndDate).toLocaleDateString('es-ES') : 'No especificada'}</li>
+                    <li>
+                      <b>Fecha inicio penalización:</b> {
+                        employee.penalizationStartDate
+                          ? new Date(employee.penalizationStartDate).toLocaleDateString('es-ES')
+                          : 'No especificada'
+                      }
+                    </li>
+                    <li>
+                      <b>Fecha fin penalización:</b> {
+                        employee.penalizationEndDate
+                          ? new Date(employee.penalizationEndDate).toLocaleDateString('es-ES')
+                          : 'No especificada'
+                      }
+                    </li>
                   </ul>
                 </div>
               </div>

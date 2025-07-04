@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import DashboardMetrics from '@/components/dashboard-metrics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +17,7 @@ interface MetricsData {
   penalizedEmployees: number;
   pendingActions: number;
   employeesByCity: { city: string; count: number }[];
-  debug?: any;
+  debug?: Record<string, unknown>;
 }
 
 // Definir el tipo de notificación si es necesario
@@ -34,7 +34,6 @@ export default function Dashboard () {
   const { toast } = useToast();
   const { isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
-
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -56,7 +55,6 @@ export default function Dashboard () {
     data: metrics,
     isLoading: metricsLoading,
     error: metricsError,
-    refetch: refetchMetrics,
   } = useQuery<MetricsData>({
     queryKey: ['/api/dashboard/metrics'],
     queryFn: async () => {
@@ -172,8 +170,6 @@ export default function Dashboard () {
           </div>
         </CardContent>
       </Card>
-
-
     </div>
   );
 }

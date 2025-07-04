@@ -20,7 +20,7 @@ export function getSession () {
   });
 
   return session({
-    secret: process.env.SESSION_SECRET || 'solucioning_session_secret_2027_ultra_secure',
+    secret: process.env.SESSION_SECRET,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
@@ -40,8 +40,8 @@ export async function setupAuth (app: Express) {
   console.log('🔐 Setting up authentication routes...');
 
   // LOGIN ROUTE - Enhanced to support database users
-  app.post('/api/auth/login', async (req: any, res) => {
-    console.log('📝 Login attempt:', { email: req.body.email, password: req.body.password });
+  app.post('/api/auth/login', async (req: { body: { email?: string; password?: string }; session: { user?: Record<string, unknown> } }, res) => {
+    console.log('📝 Login attempt for:', req.body.email);
 
     try {
       const { email, password } = req.body;
@@ -55,13 +55,20 @@ export async function setupAuth (app: Express) {
         });
       }
 
-      let userRecord = null;
+      let userRecord: {
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        role: 'super_admin' | 'admin' | 'normal';
+        password: string;
+      } | null = null;
 
       // Check database users only (secure production approach)
       console.log('🔍 Checking database for user:', email);
       try {
         const dbUsers = await storage.getAllSystemUsers();
-        const dbUser = dbUsers.find((u: any) => u.email === email && u.isActive);
+        const dbUser = dbUsers.find((u: { email: string; isActive: boolean }) => u.email === email && u.isActive);
 
         if (dbUser) {
           userRecord = {
@@ -90,18 +97,22 @@ export async function setupAuth (app: Express) {
         });
       }
 
-      // LOG: Mostrar password recibido y hash guardado
-      console.log('🔑 Password recibido:', password);
-      console.log('🔒 Hash guardado:', userRecord.password);
-
-      // Check password using bcrypt (all passwords are hashed in production)
+      // Check password - handle both hashed and plain text passwords
       let passwordValid = false;
-      try {
-        passwordValid = await bcrypt.compare(password, userRecord.password);
-        console.log('🔍 Resultado bcrypt.compare:', passwordValid);
-      } catch (bcryptError) {
-        console.error('❌ Bcrypt error:', bcryptError);
-        passwordValid = false;
+
+      // Check if password is hashed (starts with $2b$)
+      if (userRecord.password.startsWith('$2b$')) {
+        try {
+          passwordValid = await bcrypt.compare(password, userRecord.password);
+          console.log('🔍 Password validation result (hashed):', passwordValid ? 'SUCCESS' : 'FAILED');
+        } catch (bcryptError) {
+          console.error('❌ Bcrypt error:', bcryptError);
+          passwordValid = false;
+        }
+      } else {
+        // Plain text password comparison (should be removed in production)
+        passwordValid = password === userRecord.password;
+        console.log('🔍 Password validation result (plain text):', passwordValid ? 'SUCCESS' : 'FAILED');
       }
 
       if (!passwordValid) {
@@ -147,9 +158,9 @@ export async function setupAuth (app: Express) {
   });
 
   // LOGOUT ROUTE
-  app.post('/api/auth/logout', (req: any, res) => {
+  app.post('/api/auth/logout', (req: { session: { destroy: (callback: (err?: Error) => void) => void } }, res) => {
     console.log('👋 Logout request');
-    req.session.destroy((err: any) => {
+    req.session.destroy((err?: Error) => {
       if (err) {
         console.error('❌ Error destroying session:', err);
         return res.status(500).json({ error: 'Error al cerrar sesión' });
@@ -159,7 +170,7 @@ export async function setupAuth (app: Express) {
   });
 
   // GET USER INFO ROUTE
-  app.get('/api/auth/user', (req: any, res) => {
+  app.get('/api/auth/user', (req: { session?: { user?: Record<string, unknown> } }, res) => {
     console.log('👤 Get user request, session user:', req.session?.user);
 
     if (!req.session?.user) {
@@ -170,7 +181,7 @@ export async function setupAuth (app: Express) {
   });
 
   // GET ME ROUTE (alternative)
-  app.get('/api/auth/me', (req: any, res) => {
+  app.get('/api/auth/me', (req: { session?: { user?: Record<string, unknown> } }, res) => {
     if (req.session?.user) {
       res.json(req.session.user);
     } else {
@@ -181,7 +192,7 @@ export async function setupAuth (app: Express) {
   console.log('✅ Authentication routes set up successfully');
 }
 
-export const isAuthenticated: RequestHandler = async (req: any, res, next) => {
+export const isAuthenticated: RequestHandler = async (req: { session?: { user?: Record<string, unknown> }; user?: Record<string, unknown> }, res, next) => {
   if (!req.session?.user) {
     console.log('🚫 Authentication required, no session found');
     return res.status(401).json({ message: 'Unauthorized' });

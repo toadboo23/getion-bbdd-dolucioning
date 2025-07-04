@@ -25,8 +25,22 @@ export default function PenalizationModal ({ isOpen, onClose, employee, action }
   const [observations, setObservations] = useState('');
 
   const penalizeMutation = useMutation({
-    mutationFn: async ({ employeeId, startDate, endDate, observations }: { employeeId: string; startDate: string; endDate: string; observations: string }) => {
-      await apiRequest('POST', `/api/employees/${employeeId}/penalize`, { startDate, endDate, observations });
+    mutationFn: async ({
+      employeeId,
+      startDate,
+      endDate,
+      observations,
+    }: {
+      employeeId: string;
+      startDate: string;
+      endDate: string;
+      observations: string;
+    }) => {
+      await apiRequest('POST', `/api/employees/${employeeId}/penalize`, {
+        startDate,
+        endDate,
+        observations,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
@@ -40,10 +54,10 @@ export default function PenalizationModal ({ isOpen, onClose, employee, action }
       setEndDate('');
       setObservations('');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'No se pudo penalizar al empleado',
+        description: error.message || 'No se pudo penalizar al empleado',
         variant: 'destructive',
       });
     },
@@ -62,10 +76,10 @@ export default function PenalizationModal ({ isOpen, onClose, employee, action }
       });
       onClose();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'No se pudo remover la penalización',
+        description: error.message || 'No se pudo remover la penalización',
         variant: 'destructive',
       });
     },
@@ -87,7 +101,7 @@ export default function PenalizationModal ({ isOpen, onClose, employee, action }
       if (!observations.trim()) {
         toast({
           title: 'Error',
-          description: 'Por favor ingrese las observaciones del motivo de la penalización',
+          description: 'Por favor, ingrese las observaciones para el motivo de la penalización',
           variant: 'destructive',
         });
         return;
@@ -218,7 +232,7 @@ export default function PenalizationModal ({ isOpen, onClose, employee, action }
                   <div>
                     <h5 className="font-medium text-green-800">Efectos de remover la penalización:</h5>
                     <ul className="text-sm text-green-700 mt-2 space-y-1">
-                                              <li>• El estado del empleado volverá a &quot;Activo&quot;</li>
+                      <li>• El estado del empleado volverá a &quot;Activo&quot;</li>
                       <li>• Las horas originales serán restauradas</li>
                       <li>• Se eliminarán las fechas de penalización</li>
                     </ul>

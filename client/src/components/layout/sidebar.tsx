@@ -1,3 +1,4 @@
+import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth, useNotificationCount } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -11,7 +12,16 @@ import {
   UserCog,
 } from 'lucide-react';
 
-const navigation = [
+// Definir interfaz para los elementos de navegación
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
+  superAdminOnly?: boolean;
+}
+
+const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Empleados', href: '/employees', icon: Users },
   { name: 'Baja Empresa', href: '/company-leaves', icon: UserX },
@@ -30,7 +40,7 @@ export default function Sidebar ({ isMobileOpen = false, onMobileClose }: Sideba
   const { user, logout } = useAuth();
   const notificationCount = useNotificationCount();
 
-  const canAccess = (item: any) => {
+  const canAccess = (item: NavigationItem) => {
     if (item.superAdminOnly) {
       return user?.role === 'super_admin';
     }
@@ -53,11 +63,13 @@ export default function Sidebar ({ isMobileOpen = false, onMobileClose }: Sideba
           <div className="flex-1">
             <p className="text-sm font-medium text-gray-900">{user?.email}</p>
             <div className="flex items-center mt-1">
-              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                user?.role === 'super_admin' ? 'bg-red-100 text-red-800' :
-                  user?.role === 'admin' ? 'bg-blue-100 text-blue-800' :
-                    'bg-gray-100 text-gray-800'
-              }`}>
+              <span
+                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  user?.role === 'super_admin' ? 'bg-red-100 text-red-800' :
+                    user?.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                }`}
+              >
                 {user?.role === 'super_admin' ? '🔴 Super Admin' :
                   user?.role === 'admin' ? '🟡 Admin' :
                     '🟢 Normal'}

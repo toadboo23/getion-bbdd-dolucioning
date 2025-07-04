@@ -18,11 +18,6 @@ docker-compose up -d --build
 - **Backend**: Node.js, Express, PostgreSQL, Drizzle ORM
 - **DevOps**: Docker, Docker Compose
 
-## 👥 Usuarios por Defecto
-
-- **Super Admin**: `superadmin@glovo.com` / `superadmin123`
-- **Admin**: `admin@glovo.com` / `admin123`
-- **User**: `user@glovo.com` / `user123`
 
 ## 📦 Características
 

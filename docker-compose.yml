@@ -3,17 +3,18 @@
 
 services:
   # PostgreSQL Database
+  # IMPORTANTE: La base de datos se llama 'employee_management', NO 'postgres'
   postgres:
     image: postgres:16
     container_name: employee_management_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: employee_management
+      POSTGRES_DB: employee_management  # Nombre de la base de datos de la aplicación
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_2025}
+      POSTGRES_PASSWORD: dev_password_2025
       POSTGRES_HOST_AUTH_METHOD: md5
     ports:
-      - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"  # Permite acceso externo
+      - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"  # Exponer para debugging local
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -23,6 +24,7 @@ services:
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
 
   # Backend API
+  # IMPORTANTE: Se conecta a la base de datos 'employee_management'
   backend:
     build:
       context: .
@@ -31,7 +33,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev_password_2025}@postgres:5432/employee_management
+      DATABASE_URL: postgresql://postgres:dev_password_2025@postgres:5432/employee_management
       SESSION_SECRET: ${SESSION_SECRET:-solucioning_session_secret_2027_ultra_secure}
       PORT: 5173
     ports:

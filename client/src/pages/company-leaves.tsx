@@ -181,7 +181,7 @@ export default function CompanyLeaves () {
 
     // Preparar datos para exportar con nombres de columnas en español
     const exportData = recentLeaves.map(leave => {
-      const employeeData = leave.employeeData as any;
+      const employeeData = leave.employeeData as Record<string, unknown>;
       return {
         ID: leave.id,
         'ID Empleado': leave.employeeId,
@@ -199,7 +199,7 @@ export default function CompanyLeaves () {
         Vehículo: employeeData?.vehiculo || 'N/A',
         NAF: employeeData?.naf || 'N/A',
         Horas: employeeData?.horas || 'N/A',
-        'CDP%': employeeData?.horas ? Math.round((employeeData.horas / 38) * 100) : 'N/A',
+        'CDP%': employeeData?.horas ? ((employeeData.horas / 38) * 100).toFixed(2) : 'N/A',
         Flota: employeeData?.flota || 'N/A',
         'Tipo de Baja':
           leave.leaveType === 'despido'
@@ -395,7 +395,7 @@ export default function CompanyLeaves () {
                 </TableHeader>
                 <TableBody>
                   {companyLeaves.map(leave => {
-                    const employeeData = leave.employeeData as any;
+                    const employeeData = leave.employeeData as Record<string, unknown>;
                     return (
                       <TableRow key={leave.id}>
                         <TableCell>

@@ -22,8 +22,8 @@ interface AuditLog {
   entityId?: string;
   entityName?: string;
   description: string;
-  oldData?: any;
-  newData?: any;
+  oldData?: Record<string, unknown>;
+  newData?: Record<string, unknown>;
   userAgent?: string;
   createdAt: string;
 }

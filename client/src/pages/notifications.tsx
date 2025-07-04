@@ -42,7 +42,9 @@ export default function Notifications () {
 
     toast({
       title: 'Filtro aplicado',
-      description: `Mostrando solo notificaciones ${statusNames[status as keyof typeof statusNames]}`,
+      description: `Mostrando solo notificaciones ${
+        statusNames[status as keyof typeof statusNames]
+      }`,
       duration: 2000,
     });
 
@@ -120,10 +122,14 @@ export default function Notifications () {
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
       queryClient.invalidateQueries({ queryKey: ['/api/company-leaves'] });
 
-      const actionText = variables.action === 'approve' ? 'tramitada' : variables.action === 'reject' ? 'rechazada' : variables.action === 'pending_laboral' ? 'pendiente laboral' : 'procesada';
+      const actionText = variables.action === 'approve' ? 'tramitada' :
+        variables.action === 'reject' ? 'rechazada' :
+          variables.action === 'pending_laboral' ? 'pendiente laboral' : 'procesada';
       toast({
         title: `Baja ${actionText}`,
-        description: `La baja ha sido ${actionText} correctamente con fecha ${new Date(variables.processingDate).toLocaleDateString('es-ES')}`,
+        description: `La baja ha sido ${actionText} correctamente con fecha ${
+          new Date(variables.processingDate).toLocaleDateString('es-ES')
+        }`,
       });
 
       // Cerrar modal
@@ -172,23 +178,42 @@ export default function Notifications () {
 
     try {
       // Preparar datos para exportar con nombres de columnas en español
-      const exportData = notifications.map(notif => ({
-        'ID': notif.id,
-        'Tipo': notif.type === 'company_leave_request' ? 'Solicitud de Baja Empresa' :
-          notif.type === 'employee_update' ? 'Actualización de Empleado' :
-            notif.type === 'bulk_upload' ? 'Carga Masiva' : notif.type,
-        'Título': notif.title,
-        'Mensaje': notif.message,
-        'Solicitado por': notif.requestedBy,
-        'Estado': notif.status === 'pending' ? 'Pendiente' :
-          notif.status === 'pendiente_laboral' ? 'Pendiente Laboral' :
-            notif.status === 'approved' ? 'Tramitada' :
-              notif.status === 'rejected' ? 'Rechazada' :
-                notif.status === 'processed' ? 'Procesada' : notif.status,
-        'Fecha de Creación': notif.createdAt ? new Date(notif.createdAt).toLocaleDateString('es-ES') : '',
-        'Fecha de Procesamiento': notif.processingDate ? new Date(notif.processingDate).toLocaleDateString('es-ES') : '',
-        'Última Actualización': notif.updatedAt ? new Date(notif.updatedAt).toLocaleDateString('es-ES') : '',
-      }));
+      const exportData = notifications.map(notif => {
+        // Extraer employeeId del metadata si existe
+        const metadata = notif.metadata as { employeeId?: string };
+        const employeeId = metadata?.employeeId || 'N/A';
+
+        // Extraer emailGlovo del mensaje si está disponible
+        // Buscar patrones comunes en el mensaje que contengan el email
+        let emailGlovo = 'N/A';
+        if (notif.message) {
+          // Buscar email en el mensaje (patrón: @solucioning.net)
+          const emailMatch = notif.message.match(/[a-zA-Z0-9._%+-]+@solucioning\.net/g);
+          if (emailMatch && emailMatch.length > 0) {
+            emailGlovo = emailMatch[0];
+          }
+        }
+
+        return {
+          'ID Glovo': employeeId,
+          'Email Glovo': emailGlovo,
+          'ID': notif.id,
+          'Tipo': notif.type === 'company_leave_request' ? 'Solicitud de Baja Empresa' :
+            notif.type === 'employee_update' ? 'Actualización de Empleado' :
+              notif.type === 'bulk_upload' ? 'Carga Masiva' : notif.type,
+          'Título': notif.title,
+          'Mensaje': notif.message,
+          'Solicitado por': notif.requestedBy,
+          'Estado': notif.status === 'pending' ? 'Pendiente' :
+            notif.status === 'pendiente_laboral' ? 'Pendiente Laboral' :
+              notif.status === 'approved' ? 'Tramitada' :
+                notif.status === 'rejected' ? 'Rechazada' :
+                  notif.status === 'processed' ? 'Procesada' : notif.status,
+          'Fecha de Creación': notif.createdAt ? new Date(notif.createdAt).toLocaleDateString('es-ES') : '',
+          'Fecha de Procesamiento': notif.processingDate ? new Date(notif.processingDate).toLocaleDateString('es-ES') : '',
+          'Última Actualización': notif.updatedAt ? new Date(notif.updatedAt).toLocaleDateString('es-ES') : '',
+        };
+      });
 
       const fileName = `notificaciones_${new Date().toISOString().split('T')[0]}`;
       exportToExcel(exportData, fileName, 'Notificaciones');
@@ -542,18 +567,11 @@ export default function Notifications () {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleTramitar(notification, 'approve')}
-                                className="text-green-600 hover:text-green-700"
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
                                 onClick={() => handleTramitar(notification, 'reject')}
                                 className="text-red-600 hover:text-red-700"
                               >
-                                <X className="h-4 w-4" />
+                                <X className="h-4 w-4 mr-1" />
+                                Rechazar
                               </Button>
                               <Button
                                 variant="outline"
@@ -561,7 +579,30 @@ export default function Notifications () {
                                 onClick={() => handleTramitar(notification, 'pending_laboral')}
                                 className="text-orange-600 hover:text-orange-700"
                               >
-                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTriangle className="h-4 w-4 mr-1" />
+                                Pendiente Laboral
+                              </Button>
+                            </>
+                          )}
+                          {canProcessNotifications && notification.status === 'pending_laboral' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleTramitar(notification, 'approve')}
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                <Check className="h-4 w-4 mr-1" />
+                                Tramitar
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleTramitar(notification, 'reject')}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Rechazar
                               </Button>
                             </>
                           )}

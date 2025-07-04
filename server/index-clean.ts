@@ -1,6 +1,5 @@
 import express from 'express';
 import { registerRoutes } from './routes-clean.js';
-import { PostgresStorage } from './storage-postgres.js';
 
 const app = express();
 
@@ -64,50 +63,9 @@ app.use((req, res, next) => {
 async function initializeSystem () {
   try {
     console.log('🗄️ Initializing database connection...');
-    const storage = new PostgresStorage();
-
-    // Initialize default users
-    console.log('👥 Initializing default users...');
-
-    const defaultUsers = [
-      {
-        id: 'superadmin-001',
-        email: 'superadmin@glovo.com',
-        firstName: 'Super',
-        lastName: 'Admin',
-        role: 'super_admin' as const,
-      },
-      {
-        id: 'admin-001',
-        email: 'admin@glovo.com',
-        firstName: 'Admin',
-        lastName: 'User',
-        role: 'admin' as const,
-      },
-      {
-        id: 'user-001',
-        email: 'user@glovo.com',
-        firstName: 'Normal',
-        lastName: 'User',
-        role: 'normal' as const,
-      },
-    ];
-
-    for (const user of defaultUsers) {
-      try {
-        await storage.upsertUser(user);
-        console.log(`✅ User initialized: ${user.email}`);
-      } catch (error) {
-        // Silently handle duplicate key errors (users already exist)
-        if (error instanceof Error && error.message.includes('duplicate key')) {
-          console.log(`ℹ️ User already exists: ${user.email}`);
-        } else {
-          console.error(`❌ Error initializing user ${user.email}:`, error);
-        }
-      }
-    }
-
+    // System initialization completed - users are managed via system_users table
     console.log('🎯 System initialization completed');
+    console.log('📊 Users are managed via the system_users table (see init.sql)');
   } catch (error) {
     console.error('🚨 Error during system initialization:', error);
     console.log('⚠️ Continuing anyway...');
@@ -124,10 +82,9 @@ async function startServer () {
 
     httpServer.listen(PORT, () => {
       console.log('\n🚀 Server running on http://localhost:' + PORT);
-      console.log('📊 Available users:');
-      console.log('   - Super Admin: superadmin@glovo.com / superadmin123');
-      console.log('   - Admin: admin@glovo.com / admin123');
-      console.log('   - User: user@glovo.com / user123');
+      console.log('📊 Users available in system_users table:');
+      console.log('   - Super Admins: nmartinez@solucioning.net, lvega@solucioning.net');
+      console.log('   - Admins: trafico1@solucioning.net to trafico20@solucioning.net');
       console.log('\n🔗 API Endpoints:');
       console.log('   - Health: GET /api/health');
       console.log('   - Login: POST /api/auth/login');

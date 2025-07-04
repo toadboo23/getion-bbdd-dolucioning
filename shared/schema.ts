@@ -24,13 +24,17 @@ export const sessions = pgTable(
   (table) => [index('IDX_session_expire').on(table.expire)],
 );
 
-// Users table
-export const users = pgTable('users', {
-  id: varchar('id', { length: 255 }).primaryKey(),
+// System users table (for user management by super admin)
+export const systemUsers = pgTable('system_users', {
+  id: serial('id').primaryKey(),
   email: varchar('email', { length: 255 }).unique().notNull(),
-  firstName: varchar('firstName', { length: 255 }).notNull(),
-  lastName: varchar('lastName', { length: 255 }).notNull(),
-  role: varchar('role', { length: 50 }).notNull(),
+  firstName: varchar('first_name', { length: 100 }).notNull(),
+  lastName: varchar('last_name', { length: 100 }).notNull(),
+  password: varchar('password', { length: 255 }).notNull(), // Hashed password
+  role: varchar('role', { enum: ['super_admin', 'admin', 'normal'] }).notNull(),
+  isActive: boolean('is_active').default(true),
+  createdBy: varchar('created_by', { length: 255 }).notNull(), // Email of creator
+  lastLogin: timestamp('last_login'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -129,21 +133,6 @@ export const notifications = pgTable('notifications', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// System users table (for user management by super admin)
-export const systemUsers = pgTable('system_users', {
-  id: serial('id').primaryKey(),
-  email: varchar('email', { length: 255 }).unique().notNull(),
-  firstName: varchar('first_name', { length: 100 }).notNull(),
-  lastName: varchar('last_name', { length: 100 }).notNull(),
-  password: varchar('password', { length: 255 }).notNull(), // Hashed password
-  role: varchar('role', { enum: ['super_admin', 'admin', 'normal'] }).notNull(),
-  isActive: boolean('is_active').default(true),
-  createdBy: varchar('created_by', { length: 255 }).notNull(), // Email of creator
-  lastLogin: timestamp('last_login'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
-
 // Audit logs table (for tracking all admin/super_admin actions)
 export const auditLogs = pgTable('audit_logs', {
   id: serial('id').primaryKey(),
@@ -167,63 +156,6 @@ export const auditLogs = pgTable('audit_logs', {
 ]);
 
 // Schema exports for validation
-export const upsertUserSchema = createInsertSchema(users);
-export const insertEmployeeSchema = z.object({
-  // Campos requeridos
-  idGlovo: z.string().min(1, 'ID Glovo es requerido'),
-  nombre: z.string().min(1, 'Nombre es requerido'),
-  telefono: z.string().min(1, 'Teléfono es requerido'),
-  flota: z.string().min(1, 'Flota es requerida'),
-  // Campos opcionales simplificados
-  emailGlovo: z.string().optional(),
-  turno: z.string().optional(),
-  apellido: z.string().optional(),
-  email: z.string().optional(),
-  horas: z.coerce.number().optional(),
-  cdp: z.coerce.number().optional(),
-  complementaries: z.string().optional(),
-  ciudad: z.string().optional(),
-  cityCode: z.string().optional(),
-  dniNie: z.string().optional(),
-  iban: z.string().optional(),
-  direccion: z.string().optional(),
-  vehiculo: z.enum(['Bicicleta', 'Patinete', 'Moto', 'Otro']).optional(),
-  naf: z.string().optional(),
-  fechaAltaSegSoc: z.string().optional(),
-  statusBaja: z.string().optional(),
-  estadoSs: z.string().optional(),
-  informadoHorario: z.boolean().optional(),
-  cuentaDivilo: z.string().optional(),
-  proximaAsignacionSlots: z.string().optional(),
-  jefeTrafico: z.string().optional(),
-  comentsJefeDeTrafico: z.string().optional(),
-  incidencias: z.string().optional(),
-  fechaIncidencia: z.string().optional(),
-  faltasNoCheckInEnDias: z.coerce.number().optional(),
-  cruce: z.string().optional(),
-  status: z.string().optional(),
-  penalizationStartDate: z.string().optional(),
-  penalizationEndDate: z.string().optional(),
-  originalHours: z.coerce.number().optional(),
-});
-
-export const updateEmployeeSchema = insertEmployeeSchema.partial();
-export const insertCompanyLeaveSchema = createInsertSchema(companyLeaves).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-export const insertItLeaveSchema = createInsertSchema(itLeaves).omit({
-  id: true,
-  createdAt: true,
-});
-export const insertNotificationSchema = createInsertSchema(notifications).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-// System users schemas
 export const insertSystemUserSchema = createInsertSchema(systemUsers).omit({
   id: true,
   createdAt: true,
@@ -235,6 +167,14 @@ export const updateSystemUserSchema = insertSystemUserSchema.partial().omit({
   createdBy: true,
 });
 
+// Employee schema for validation
+export const insertEmployeeSchema = createInsertSchema(employees).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateEmployeeSchema = insertEmployeeSchema.partial();
+
 // Audit logs schema
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   id: true,
@@ -242,19 +182,25 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 });
 
 // Type exports
-export type UpsertUser = z.infer<typeof upsertUserSchema>;
-export type User = typeof users.$inferSelect;
-export type Employee = typeof employees.$inferSelect;
-export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
-export type UpdateEmployee = z.infer<typeof updateEmployeeSchema>;
-export type CompanyLeave = typeof companyLeaves.$inferSelect;
-export type InsertCompanyLeave = z.infer<typeof insertCompanyLeaveSchema>;
-export type ItLeave = typeof itLeaves.$inferSelect;
-export type InsertItLeave = z.infer<typeof insertItLeaveSchema>;
-export type Notification = typeof notifications.$inferSelect;
-export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type SystemUser = typeof systemUsers.$inferSelect;
 export type InsertSystemUser = z.infer<typeof insertSystemUserSchema>;
 export type UpdateSystemUser = z.infer<typeof updateSystemUserSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+// Employee types
+export type Employee = typeof employees.$inferSelect;
+export type InsertEmployee = typeof employees.$inferInsert;
+export type UpdateEmployee = Partial<InsertEmployee>;
+
+// Company leave types
+export type CompanyLeave = typeof companyLeaves.$inferSelect;
+export type InsertCompanyLeave = typeof companyLeaves.$inferInsert;
+
+// IT leave types
+export type ItLeave = typeof itLeaves.$inferSelect;
+export type InsertItLeave = typeof itLeaves.$inferInsert;
+
+// Notification types
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;

@@ -2,8 +2,11 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '../shared/schema.js';
 
-// Database connection for local development
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://postgres:password123@localhost:5432/employee_management';
+// Database connection configuration
+const databaseUrl = process.env.DATABASE_URL ||
+  `postgresql://${process.env.POSTGRES_USER || 'postgres'}:${process.env.POSTGRES_PASSWORD}@${process.env.POSTGRES_HOST || 'localhost'}:${process.env.POSTGRES_PORT || '5432'}/${process.env.POSTGRES_DB || 'employee_management'}`;
+
+console.log('🔗 Database connection URL:', databaseUrl.replace(/:[^:@]*@/, ':****@')); // Hide password in logs
 
 // Create postgres client
 const client = postgres(databaseUrl, {

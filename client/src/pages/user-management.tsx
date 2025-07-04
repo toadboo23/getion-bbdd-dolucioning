@@ -109,7 +109,7 @@ export default function UserManagement () {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: number; data: Record<string, unknown> }) => {
       await apiRequest('PUT', `/api/system-users/${id}`, data);
     },
     onSuccess: () => {
@@ -733,12 +733,12 @@ export default function UserManagement () {
             </div>
             {passwordForm.newPassword && passwordForm.confirmPassword && (
               <div className={`text-sm p-2 rounded ${
-                passwordForm.newPassword === passwordForm.confirmPassword 
-                  ? 'bg-green-50 text-green-700 border border-green-200' 
+                passwordForm.newPassword === passwordForm.confirmPassword
+                  ? 'bg-green-50 text-green-700 border border-green-200'
                   : 'bg-red-50 text-red-700 border border-red-200'
               }`}>
-                {passwordForm.newPassword === passwordForm.confirmPassword 
-                  ? '✓ Las contraseñas coinciden' 
+                {passwordForm.newPassword === passwordForm.confirmPassword
+                  ? '✓ Las contraseñas coinciden'
                   : '✗ Las contraseñas no coinciden'
                 }
               </div>
