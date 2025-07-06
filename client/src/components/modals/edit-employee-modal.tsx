@@ -218,7 +218,7 @@ export default function EditEmployeeModal ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto" aria-describedby="edit-employee-description">
         <DialogHeader>
           <DialogTitle>
             {employee ? 'Editar Empleado' : 'Agregar Empleado'}
@@ -232,6 +232,9 @@ export default function EditEmployeeModal ({
             </div>
           )}
         </DialogHeader>
+        <div id="edit-employee-description" className="sr-only">
+          Modal para editar información de empleados. Permite modificar datos personales, laborales y adicionales del empleado.
+        </div>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

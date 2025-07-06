@@ -136,13 +136,16 @@ export default function EmployeeDetailModal ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto" aria-describedby="employee-detail-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3 text-xl">
             <User className="w-6 h-6 text-blue-600" />
             Detalles del Empleado
           </DialogTitle>
         </DialogHeader>
+        <div id="employee-detail-description" className="sr-only">
+          Modal con detalles completos del empleado. Muestra información personal, laboral y adicional del empleado seleccionado.
+        </div>
 
         <div className="space-y-6 mt-6">
           {/* Header con información principal */}

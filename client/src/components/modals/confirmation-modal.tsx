@@ -30,7 +30,7 @@ export default function ConfirmationModal ({
 }: ConfirmationModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[400px]" aria-describedby="confirmation-description">
         <DialogHeader>
           <div className="flex items-center space-x-3">
             <div className="flex-shrink-0">
@@ -43,6 +43,9 @@ export default function ConfirmationModal ({
             </DialogTitle>
           </div>
         </DialogHeader>
+        <div id="confirmation-description" className="sr-only">
+          Modal de confirmación. Permite confirmar o cancelar una acción importante.
+        </div>
 
         <div className="mt-4">
           <p className="text-sm text-gray-600">{message}</p>

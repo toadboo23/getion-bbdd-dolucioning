@@ -358,13 +358,16 @@ export default function UserManagement () {
                 Crear Usuario
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md" aria-describedby="create-user-description">
               <DialogHeader>
                 <DialogTitle>Crear Nuevo Usuario</DialogTitle>
                 <DialogDescription>
                   Complete los datos para crear un nuevo usuario del sistema
                 </DialogDescription>
               </DialogHeader>
+              <div id="create-user-description" className="sr-only">
+                Modal para crear un nuevo usuario del sistema. Permite ingresar nombre, apellido, email, rol y contraseña.
+              </div>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -637,13 +640,16 @@ export default function UserManagement () {
 
       {/* Dialog de edición */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby="edit-user-description">
           <DialogHeader>
             <DialogTitle>Editar Usuario</DialogTitle>
             <DialogDescription>
               Modifica los datos del usuario {editingUser?.firstName} {editingUser?.lastName}
             </DialogDescription>
           </DialogHeader>
+          <div id="edit-user-description" className="sr-only">
+            Modal para editar datos de usuario. Permite modificar nombre, apellido, rol y estado del usuario.
+          </div>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -701,13 +707,16 @@ export default function UserManagement () {
 
       {/* Dialog de cambio de contraseña */}
       <Dialog open={isChangePasswordDialogOpen} onOpenChange={setIsChangePasswordDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby="change-password-description">
           <DialogHeader>
             <DialogTitle>Cambiar Contraseña</DialogTitle>
             <DialogDescription>
               Cambia la contraseña del usuario {editingUser?.firstName} {editingUser?.lastName}
             </DialogDescription>
           </DialogHeader>
+          <div id="change-password-description" className="sr-only">
+            Modal para cambiar la contraseña de un usuario. Permite ingresar una nueva contraseña y confirmarla.
+          </div>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="newPassword">Nueva Contraseña *</Label>

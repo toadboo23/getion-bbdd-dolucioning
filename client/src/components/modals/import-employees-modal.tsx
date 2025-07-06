@@ -426,13 +426,16 @@ export default function ImportEmployeesModal ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby="import-employees-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
             Importar Empleados
           </DialogTitle>
         </DialogHeader>
+        <div id="import-employees-description" className="sr-only">
+          Modal para importar empleados desde un archivo Excel. Permite seleccionar archivo, validar datos y procesar la importación.
+        </div>
 
         <div className="space-y-6">
           {/* Paso 1: Selección de archivo */}

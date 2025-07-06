@@ -508,10 +508,11 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       const leaveData = req.body;
       
-      // Asegurar que leaveRequestedAt esté presente
+      // Asegurar que leaveRequestedAt y leaveRequestedBy estén presentes
       const processedLeaveData = {
         ...leaveData,
         leaveRequestedAt: leaveData.leaveRequestedAt || new Date(),
+        leaveRequestedBy: leaveData.leaveRequestedBy || leaveData.requestedBy || user.email,
       };
       
       const leave = await storage.createCompanyLeave(processedLeaveData);

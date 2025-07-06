@@ -123,13 +123,16 @@ export default function PenalizationModal ({ isOpen, onClose, employee, action }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col" aria-describedby="penalization-description">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-orange-600" />
             {isPenalize ? 'Penalizar Empleado' : 'Remover Penalización'}
           </DialogTitle>
         </DialogHeader>
+        <div id="penalization-description" className="sr-only">
+          Modal para gestionar penalizaciones de empleados. Permite penalizar empleados estableciendo fechas de inicio y fin, o remover penalizaciones existentes.
+        </div>
 
         {employee && (
           <div className="flex-1 overflow-y-auto space-y-6 pr-2">

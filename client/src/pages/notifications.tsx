@@ -619,7 +619,7 @@ export default function Notifications () {
 
       {/* Modal de tramitación */}
       <Dialog open={tramitationModal.isOpen} onOpenChange={(open) => setTramitationModal(prev => ({ ...prev, isOpen: open }))}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby="tramitation-description">
           <DialogHeader>
             <DialogTitle>
               {tramitationModal.action === 'approve' ? 'Tramitar Solicitud' :
@@ -628,6 +628,9 @@ export default function Notifications () {
                     'Procesar Solicitud'}
             </DialogTitle>
           </DialogHeader>
+          <div id="tramitation-description" className="sr-only">
+            Modal para tramitar notificaciones. Permite aprobar, rechazar o mover a pendiente laboral las solicitudes.
+          </div>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="processingDate">Fecha de Procesamiento</Label>
