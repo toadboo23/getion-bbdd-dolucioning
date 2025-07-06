@@ -281,7 +281,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
         const processNumber = (numberValue: unknown): number | undefined => {
           if (numberValue === null || numberValue === undefined || numberValue === '') return undefined;
           const num = Number(numberValue);
-          return isNaN(num) ? undefined : num;
+          return isNaN(num) ? undefined : Math.round(num); // Convertir a entero
         };
 
         const processDate = (dateValue: unknown): string | undefined => {
