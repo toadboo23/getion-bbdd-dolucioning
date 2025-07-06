@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Base de datos PostgreSQL
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: solucioning_db
     environment:
       POSTGRES_DB: employee_management
