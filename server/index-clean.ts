@@ -20,7 +20,9 @@ app.use((req, res, next) => {
     'http://localhost:3000',
     'http://localhost:5174', // Vite dev server
     'http://frontend:3000', // Docker frontend
-    'http://employee_management_frontend:3000', // Docker service name',
+    'http://employee_management_frontend:3000', // Docker service name
+    'http://69.62.107.86:3000', // Production frontend
+    'http://solucioning_frontend:3000', // Docker service name
   ];
 
   const origin = req.headers.origin;

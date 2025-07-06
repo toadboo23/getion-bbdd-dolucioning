@@ -1,0 +1,23 @@
+# Variables de Entorno para Producción - PostgreSQL Local
+# Configuración para VPS con PostgreSQL instalado localmente
+
+# Base de Datos PostgreSQL (Local)
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=solucioning
+POSTGRES_USER=solucioning
+POSTGRES_PASSWORD=Patoloco2323@@
+
+# Backend API
+SESSION_SECRET=c#Sg2Rb<dM{@sC+Dj%I>vY~x`Ah6X-Nze(q,=}mLpGoHVl!aw.K9"OT't1*8i$?B
+BACKEND_PORT=5173
+
+# Frontend
+API_URL=http://localhost:5173
+FRONTEND_PORT=3000
+
+# Configuración de producción
+NODE_ENV=production
+
+# Configuración de Docker
+DOCKER_HOST=172.17.0.1 
