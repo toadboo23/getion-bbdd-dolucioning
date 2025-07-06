@@ -1,350 +1,329 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
-import { PostgresStorage } from "./storage-postgres.js";
-import { setupAuth, isAuthenticated } from "./auth-local.js";
-import { AuditService } from "./audit-service.js";
+import type { Express } from 'express';
+import { createServer, type Server } from 'http';
+import { PostgresStorage } from './storage-postgres.js';
+import { setupAuth, isAuthenticated } from './auth-local.js';
+import { AuditService } from './audit-service.js';
+// XLSX import removed as it's not used in this file
 
 const storage = new PostgresStorage();
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  console.log("🚀 Setting up routes...");
+export async function registerRoutes (app: Express): Promise<Server> {
+  if (process.env.NODE_ENV !== 'production') console.log('🚀 Setting up routes...');
 
   // Setup authentication first
   await setupAuth(app);
 
   // Health check
-  app.get("/api/health", (req, res) => {
-    console.log("❤️ Health check");
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
-  });
-
-  // Create test employees (development only)
-  app.post("/api/create-test-employees", isAuthenticated, async (req: any, res) => {
-    console.log("🧪 Creating test employees");
-    try {
-      const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can create test employees" });
-      }
-
-      // Create test employees
-      const testEmployees = [
-        {
-          idGlovo: "TEST001",
-          nombre: "Juan Pérez",
-          telefono: "+34 666 777 888",
-          emailGlovo: "juan@glovo.com",
-          apellido: "Pérez",
-          ciudad: "madrid"
-        },
-        {
-          idGlovo: "TEST002", 
-          nombre: "María García",
-          telefono: "+34 666 777 889",
-          emailGlovo: "maria@glovo.com",
-          apellido: "García",
-          ciudad: "barcelona"
-        }
-      ];
-
-      const createdEmployees = [];
-      for (const emp of testEmployees) {
-        try {
-          const created = await storage.createEmployee(emp);
-          createdEmployees.push(created);
-        } catch (error) {
-          console.log(`Employee ${emp.idGlovo} already exists or error:`, error);
-        }
-      }
-
-      console.log("✅ Test employees processed");
-      res.json({ message: "Test employees created", employees: createdEmployees });
-    } catch (error) {
-      console.error("❌ Error creating test employees:", error);
-      res.status(500).json({ message: "Failed to create test employees" });
-    }
+  app.get('/api/health', (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('❤️ Health check');
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
   // Dashboard metrics (protected)
-  app.get("/api/dashboard/metrics", isAuthenticated, async (req: any, res) => {
-    console.log("📊 Dashboard metrics request");
+  app.get('/api/dashboard/metrics', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('📊 Dashboard metrics request');
     try {
-      const user = req.user;
+      const user = req.user as { role?: string };
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para ver el dashboard' });
+      }
       const metrics = await storage.getDashboardMetrics();
-      
+
       // Solo el super admin puede ver las notificaciones pendientes
       if (user?.role !== 'super_admin') {
         metrics.pendingActions = 0; // Ocultar notificaciones pendientes para otros roles
       }
-      
+
       res.json(metrics);
     } catch (error) {
-      console.error("❌ Error fetching dashboard metrics:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard metrics" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching dashboard metrics:', error);
+      res.status(500).json({ message: 'Failed to fetch dashboard metrics' });
     }
   });
 
   // Get unique cities for filters (protected)
-  app.get("/api/cities", isAuthenticated, async (req, res) => {
-    console.log("🏙️ Unique cities request");
+  app.get('/api/cities', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🏙️ Unique cities request');
     try {
       const cities = await storage.getUniqueCities();
       res.json(cities);
     } catch (error) {
-      console.error("❌ Error fetching cities:", error);
-      res.status(500).json({ message: "Failed to fetch cities" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching cities:', error);
+      res.status(500).json({ message: 'Failed to fetch cities' });
     }
   });
 
-  // Get unique traffic managers for filters (protected)
-  app.get("/api/traffic-managers", isAuthenticated, async (req, res) => {
-    console.log("👔 Unique traffic managers request");
+  // Get unique fleets for filters (protected)
+  app.get('/api/fleets', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🛳️ Unique fleets request');
     try {
-      const trafficManagers = await storage.getUniqueTrafficManagers();
-      res.json(trafficManagers);
+      const fleets = await storage.getUniqueFleets();
+      res.json(fleets);
     } catch (error) {
-      console.error("❌ Error fetching traffic managers:", error);
-      res.status(500).json({ message: "Failed to fetch traffic managers" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching fleets:', error);
+      res.status(500).json({ message: 'Failed to fetch fleets' });
+    }
+  });
+
+  // Get unique flotas for filters (protected)
+  app.get('/api/flotas', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🚗 Unique flotas request');
+    try {
+      const flotas = await storage.getUniqueFlotas();
+      res.json(flotas);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching flotas:', error);
+      res.status(500).json({ message: 'Failed to fetch flotas' });
     }
   });
 
   // Employees list (protected)
-  app.get("/api/employees", isAuthenticated, async (req, res) => {
-    console.log("👥 Employees list request with filters:", req.query);
+  app.get('/api/employees', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('👥 Employees list request with filters:', req.query);
     try {
-      const { city, status, search, trafficManager } = req.query;
-      
-      // Get all employees first
+      const { city, status, search, flota } = req.query;
+
       let employees = await storage.getAllEmployees();
-      
-      // Apply search filter
-      if (search && typeof search === 'string' && search.trim() !== '') {
-        const searchTerm = search.toLowerCase().trim();
-        employees = employees.filter(emp => 
-          emp.nombre?.toLowerCase().includes(searchTerm) ||
-          emp.apellido?.toLowerCase().includes(searchTerm) ||
-          emp.email?.toLowerCase().includes(searchTerm) ||
-          emp.emailGlovo?.toLowerCase().includes(searchTerm) ||
-          emp.telefono?.toLowerCase().includes(searchTerm) ||
-          emp.idGlovo?.toLowerCase().includes(searchTerm)
-        );
+
+      // Apply filters
+      if (city && city !== 'all') {
+        employees = employees.filter(emp => emp.ciudad === city);
       }
-      
-      // Apply city filter
-      if (city && typeof city === 'string' && city.trim() !== '') {
-        employees = employees.filter(emp => 
-          emp.ciudad?.toLowerCase() === city.toLowerCase()
-        );
-      }
-      
-      // Apply status filter
-      if (status && typeof status === 'string' && status.trim() !== '') {
+
+      if (status && status !== 'all') {
         employees = employees.filter(emp => emp.status === status);
       }
-      
-      // Apply traffic manager filter
-      if (trafficManager && typeof trafficManager === 'string' && trafficManager.trim() !== '') {
-        employees = employees.filter(emp => 
-          emp.jefeTrafico?.toLowerCase() === trafficManager.toLowerCase()
+
+      if (flota && flota !== 'all') {
+        employees = employees.filter(emp => emp.flota === flota);
+      }
+
+      if (search) {
+        const searchTerm = search.toString().toLowerCase();
+        employees = employees.filter(emp =>
+          emp.nombre?.toLowerCase().includes(searchTerm) ||
+          emp.apellido?.toLowerCase().includes(searchTerm) ||
+          emp.telefono?.includes(searchTerm) ||
+          emp.email?.toLowerCase().includes(searchTerm),
         );
       }
-      
-      console.log(`✅ Filtered employees: ${employees.length} results`);
+
       res.json(employees);
     } catch (error) {
-      console.error("❌ Error fetching employees:", error);
-      res.status(500).json({ message: "Failed to fetch employees" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching employees:', error);
+      res.status(500).json({ message: 'Failed to fetch employees' });
     }
   });
 
-  // Individual employee (protected)
-  app.get("/api/employees/:id", isAuthenticated, async (req, res) => {
-    console.log("👤 Employee detail request for ID:", req.params.id);
+  // Create employee (protected - admin/super_admin only)
+  app.post('/api/employees', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('➕ Create employee request');
     try {
-      const id = req.params.id;
-      const employee = await storage.getEmployee(id);
-      
-      if (!employee) {
-        return res.status(404).json({ message: "Employee not found" });
-      }
-      
-      res.json(employee);
-    } catch (error) {
-      console.error("❌ Error fetching employee:", error);
-      res.status(500).json({ message: "Failed to fetch employee" });
-    }
-  });
-
-  // Create new employee (protected)
-  app.post("/api/employees", isAuthenticated, async (req: any, res) => {
-    console.log("➕ Create employee request", req.body);
-    console.log("🔍 Raw request body:", JSON.stringify(req.body, null, 2));
-    
-    try {
-      // Check permissions
-      const user = req.user;
-      if (!user || !['super_admin', 'admin'].includes(user.role)) {
-        console.log("❌ Permission denied for user:", user?.email, user?.role);
-        return res.status(403).json({ message: "Insufficient permissions" });
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para crear empleados' });
       }
 
-      const employeeData = req.body;
-      
-      // Validate required fields
-      if (!employeeData.idGlovo || !employeeData.nombre || !employeeData.telefono) {
-        console.log("❌ Missing required fields:", {
-          idGlovo: employeeData.idGlovo,
-          nombre: employeeData.nombre,
-          telefono: employeeData.telefono
-        });
-        return res.status(400).json({ 
-          message: "Campos requeridos: ID Glovo, Nombre y Teléfono" 
-        });
-      }
+      const employeeData = req.body as Record<string, unknown>;
+      const employee = await storage.createEmployee(employeeData as any);
 
-      console.log("🔧 Processing employee data for creation...");
-      
-      // Create employee
-      const employee = await storage.createEmployee(employeeData);
-      console.log("✅ Employee created successfully:", employee.idGlovo);
-      
-      // Log audit trail
-      await AuditService.logEmployeeCreation(user.email, user.role, employee, req);
-      
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: user.role as 'super_admin' | 'admin',
+        action: 'create_employee',
+        entityType: 'employee',
+        entityId: employee.idGlovo,
+        entityName: `${employee.nombre} ${employee.apellido}`,
+        description: `Empleado creado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo})`,
+        newData: employee,
+      });
+
       res.status(201).json(employee);
     } catch (error) {
-      console.error("❌ Error creating employee:", error);
-      console.error("❌ Error details:", error instanceof Error ? error.message : String(error));
-      res.status(500).json({ message: "Failed to create employee" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error creating employee:', error);
+      res.status(500).json({ message: 'Failed to create employee' });
+    }
+  });
+
+  // Update employee (protected - admin/super_admin only)
+  app.put('/api/employees/:id', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('✏️ Update employee request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para editar empleados' });
+      }
+
+      const { id } = req.params;
+      const employeeData = req.body as Record<string, unknown>;
+
+      // Get old data for audit
+      const oldEmployee = await storage.getEmployee(id);
+
+      const employee = await storage.updateEmployee(id, employeeData as Record<string, unknown>);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: user.role as 'super_admin' | 'admin',
+        action: 'update_employee',
+        entityType: 'employee',
+        entityId: employee.idGlovo,
+        entityName: `${employee.nombre} ${employee.apellido}`,
+        description: `Empleado actualizado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo})`,
+        oldData: oldEmployee,
+        newData: employee,
+      });
+
+      res.json(employee);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error updating employee:', error);
+      res.status(500).json({ message: 'Failed to update employee' });
+    }
+  });
+
+  // Delete employee (protected - super_admin only)
+  app.delete('/api/employees/:id', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🗑️ Delete employee request');
+    try {
+      const user = req.user as { role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede eliminar empleados' });
+      }
+
+      const { id } = req.params;
+
+      // Get employee data for audit
+      const employee = await storage.getEmployee(id);
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      await storage.deleteEmployee(id);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'delete_employee',
+        entityType: 'employee',
+        entityId: employee.idGlovo,
+        entityName: `${employee.nombre} ${employee.apellido}`,
+        description: `Empleado eliminado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo})`,
+        oldData: employee,
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error deleting employee:', error);
+      res.status(500).json({ message: 'Failed to delete employee' });
+    }
+  });
+
+  // Delete all employees (protected - super_admin only)
+  app.delete('/api/employees/all', isAuthenticated, async (req: { user?: { email?: string; role?: string } }, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🗑️ Delete all employees request');
+    try {
+      const user = req.user;
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede eliminar todos los empleados' });
+      }
+
+      // Get count for audit
+      const employees = await storage.getAllEmployees();
+
+      await storage.clearAllEmployees();
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'delete_all_employees',
+        entityType: 'employee',
+        description: `Todos los empleados eliminados (${employees.length} empleados)`,
+        oldData: { count: employees.length },
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error deleting all employees:', error);
+      res.status(500).json({ message: 'Failed to delete all employees' });
     }
   });
 
   // Bulk import employees (protected - super_admin only)
-  app.post("/api/employees/bulk-import", isAuthenticated, async (req: any, res) => {
-    console.log("📦 Bulk import employees request from user:", req.user?.email, req.user?.role);
+  app.post('/api/employees/bulk-import', isAuthenticated, async (req: { user?: { email?: string; role?: string }; body: { employees: Record<string, unknown>[]; dryRun?: boolean } }, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('📥 Bulk import employees request');
     try {
       const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        console.log("❌ Permission denied for bulk import. User role:", user?.role);
-        return res.status(403).json({ message: "Only super admin can import employees" });
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede importar empleados' });
       }
 
-      const { employees } = req.body;
-      
-      if (!employees || !Array.isArray(employees) || employees.length === 0) {
-        return res.status(400).json({ message: "Se requiere un array de empleados" });
+      const { employees, dryRun = false } = req.body;
+
+      if (!Array.isArray(employees) || employees.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid input: employees must be a non-empty array',
+        });
       }
 
-      console.log(`🔧 Processing ${employees.length} employees for bulk import...`);
-      
-      // Helper function to process strings
-      const processString = (stringValue: any): string | undefined => {
-        if (!stringValue || stringValue === "" || stringValue === "null" || stringValue === "undefined") {
-          return undefined;
-        }
-        return String(stringValue).trim();
-      };
+      // Process and validate employees
+      const processedEmployees = employees.map((emp: Record<string, unknown>, index: number) => {
+        const processString = (stringValue: unknown): string | undefined => {
+          if (!stringValue) return undefined;
+          const processed = String(stringValue).trim();
+          return processed === '' ? undefined : processed;
+        };
 
-      // Helper function to process numbers
-      const processNumber = (numberValue: any): number | undefined => {
-        if (!numberValue || numberValue === "" || numberValue === "null" || numberValue === "undefined") {
-          return undefined;
-        }
-        
-        const parsed = Number(numberValue);
-        return !isNaN(parsed) ? parsed : undefined;
-      };
+        const processNumber = (numberValue: unknown): number | undefined => {
+          if (numberValue === null || numberValue === undefined || numberValue === '') return undefined;
+          const num = Number(numberValue);
+          return isNaN(num) ? undefined : num;
+        };
 
-      // Helper function to process dates
-      const processDate = (dateValue: any): string | undefined => {
-        if (!dateValue || dateValue === "" || dateValue === "null" || dateValue === "undefined") {
-          return undefined;
-        }
-        
-        try {
-          // If it's already a valid date string, return it
-          if (typeof dateValue === 'string') {
-            const trimmed = dateValue.trim();
-            if (trimmed === "") return undefined;
-            
-            // Try to parse the date
-            const parsed = Date.parse(trimmed);
-            if (!isNaN(parsed)) {
-              return new Date(parsed).toISOString().split('T')[0]; // Return YYYY-MM-DD format
-            }
-            
-            // Try manual parsing for different formats
-            if (trimmed.match(/^\d{4}-\d{2}-\d{2}$/)) {
-              return trimmed; // Already in YYYY-MM-DD format
-            }
-            
-            if (trimmed.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-              // DD/MM/YYYY format
-              const parts = trimmed.split('/');
-              const date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-              if (!isNaN(date.getTime())) {
-                return date.toISOString().split('T')[0];
-              }
-            }
+        const processDate = (dateValue: unknown): string | undefined => {
+          if (!dateValue) return undefined;
+          try {
+            const date = new Date(dateValue as string | number | Date);
+            if (isNaN(date.getTime())) return undefined;
+            return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+          } catch {
+            return undefined;
           }
-          
-          // If it's a number (Excel date serial)
-          if (typeof dateValue === 'number') {
-            // Excel dates are days since 1900-01-01 (with leap year bug)
-            const excelEpoch = new Date(1900, 0, 1);
-            const days = dateValue - 2; // Account for Excel's leap year bug
-            const date = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000);
-            if (!isNaN(date.getTime())) {
-              return date.toISOString().split('T')[0];
-            }
+        };
+
+        const processBoolean = (boolValue: unknown): boolean => {
+          if (typeof boolValue === 'boolean') return boolValue;
+          if (typeof boolValue === 'string') {
+            const lower = boolValue.toLowerCase();
+            return lower === 'true' || lower === '1' || lower === 'yes' || lower === 'sí';
           }
-        } catch (error) {
-          console.warn(`Error parsing date "${dateValue}":`, error);
-        }
-        
-        return undefined;
-      };
+          return false;
+        };
 
-      // Helper function to process boolean
-      const processBoolean = (boolValue: any): boolean => {
-        if (typeof boolValue === 'boolean') return boolValue;
-        if (typeof boolValue === 'string') {
-          const lower = boolValue.toLowerCase();
-          return lower === 'true' || lower === '1' || lower === 'yes' || lower === 'sí';
-        }
-        return false;
-      };
+        const horas = processNumber(emp.horas);
+        const cdp = horas ? Number(((horas / 38) * 100).toFixed(2)) : 0;
 
-      // Validate and process each employee
-      const validEmployees = [];
-      const errors = [];
-
-      for (let i = 0; i < employees.length; i++) {
-        const emp = employees[i];
-        
-        // Check required fields
-        if (!emp.idGlovo || !emp.nombre || !emp.telefono) {
-          errors.push(`Empleado ${i + 1}: Faltan campos requeridos (ID Glovo, Nombre, Teléfono)`);
-          continue;
-        }
-        
-        // Process all fields with proper type conversion
-        const processedEmployee = {
-          idGlovo: String(emp.idGlovo).trim(),
-          nombre: String(emp.nombre).trim(),
-          telefono: String(emp.telefono).trim(),
+        return {
+          idGlovo: processString(emp.idGlovo) || `TEMP_${index}`,
           emailGlovo: processString(emp.emailGlovo),
           turno: processString(emp.turno),
+          nombre: processString(emp.nombre) || 'Sin Nombre',
           apellido: processString(emp.apellido),
+          telefono: processString(emp.telefono) || 'Sin Teléfono',
           email: processString(emp.email),
-          horas: processNumber(emp.horas),
+          horas: horas,
+          cdp: cdp,
           complementaries: processString(emp.complementaries),
           ciudad: processString(emp.ciudad),
           cityCode: processString(emp.cityCode),
           dniNie: processString(emp.dniNie),
           iban: processString(emp.iban),
           direccion: processString(emp.direccion),
-          vehiculo: processString(emp.vehiculo),
+          vehiculo: processString(emp.vehiculo) as 'Bicicleta' | 'Patinete' | 'Moto' | 'Otro' | undefined,
           naf: processString(emp.naf),
           fechaAltaSegSoc: processDate(emp.fechaAltaSegSoc),
           statusBaja: processString(emp.statusBaja),
@@ -356,856 +335,702 @@ export async function registerRoutes(app: Express): Promise<Server> {
           comentsJefeDeTrafico: processString(emp.comentsJefeDeTrafico),
           incidencias: processString(emp.incidencias),
           fechaIncidencia: processDate(emp.fechaIncidencia),
-          faltasNoCheckInEnDias: processNumber(emp.faltasNoCheckInEnDias),
+          faltasNoCheckInEnDias: processNumber(emp.faltasNoCheckInEnDias) || 0,
           cruce: processString(emp.cruce),
-          status: emp.status || "active"
-        } as any;
-
-        console.log(`📝 Processed employee ${i + 1}:`, {
-          idGlovo: processedEmployee.idGlovo,
-          nombre: processedEmployee.nombre,
-          fechas: {
-            fechaAltaSegSoc: processedEmployee.fechaAltaSegSoc,
-            proximaAsignacionSlots: processedEmployee.proximaAsignacionSlots,
-            fechaIncidencia: processedEmployee.fechaIncidencia
-          }
-        });
-
-        validEmployees.push(processedEmployee);
-      }
-
-      if (validEmployees.length === 0) {
-        return res.status(400).json({ 
-          message: "No hay empleados válidos para importar",
-          errors 
-        });
-      }
-
-      console.log(`✅ Ready to import ${validEmployees.length} valid employees`);
-
-      // Clear existing employees and bulk create new ones
-      await storage.clearAllEmployees();
-      const createdEmployees = await storage.bulkCreateEmployees(validEmployees);
-      
-      console.log(`✅ Bulk import completed: ${createdEmployees.length} employees created`);
-      
-      // Log audit trail
-      await AuditService.logBulkImport(user.email, user.role, createdEmployees.length, req);
-      
-      res.status(201).json({ 
-        message: `${createdEmployees.length} empleados importados correctamente`,
-        imported: createdEmployees.length,
-        errors: errors.length > 0 ? errors : undefined
+          flota: processString(emp.flota) || 'SIN_FLOTA',
+          status: (processString(emp.status) as 'active' | 'it_leave' | 'company_leave_pending' | 'company_leave_approved' | 'pending_laboral' | 'pendiente_laboral' | 'penalizado') || 'active',
+        };
       });
-    } catch (error) {
-      console.error("❌ Error in bulk import:", error);
-      console.error("❌ Full error details:", error instanceof Error ? error.stack : String(error));
-      res.status(500).json({ message: "Failed to import employees", error: error instanceof Error ? error.message : String(error) });
-    }
-  });
 
-  // Update employee (protected)
-  app.put("/api/employees/:id", isAuthenticated, async (req: any, res) => {
-    console.log("📝 Update employee request for ID:", req.params.id, req.body);
-    try {
-      // Check permissions
-      const user = req.user;
-      if (!user || !['super_admin', 'admin'].includes(user.role)) {
-        return res.status(403).json({ message: "Insufficient permissions" });
-      }
-
-      const idGlovo = req.params.id;
-      const employeeData = req.body;
-
-      // Get old data for audit log
-      const oldEmployee = await storage.getEmployee(idGlovo);
-      
-      // Update employee
-      const employee = await storage.updateEmployee(idGlovo, employeeData);
-      console.log("✅ Employee updated successfully:", idGlovo);
-      
-      // Log audit trail
-      if (oldEmployee) {
-        await AuditService.logEmployeeUpdate(user.email, user.role, idGlovo, oldEmployee, employee, req);
-      }
-      
-      res.json(employee);
-    } catch (error) {
-      console.error("❌ Error updating employee:", error);
-      res.status(500).json({ message: "Failed to update employee" });
-    }
-  });
-
-  // Request company leave (protected)
-  app.post("/api/employees/:id/company-leave", isAuthenticated, async (req: any, res) => {
-    console.log("🏢 Company leave request for employee:", req.params.id, req.body);
-    try {
-      const user = req.user;
-      if (!user || !['super_admin', 'admin'].includes(user.role)) {
-        return res.status(403).json({ message: "Insufficient permissions" });
-      }
-
-      const employeeId = req.params.id;
-      const { leaveType, leaveDate } = req.body;
-
-      if (!leaveType || !leaveDate) {
-        return res.status(400).json({ message: "Tipo de baja y fecha son requeridos" });
-      }
-
-      // Get employee to ensure it exists
-      const employee = await storage.getEmployee(employeeId);
-      if (!employee) {
-        return res.status(404).json({ message: "Employee not found" });
-      }
-
-      // Update employee status to company_leave_pending
-      await storage.updateEmployee(employeeId, { 
-        status: "company_leave_pending"
-      });
-      
-      // Create notification for super admin approval
-      const notification = await storage.createNotification({
-        type: "company_leave_request",
-        title: `Solicitud de Baja Empresa - ${employee.nombre} ${employee.apellido || ""}`,
-        message: `${user.firstName} ${user.lastName} solicita baja empresa para ${employee.nombre} ${employee.apellido || ""} (${employeeId}) por motivo: ${leaveType}. Fecha: ${leaveDate}`,
-        requestedBy: user.email,
-        status: "pending",
-        metadata: {
-          employeeId,
-          leaveType,
-          leaveDate,
-          requestedByUserId: user.id,
-          requestedByName: `${user.firstName} ${user.lastName}`,
-          employeeName: `${employee.nombre} ${employee.apellido || ""}`,
+      // Validate required fields
+      const errors: string[] = [];
+      processedEmployees.forEach((emp, index) => {
+        if (!emp.idGlovo || emp.idGlovo === `TEMP_${index}`) {
+          errors.push(`Fila ${index + 2}: ID Glovo es requerido`);
+        }
+        if (!emp.nombre || emp.nombre === 'Sin Nombre') {
+          errors.push(`Fila ${index + 2}: Nombre es requerido`);
+        }
+        if (!emp.telefono || emp.telefono === 'Sin Teléfono') {
+          errors.push(`Fila ${index + 2}: Teléfono es requerido`);
         }
       });
 
-      console.log("✅ Company leave notification created:", notification.id);
-      
-      // Log audit trail
-      await AuditService.logCompanyLeaveRequest(user.email, user.role, employee, leaveType, leaveDate, req);
-      
-      res.status(201).json({ message: "Solicitud de baja empresa enviada para aprobación", notificationId: notification.id });
+      if (errors.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Errores de validación encontrados',
+          errors,
+        });
+      }
+
+      // Si es dryRun, solo devolver validación sin importar
+      if (dryRun) {
+        return res.json({
+          success: true,
+          message: 'Vista previa completada',
+          validEmployees: processedEmployees,
+          invalidEmployees: [],
+          validationErrors: errors,
+        });
+      }
+
+      // Import employees
+      const createdEmployees = await storage.bulkCreateEmployees(processedEmployees);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'bulk_import_employees',
+        entityType: 'employee',
+        description: `Importación masiva de empleados: ${createdEmployees.length} empleados importados`,
+        newData: { count: createdEmployees.length, employees: createdEmployees },
+      });
+
+      res.json({
+        success: true,
+        message: `Se importaron ${createdEmployees.length} empleados correctamente`,
+        employees: createdEmployees,
+      });
     } catch (error) {
-      console.error("❌ Error creating company leave request:", error);
-      res.status(500).json({ message: "Failed to create company leave request" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error in bulk import:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al importar empleados',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   });
 
-  // Request IT leave (protected)
-  app.post("/api/employees/:id/it-leave", isAuthenticated, async (req: any, res) => {
-    console.log("🏥 [IT-LEAVE] Request for employee:", req.params.id, req.body);
+  // Employee penalization (protected - admin/super_admin only)
+  app.post('/api/employees/:id/penalize', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('⚠️ Penalize employee request');
     try {
       const user = req.user;
-      if (!user || !['super_admin', 'admin'].includes(user.role)) {
-        console.log("❌ [IT-LEAVE] Insufficient permissions for user:", user?.email, user?.role);
-        return res.status(403).json({ message: "Insufficient permissions" });
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para penalizar empleados' });
       }
 
-      const employeeId = req.params.id;
-      const { leaveType, leaveDate } = req.body;
-      
-      console.log("📋 [IT-LEAVE] Processing data:", { employeeId, leaveType, leaveDate });
-      
-      if (!leaveType || !leaveDate) {
-        console.log("❌ [IT-LEAVE] Missing required fields:", { leaveType: !!leaveType, leaveDate: !!leaveDate });
-        return res.status(400).json({ message: "Tipo de baja y fecha son requeridos" });
+      const { id } = req.params;
+      const { startDate, endDate, observations } = req.body;
+
+      // Validate required fields
+      if (!startDate || !endDate || !observations) {
+        return res.status(400).json({ message: 'startDate, endDate y observations son requeridos' });
       }
 
-      // Get employee to ensure it exists
-      console.log("🔍 [IT-LEAVE] Getting employee:", employeeId);
-      const employee = await storage.getEmployee(employeeId);
+      // Get employee data for audit
+      const employee = await storage.getEmployee(id);
       if (!employee) {
-        console.log("❌ [IT-LEAVE] Employee not found:", employeeId);
-        return res.status(404).json({ message: "Employee not found" });
+        return res.status(404).json({ message: 'Employee not found' });
       }
-      
-      console.log("👤 [IT-LEAVE] Employee found:", { 
-        id: employee.idGlovo, 
-        name: `${employee.nombre} ${employee.apellido}`,
-        currentStatus: employee.status 
+
+      const penalizedEmployee = await storage.penalizeEmployee(id, startDate, endDate, observations);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'penalize_employee',
+        entityType: 'employee',
+        entityId: employee.idGlovo,
+        entityName: `${employee.nombre} ${employee.apellido}`,
+        description: `Empleado penalizado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo}) desde ${startDate} hasta ${endDate}`,
+        oldData: employee,
+        newData: penalizedEmployee,
       });
 
-      // Update employee status to it_leave
-      console.log("🔄 [IT-LEAVE] Updating employee status to 'it_leave'...");
-      const updatedEmployee = await storage.updateEmployee(employeeId, { 
-        status: "it_leave"
-      });
-      
-      console.log("✅ [IT-LEAVE] Employee status updated:", {
-        id: updatedEmployee.idGlovo,
-        oldStatus: employee.status,
-        newStatus: updatedEmployee.status
+      res.json(penalizedEmployee);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error penalizing employee:', error);
+      res.status(500).json({ message: 'Failed to penalize employee' });
+    }
+  });
+
+  app.post('/api/employees/:id/remove-penalization', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('✅ Remove employee penalization request');
+    try {
+      const user = req.user;
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para remover penalizaciones' });
+      }
+
+      const { id } = req.params;
+
+      // Get employee data for audit
+      const employee = await storage.getEmployee(id);
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      const updatedEmployee = await storage.removePenalization(id);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'remove_employee_penalization',
+        entityType: 'employee',
+        entityId: employee.idGlovo,
+        entityName: `${employee.nombre} ${employee.apellido}`,
+        description: `Penalización removida del empleado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo})`,
+        oldData: employee,
+        newData: updatedEmployee,
       });
 
-      // Create IT leave record
-      console.log("📝 [IT-LEAVE] Creating IT leave record...");
-      const itLeaveData = {
-        employeeId,
-        leaveType,
-        leaveDate: new Date(leaveDate),
-        requestedAt: new Date(),
-        requestedBy: user.email,
-        approvedBy: user.email, // Auto-approved for IT leaves
-        approvedAt: new Date(),
-        status: "approved" as const
+      res.json(updatedEmployee);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error removing employee penalization:', error);
+      res.status(500).json({ message: 'Failed to remove employee penalization' });
+    }
+  });
+
+  // Company leaves (protected)
+  app.get('/api/company-leaves', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🏢 Company leaves request');
+    try {
+      const leaves = await storage.getAllCompanyLeaves();
+      res.json(leaves);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching company leaves:', error);
+      res.status(500).json({ message: 'Failed to fetch company leaves' });
+    }
+  });
+
+  app.post('/api/company-leaves', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('➕ Create company leave request');
+    try {
+      const user = req.user;
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para crear bajas de empresa' });
+      }
+
+      const leaveData = req.body;
+      
+      // Asegurar que leaveRequestedAt y leaveRequestedBy estén presentes
+      const processedLeaveData = {
+        ...leaveData,
+        leaveRequestedAt: leaveData.leaveRequestedAt || new Date(),
+        leaveRequestedBy: leaveData.leaveRequestedBy || leaveData.requestedBy || user.email,
       };
       
-      console.log("📊 [IT-LEAVE] IT leave data:", itLeaveData);
-      const itLeave = await storage.createItLeave(itLeaveData);
+      const leave = await storage.createCompanyLeave(processedLeaveData);
 
-      console.log("🎉 [IT-LEAVE] ✅ SUCCESS! IT leave processed completely:", {
-        itLeaveId: itLeave.id,
-        employeeId: updatedEmployee.idGlovo,
-        employeeName: `${updatedEmployee.nombre} ${updatedEmployee.apellido}`,
-        newStatus: updatedEmployee.status,
-        leaveType: itLeave.leaveType,
-        processedBy: user.email
+      // Crear notificación automáticamente
+      const notificationData = {
+        type: 'company_leave_request' as const,
+        title: 'Solicitud de Baja Empresa',
+        message: `Se ha solicitado una baja empresa para el empleado ${leaveData.employeeId}`,
+        requestedBy: user.email,
+        status: 'pending' as const,
+        metadata: {
+          employeeId: leaveData.employeeId,
+          leaveType: leaveData.leaveType,
+          leaveDate: leaveData.leaveDate,
+          companyLeaveId: leave.id,
+        },
+      };
+
+      const notification = await storage.createNotification(notificationData);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'create_company_leave',
+        entityType: 'company_leave',
+        entityId: leave.employeeId,
+        description: `Baja de empresa creada para empleado ${leave.employeeId}`,
+        newData: leave,
       });
-      
-      // Log audit trail
-      await AuditService.logItLeaveRequest(user.email, user.role, updatedEmployee, leaveType, leaveDate, req);
-      
-      res.status(201).json({ 
-        message: "Baja IT procesada correctamente",
-        success: true,
-        data: {
-          itLeaveId: itLeave.id,
-          employeeId: updatedEmployee.idGlovo,
-          newStatus: updatedEmployee.status,
-          leaveType: itLeave.leaveType
-        }
-      });
+
+      res.status(201).json({ leave, notification });
     } catch (error) {
-      console.error("💥 [IT-LEAVE] CRITICAL ERROR:", error);
-      console.error("💥 [IT-LEAVE] Error details:", {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        employeeId: req.params.id,
-        requestBody: req.body,
-        user: req.user?.email
-      });
-      res.status(500).json({ 
-        message: "Failed to create IT leave",
-        error: error instanceof Error ? error.message : String(error)
-      });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error creating company leave:', error);
+      res.status(500).json({ message: 'Failed to create company leave' });
     }
   });
 
-  // ============================================
-  // SYSTEM USERS MANAGEMENT (Super Admin Only)
-  // ============================================
+  // IT leaves (protected)
+  app.get('/api/it-leaves', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🏥 IT leaves request');
+    try {
+      const leaves = await storage.getAllItLeaves();
+      res.json(leaves);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching IT leaves:', error);
+      res.status(500).json({ message: 'Failed to fetch IT leaves' });
+    }
+  });
 
-  // Get all system users (super_admin only)
-  app.get("/api/system-users", isAuthenticated, async (req: any, res) => {
-    console.log("👥 Get all system users request");
+  app.post('/api/it-leaves', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('➕ Create IT leave request');
     try {
       const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can manage system users" });
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para crear bajas IT' });
+      }
+
+      const leaveData = req.body;
+      const leave = await storage.createItLeave(leaveData);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'create_it_leave',
+        entityType: 'it_leave',
+        entityId: leave.employeeId,
+        description: `Baja IT creada para empleado ${leave.employeeId}`,
+        newData: leave,
+      });
+
+      res.status(201).json(leave);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error creating IT leave:', error);
+      res.status(500).json({ message: 'Failed to create IT leave' });
+    }
+  });
+
+  // Notifications (protected)
+  app.get('/api/notifications', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🔔 Notifications request');
+    try {
+      const notifications = await storage.getAllNotifications();
+      res.json(notifications);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching notifications:', error);
+      res.status(500).json({ message: 'Failed to fetch notifications' });
+    }
+  });
+
+  app.post('/api/notifications', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('➕ Create notification request');
+    try {
+      const user = req.user;
+      const notificationData = req.body;
+      const notification = await storage.createNotification(notificationData);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'create_notification',
+        entityType: 'notification',
+        entityId: notification.id.toString(),
+        description: `Notificación creada: ${notification.title}`,
+        newData: notification,
+      });
+
+      res.status(201).json(notification);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error creating notification:', error);
+      res.status(500).json({ message: 'Failed to create notification' });
+    }
+  });
+
+  app.put('/api/notifications/:id/status', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('✏️ Update notification status request');
+    try {
+      const user = req.user;
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para actualizar notificaciones' });
+      }
+
+      const { id } = req.params;
+      const { status } = req.body;
+
+      const notification = await storage.updateNotificationStatus(parseInt(id), status);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'update_notification_status',
+        entityType: 'notification',
+        entityId: notification.id.toString(),
+        description: `Estado de notificación actualizado a: ${status}`,
+        oldData: { status: notification.status },
+        newData: { status },
+      });
+
+      res.json(notification);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error updating notification status:', error);
+      res.status(500).json({ message: 'Failed to update notification status' });
+    }
+  });
+
+  // Process notification (protected - super_admin only)
+  app.post('/api/notifications/:id/process', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('⚙️ Process notification request');
+    try {
+      const user = req.user;
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede procesar notificaciones' });
+      }
+
+      const { id } = req.params;
+      const { action, processingDate } = req.body;
+
+      if (!action || !['approve', 'reject', 'pending_laboral', 'processed'].includes(action)) {
+        return res.status(400).json({ message: 'Acción inválida. Debe ser: approve, reject, pending_laboral, o processed' });
+      }
+
+      // Get the notification
+      const notification = await storage.getNotification(parseInt(id));
+      if (!notification) {
+        return res.status(404).json({ message: 'Notificación no encontrada' });
+      }
+
+      // If this is a company leave request, update the employee status and company leave record
+      if (notification.type === 'company_leave_request' && notification.metadata) {
+        const metadata = notification.metadata as any;
+        const employeeId = metadata.employeeId;
+        const companyLeaveId = metadata.companyLeaveId;
+
+        if (employeeId) {
+          let newEmployeeStatus: string;
+          let newCompanyLeaveStatus: string;
+
+          switch (action) {
+            case 'approve':
+              newEmployeeStatus = 'company_leave_approved';
+              newCompanyLeaveStatus = 'approved';
+              break;
+            case 'reject':
+              newEmployeeStatus = 'active'; // Return to active status
+              newCompanyLeaveStatus = 'rejected';
+              break;
+            case 'pending_laboral':
+              newEmployeeStatus = 'pending_laboral';
+              newCompanyLeaveStatus = 'pending';
+              break;
+            default:
+              newEmployeeStatus = 'company_leave_pending';
+              newCompanyLeaveStatus = 'pending';
+          }
+
+          // Update employee status
+          await storage.updateEmployee(employeeId, { status: newEmployeeStatus });
+
+          // Update company leave status if it exists
+          if (companyLeaveId) {
+            await storage.updateCompanyLeaveStatus(parseInt(companyLeaveId), newCompanyLeaveStatus, user.email, new Date(processingDate));
+          }
+
+          // If action is pending_laboral, create a new notification for pending laboral
+          if (action === 'pending_laboral') {
+            // Create a new notification for pending laboral
+            await storage.createNotification({
+              type: 'company_leave_request',
+              title: 'Baja Empresa - Pendiente Laboral',
+              message: `El empleado ${employeeId} ha sido movido a pendiente laboral. Requiere tramitación.`,
+              status: 'pending_laboral',
+              requestedBy: user.email,
+              metadata: {
+                employeeId,
+                companyLeaveId,
+                originalNotificationId: notification.id,
+                action: 'pending_laboral',
+              },
+            });
+          }
+
+          // Log audit for employee status change
+          await AuditService.logAction({
+            userId: user.email,
+            userRole: user.role,
+            action: 'process_company_leave_notification',
+            entityType: 'employee',
+            entityId: employeeId,
+            description: `Notificación de baja empresa procesada: ${action} - Empleado ${employeeId} - Estado: ${newEmployeeStatus}`,
+            newData: {
+              action,
+              employeeId,
+              newEmployeeStatus,
+              newCompanyLeaveStatus,
+              processingDate,
+            },
+          });
+        }
+      }
+
+      // Update notification status with processing date
+      const updatedNotification = await storage.updateNotificationStatusWithDate(
+        parseInt(id),
+        action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : action === 'pending_laboral' ? 'approved' : 'processed',
+        new Date(processingDate),
+      );
+
+      // Log audit for notification processing
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'process_notification',
+        entityType: 'notification',
+        entityId: notification.id.toString(),
+        description: `Notificación procesada: ${notification.title} - Acción: ${action}`,
+        oldData: { status: notification.status },
+        newData: { action, processingDate, newStatus: updatedNotification.status },
+      });
+
+      res.json(updatedNotification);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error processing notification:', error);
+      res.status(500).json({ message: 'Failed to process notification' });
+    }
+  });
+
+  // System users (protected - super_admin only)
+  app.get('/api/system-users', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('👥 System users request');
+    try {
+      const user = req.user;
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede ver usuarios del sistema' });
       }
 
       const users = await storage.getAllSystemUsers();
       res.json(users);
     } catch (error) {
-      console.error("❌ Error fetching system users:", error);
-      res.status(500).json({ message: "Failed to fetch system users" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching system users:', error);
+      res.status(500).json({ message: 'Failed to fetch system users' });
     }
   });
 
-  // Create new system user (super_admin only)
-  app.post("/api/system-users", isAuthenticated, async (req: any, res) => {
-    console.log("➕ Create system user request");
+  app.post('/api/system-users', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('➕ Create system user request');
     try {
       const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can create system users" });
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede crear usuarios del sistema' });
       }
 
-      const { email, firstName, lastName, password, role } = req.body;
+      const userData = req.body;
+      const newUser = await storage.createSystemUser(userData);
 
-      // Validations
-      if (!email || !firstName || !lastName || !password || !role) {
-        return res.status(400).json({ message: "All fields are required" });
-      }
-
-      if (!['admin', 'normal'].includes(role)) {
-        return res.status(400).json({ message: "Invalid role. Must be 'admin' or 'normal'" });
-      }
-
-      // Check if user already exists
-      const existingUser = await storage.getSystemUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User with this email already exists" });
-      }
-
-      // Hash password (in a real app, use bcrypt)
-      const hashedPassword = password; // Simplified for demo
-
-      const newUser = await storage.createSystemUser({
-        email,
-        firstName,
-        lastName,
-        password: hashedPassword,
-        role,
-        isActive: true,
-        createdBy: user.email
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'create_system_user',
+        entityType: 'system_user',
+        entityId: newUser.id.toString(),
+        entityName: `${newUser.firstName} ${newUser.lastName}`,
+        description: `Usuario del sistema creado: ${newUser.email}`,
+        newData: { ...newUser, password: '[HIDDEN]' },
       });
 
-      // Log audit trail
-      await AuditService.logUserCreation(user.email, user.role, newUser, req);
-
-      // Don't return password
-      const { password: _, ...userResponse } = newUser;
-      res.status(201).json(userResponse);
+      res.status(201).json(newUser);
     } catch (error) {
-      console.error("❌ Error creating system user:", error);
-      res.status(500).json({ message: "Failed to create system user" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error creating system user:', error);
+      res.status(500).json({ message: 'Failed to create system user' });
     }
   });
 
-  // Update system user (super_admin only)
-  app.put("/api/system-users/:id", isAuthenticated, async (req: any, res) => {
-    console.log("📝 Update system user request");
+  app.put('/api/system-users/:id', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('✏️ Update system user request');
     try {
       const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can update system users" });
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede editar usuarios del sistema' });
       }
 
-      const userId = parseInt(req.params.id);
-      const { firstName, lastName, role, isActive } = req.body;
+      const { id } = req.params;
+      const userData = req.body;
 
-      // Validations
-      if (!firstName || !lastName || !role || isActive === undefined) {
-        return res.status(400).json({ message: "All fields are required" });
-      }
+      // Get old data for audit
+      const oldUser = await storage.getSystemUser(parseInt(id));
 
-      if (!['admin', 'normal'].includes(role)) {
-        return res.status(400).json({ message: "Invalid role. Must be 'admin' or 'normal'" });
-      }
+      const updatedUser = await storage.updateSystemUser(parseInt(id), userData);
 
-      const existingUser = await storage.getSystemUser(userId);
-      if (!existingUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const updatedUser = await storage.updateSystemUser(userId, {
-        firstName,
-        lastName,
-        role,
-        isActive
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'update_system_user',
+        entityType: 'system_user',
+        entityId: updatedUser.id.toString(),
+        entityName: `${updatedUser.firstName} ${updatedUser.lastName}`,
+        description: `Usuario del sistema actualizado: ${updatedUser.email}`,
+        oldData: oldUser,
+        newData: { ...updatedUser, password: '[HIDDEN]' },
       });
 
-      // Log audit trail
-      await AuditService.logUserUpdate(user.email, user.role, existingUser.email, existingUser, updatedUser, req);
-
-      // Don't return password
-      const { password: _, ...userResponse } = updatedUser;
-      res.json(userResponse);
+      res.json(updatedUser);
     } catch (error) {
-      console.error("❌ Error updating system user:", error);
-      res.status(500).json({ message: "Failed to update system user" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error updating system user:', error);
+      res.status(500).json({ message: 'Failed to update system user' });
     }
   });
 
-  // Delete system user (super_admin only)
-  app.delete("/api/system-users/:id", isAuthenticated, async (req: any, res) => {
-    console.log("🗑️ Delete system user request");
+  app.delete('/api/system-users/:id', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🗑️ Delete system user request');
     try {
       const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can delete system users" });
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede eliminar usuarios del sistema' });
       }
 
-      const userId = parseInt(req.params.id);
+      const { id } = req.params;
 
-      const existingUser = await storage.getSystemUser(userId);
-      if (!existingUser) {
-        return res.status(404).json({ message: "User not found" });
+      // Get user data for audit
+      const systemUser = await storage.getSystemUser(parseInt(id));
+      if (!systemUser) {
+        return res.status(404).json({ message: 'System user not found' });
       }
 
-      // Prevent deleting super admin
-      if (existingUser.email === 'admin@dvv5.com') {
-        return res.status(400).json({ message: "Cannot delete super admin user" });
+      // Prevent deletion of super admin
+      if (systemUser.email === 'superadmin@glovo.com') {
+        return res.status(403).json({ message: 'No se puede eliminar el super administrador' });
       }
 
-      await storage.deleteSystemUser(userId);
+      await storage.deleteSystemUser(parseInt(id));
 
-      // Log audit trail
-      await AuditService.logUserDelete(user.email, user.role, existingUser, req);
-
-      res.json({ message: "User deleted successfully" });
-    } catch (error) {
-      console.error("❌ Error deleting system user:", error);
-      res.status(500).json({ message: "Failed to delete system user" });
-    }
-  });
-
-  // Reactivate employee from IT leave (super admin only)
-  app.post("/api/employees/:id/reactivate", isAuthenticated, async (req: any, res) => {
-    console.log("🔄 [REACTIVATE] Reactivate employee request:", req.params.id);
-    try {
-      const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        console.log("❌ [REACTIVATE] Insufficient permissions for user:", user?.email, user?.role);
-        return res.status(403).json({ message: "Only super admin can reactivate employees" });
-      }
-
-      const employeeId = req.params.id;
-      
-      // Get employee to ensure it exists and is in IT leave
-      console.log("🔍 [REACTIVATE] Getting employee:", employeeId);
-      const employee = await storage.getEmployee(employeeId);
-      if (!employee) {
-        console.log("❌ [REACTIVATE] Employee not found:", employeeId);
-        return res.status(404).json({ message: "Employee not found" });
-      }
-      
-      if (employee.status !== 'it_leave') {
-        console.log("❌ [REACTIVATE] Employee is not in IT leave:", { 
-          id: employee.idGlovo, 
-          currentStatus: employee.status 
-        });
-        return res.status(400).json({ 
-          message: `Employee is not in IT leave. Current status: ${employee.status}` 
-        });
-      }
-      
-      console.log("👤 [REACTIVATE] Employee in IT leave found:", { 
-        id: employee.idGlovo, 
-        name: `${employee.nombre} ${employee.apellido}`,
-        currentStatus: employee.status 
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'delete_system_user',
+        entityType: 'system_user',
+        entityId: systemUser.id.toString(),
+        entityName: `${systemUser.firstName} ${systemUser.lastName}`,
+        description: `Usuario del sistema eliminado: ${systemUser.firstName} ${systemUser.lastName} (${systemUser.email})`,
+        oldData: systemUser,
       });
 
-      // Update employee status to active
-      console.log("🔄 [REACTIVATE] Updating employee status to 'active'...");
-      const updatedEmployee = await storage.updateEmployee(employeeId, { 
-        status: "active"
-      });
-      
-      console.log("✅ [REACTIVATE] Employee status updated:", {
-        id: updatedEmployee.idGlovo,
-        oldStatus: employee.status,
-        newStatus: updatedEmployee.status
-      });
-
-      // Log audit trail for reactivation
-      await AuditService.logEmployeeReactivation(
-        user.email, 
-        user.role, 
-        updatedEmployee, 
-        req
-      );
-
-      console.log("🎉 [REACTIVATE] ✅ SUCCESS! Employee reactivated:", {
-        employeeId: updatedEmployee.idGlovo,
-        employeeName: `${updatedEmployee.nombre} ${updatedEmployee.apellido}`,
-        oldStatus: employee.status,
-        newStatus: updatedEmployee.status,
-        reactivatedBy: user.email
-      });
-      
-      res.status(200).json({ 
-        message: "Empleado reactivado exitosamente",
-        success: true,
-        data: {
-          employeeId: updatedEmployee.idGlovo,
-          employeeName: `${updatedEmployee.nombre} ${updatedEmployee.apellido}`,
-          oldStatus: employee.status,
-          newStatus: updatedEmployee.status,
-          reactivatedBy: user.email,
-          reactivatedAt: new Date().toISOString()
-        }
-      });
+      res.status(204).send();
     } catch (error) {
-      console.error("💥 [REACTIVATE] CRITICAL ERROR:", error);
-      console.error("💥 [REACTIVATE] Error details:", {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        employeeId: req.params.id,
-        user: req.user?.email
-      });
-      res.status(500).json({ 
-        message: "Failed to reactivate employee",
-        error: error instanceof Error ? error.message : String(error)
-      });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error deleting system user:', error);
+      res.status(500).json({ message: 'Failed to delete system user' });
     }
   });
 
-  // Approve/reject company leave notification (super admin only)
-  app.post("/api/notifications/:id/process", isAuthenticated, async (req: any, res) => {
-    console.log("📋 Process notification:", req.params.id, req.body);
+  // Change system user password (protected - super_admin only)
+  app.put('/api/system-users/:id/password', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🔑 Change system user password request');
     try {
       const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can process notifications" });
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede cambiar contraseñas' });
       }
 
-      const notificationId = parseInt(req.params.id);
-      const { action, processingDate } = req.body; // "approve" or "reject" + processingDate
+      const { id } = req.params;
+      const { password } = req.body;
 
-      if (!action || !["approve", "reject"].includes(action)) {
-        return res.status(400).json({ message: "Action must be 'approve' or 'reject'" });
+      if (!password || password.length < 6) {
+        return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
       }
 
-      // Validar fecha de procesamiento
-      const processDate = processingDate ? new Date(processingDate) : new Date();
-      if (isNaN(processDate.getTime())) {
-        return res.status(400).json({ message: "Invalid processing date" });
+      // Get user data for audit
+      const systemUser = await storage.getSystemUser(parseInt(id));
+      if (!systemUser) {
+        return res.status(404).json({ message: 'System user not found' });
       }
 
-      console.log(`📋 Processing notification ${notificationId} with action "${action}" and date "${processDate.toISOString()}"`);
+      // Hash the new password
+      const bcrypt = await import('bcrypt');
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // Get all notifications and find the one we need
-      const allNotifications = await storage.getAllNotifications();
-      const notification = allNotifications.find(n => n.id === notificationId);
-      
-      if (!notification) {
-        return res.status(404).json({ message: "Notification not found" });
-      }
+      // Update the password
+      const updatedUser = await storage.updateSystemUserPassword(parseInt(id), hashedPassword);
 
-      if (notification.status !== "pending") {
-        return res.status(400).json({ message: "Notification already processed" });
-      }
-
-      if (action === "approve" && notification.type === "company_leave_request") {
-        const metadata = notification.metadata as any;
-        
-        // Get complete employee data before creating the leave record
-        const employee = await storage.getEmployee(metadata.employeeId);
-        if (!employee) {
-          return res.status(404).json({ message: "Employee not found" });
-        }
-        
-        // Create company leave record with complete employee data
-          const companyLeave = await storage.createCompanyLeave({
-          employeeId: metadata.employeeId,
-          employeeData: employee, // Store complete employee data as JSON
-          leaveType: metadata.leaveType,
-          leaveDate: metadata.leaveDate, // Already a string date from metadata
-          leaveRequestedAt: notification.createdAt || new Date(),
-          leaveRequestedBy: notification.requestedBy,
-          approvedBy: user.email,
-          approvedAt: processDate, // Usar fecha personalizada
-          status: "approved",
-        });
-
-        // Remove employee from active employees table
-        await storage.deleteEmployee(metadata.employeeId);
-
-        console.log(`✅ Company leave approved with date ${processDate.toISOString()}, employee moved to company_leaves table`);
-      } else if (action === "reject" && notification.type === "company_leave_request") {
-        const metadata = notification.metadata as any;
-        
-        // Get complete employee data before creating the leave record
-        const employee = await storage.getEmployee(metadata.employeeId);
-        if (!employee) {
-          return res.status(404).json({ message: "Employee not found" });
-        }
-        
-        // Create company leave record with complete employee data (but as rejected)
-        const companyLeave = await storage.createCompanyLeave({
-          employeeId: metadata.employeeId,
-          employeeData: employee, // Store complete employee data as JSON
-          leaveType: metadata.leaveType,
-          leaveDate: metadata.leaveDate,
-          leaveRequestedAt: notification.createdAt || new Date(),
-          leaveRequestedBy: notification.requestedBy,
-          approvedBy: user.email,
-          approvedAt: processDate, // Usar fecha personalizada
-          status: "rejected",
-        });
-
-        // Remove employee from active employees table
-        await storage.deleteEmployee(metadata.employeeId);
-
-        console.log(`✅ Company leave rejected with date ${processDate.toISOString()}, employee moved to company_leaves table`);
-      }
-
-      // Update notification status
-      await storage.updateNotificationStatus(notificationId, action === "approve" ? "approved" : "rejected");
-
-      // Log audit trail
-      if (notification.type === "company_leave_request") {
-        const metadata = notification.metadata as any;
-        const employee = await storage.getEmployee(metadata.employeeId);
-        if (employee) {
-          await AuditService.logCompanyLeaveApproval(user.email, user.role, employee, metadata.leaveType, action, processDate.toISOString(), req);
-        }
-      }
-
-      console.log(`✅ Notification ${action}d:`, notificationId);
-      res.json({ message: `Notification ${action}d successfully` });
-    } catch (error) {
-      console.error("❌ Error processing notification:", error);
-      res.status(500).json({ message: "Failed to process notification" });
-    }
-  });
-
-  // Company leaves (protected)
-  app.get("/api/company-leaves", isAuthenticated, async (req, res) => {
-    console.log("🏢 Company leaves request");
-    try {
-      const leaves = await storage.getAllCompanyLeaves();
-      res.json(leaves);
-    } catch (error) {
-      console.error("❌ Error fetching company leaves:", error);
-      res.status(500).json({ message: "Failed to fetch company leaves" });
-    }
-  });
-
-
-
-  // Notifications (protected - admin and super_admin can view)
-  app.get("/api/notifications", isAuthenticated, async (req: any, res) => {
-    console.log("🔔 Notifications request from user:", req.user?.email, req.user?.role);
-    try {
-      const user = req.user;
-      if (!user || !['admin', 'super_admin'].includes(user.role)) {
-        console.log("❌ Permission denied for notifications view. User role:", user?.role);
-        return res.status(403).json({ message: "Insufficient permissions to view notifications" });
-      }
-
-      const notifications = await storage.getAllNotifications();
-      console.log(`✅ Returning ${notifications.length} notifications to ${user.role} user: ${user.email}`);
-      res.json(notifications);
-    } catch (error) {
-      console.error("❌ Error fetching notifications:", error);
-      res.status(500).json({ message: "Failed to fetch notifications" });
-    }
-  });
-
-  // ============================================
-  // SYSTEM USERS MANAGEMENT (Super Admin Only)
-  // ============================================
-
-  // Get all system users
-  app.get("/api/system-users", isAuthenticated, async (req: any, res) => {
-    console.log("👥 System users request from:", req.user?.email, req.user?.role);
-    try {
-      const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        console.log("❌ Permission denied for system users. User role:", user?.role);
-        return res.status(403).json({ message: "Only super admin can manage system users" });
-      }
-
-      const users = await storage.getAllSystemUsers();
-      // Remove password from response
-      const safeUsers = users.map(u => ({ ...u, password: undefined }));
-      console.log(`✅ Returning ${users.length} system users`);
-      res.json(safeUsers);
-    } catch (error) {
-      console.error("❌ Error fetching system users:", error);
-      res.status(500).json({ message: "Failed to fetch system users" });
-    }
-  });
-
-  // Create new system user
-  app.post("/api/system-users", isAuthenticated, async (req: any, res) => {
-    console.log("➕ Create system user request:", req.body.email, req.body.role);
-    try {
-      const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can create system users" });
-      }
-
-      const { email, firstName, lastName, password, role } = req.body;
-
-      if (!email || !firstName || !lastName || !password || !role) {
-        return res.status(400).json({ message: "All fields are required" });
-      }
-
-      if (!['super_admin', 'admin', 'normal'].includes(role)) {
-        return res.status(400).json({ message: "Invalid role" });
-      }
-
-      // Check if user already exists
-      const existingUser = await storage.getSystemUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User already exists" });
-      }
-
-      // Hash password (in production, use bcrypt or similar)
-      const hashedPassword = password; // TODO: Implement proper password hashing
-
-      const newUser = await storage.createSystemUser({
-        email,
-        firstName,
-        lastName,
-        password: hashedPassword,
-        role,
-        createdBy: user.email
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'change_system_user_password',
+        entityType: 'system_user',
+        entityId: systemUser.id.toString(),
+        entityName: `${systemUser.firstName} ${systemUser.lastName}`,
+        description: `Contraseña cambiada para usuario: ${systemUser.firstName} ${systemUser.lastName} (${systemUser.email})`,
+        oldData: systemUser,
+        newData: { ...updatedUser, password: '[HIDDEN]' },
       });
 
-      // Log audit trail
-      await AuditService.logUserCreation(user.email, user.role, newUser, req);
-
-      // Remove password from response
-      const safeUser = { ...newUser, password: undefined };
-      res.status(201).json(safeUser);
+      res.json({ message: 'Password updated successfully' });
     } catch (error) {
-      console.error("❌ Error creating system user:", error);
-      res.status(500).json({ message: "Failed to create system user" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error changing system user password:', error);
+      res.status(500).json({ message: 'Failed to change password' });
     }
   });
 
-  // Update system user
-  app.put("/api/system-users/:id", isAuthenticated, async (req: any, res) => {
-    console.log("📝 Update system user request:", req.params.id);
+  // Audit logs (protected - super_admin only)
+  app.get('/api/audit-logs', isAuthenticated, async (req: { user?: { role?: string }; query: { limit?: string } }, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('📋 Audit logs request');
     try {
       const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can update system users" });
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede ver logs de auditoría' });
       }
 
-      const userId = parseInt(req.params.id);
-      const updateData = req.body;
-
-      // Get old data for audit log
-      const oldUser = await storage.getSystemUser(userId);
-      if (!oldUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Hash password if provided
-      if (updateData.password) {
-        updateData.password = updateData.password; // TODO: Implement proper password hashing
-      }
-
-      const updatedUser = await storage.updateSystemUser(userId, updateData);
-
-      // Log audit trail
-      await AuditService.logUserUpdate(user.email, user.role, oldUser.email, oldUser, updatedUser, req);
-
-      // Remove password from response
-      const safeUser = { ...updatedUser, password: undefined };
-      res.json(safeUser);
-    } catch (error) {
-      console.error("❌ Error updating system user:", error);
-      res.status(500).json({ message: "Failed to update system user" });
-    }
-  });
-
-  // Delete system user
-  app.delete("/api/system-users/:id", isAuthenticated, async (req: any, res) => {
-    console.log("🗑️ Delete system user request:", req.params.id);
-    try {
-      const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can delete system users" });
-      }
-
-      const userId = parseInt(req.params.id);
-
-      // Get user data for audit log
-      const userToDelete = await storage.getSystemUser(userId);
-      if (!userToDelete) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Prevent deleting yourself
-      if (userToDelete.email === user.email) {
-        return res.status(400).json({ message: "Cannot delete your own account" });
-      }
-
-      await storage.deleteSystemUser(userId);
-
-      // Log audit trail
-      await AuditService.logUserDelete(user.email, user.role, userToDelete, req);
-
-      res.json({ message: "User deleted successfully" });
-    } catch (error) {
-      console.error("❌ Error deleting system user:", error);
-      res.status(500).json({ message: "Failed to delete system user" });
-    }
-  });
-
-  // ============================================
-  // AUDIT LOGS (Super Admin Only)
-  // ============================================
-
-  // Get audit logs
-  app.get("/api/audit-logs", isAuthenticated, async (req: any, res) => {
-    console.log("📋 Audit logs request from:", req.user?.email, req.user?.role);
-    try {
-      const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        console.log("❌ Permission denied for audit logs. User role:", user?.role);
-        return res.status(403).json({ message: "Only super admin can view audit logs" });
-      }
-
-      const { limit = 100, userId, action, entityType } = req.query;
-
-      let logs;
-      if (userId) {
-        logs = await storage.getAuditLogsByUser(userId as string, parseInt(limit as string));
-      } else if (action) {
-        logs = await storage.getAuditLogsByAction(action as string, parseInt(limit as string));
-      } else if (entityType) {
-        logs = await storage.getAuditLogsByEntity(entityType as string, undefined, parseInt(limit as string));
-      } else {
-        logs = await storage.getAllAuditLogs(parseInt(limit as string));
-      }
-
-      console.log(`✅ Returning ${logs.length} audit logs`);
+      const { limit = 1000 } = req.query;
+      const logs = await storage.getAllAuditLogs(parseInt(limit.toString()));
       res.json(logs);
     } catch (error) {
-      console.error("❌ Error fetching audit logs:", error);
-      res.status(500).json({ message: "Failed to fetch audit logs" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching audit logs:', error);
+      res.status(500).json({ message: 'Failed to fetch audit logs' });
     }
   });
 
-  // Get audit logs statistics
-  app.get("/api/audit-logs/stats", isAuthenticated, async (req: any, res) => {
-    console.log("📊 Audit logs stats request from:", req.user?.email, req.user?.role);
+  app.get('/api/audit-logs/stats', isAuthenticated, async (req: { user?: { role?: string } }, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('📊 Audit logs stats request');
     try {
       const user = req.user;
-      if (!user || user.role !== 'super_admin') {
-        return res.status(403).json({ message: "Only super admin can view audit stats" });
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede ver estadísticas de auditoría' });
       }
 
       const stats = await storage.getAuditLogsStats();
-      console.log("✅ Returning audit logs statistics");
       res.json(stats);
     } catch (error) {
-      console.error("❌ Error fetching audit logs stats:", error);
-      res.status(500).json({ message: "Failed to fetch audit logs stats" });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching audit logs stats:', error);
+      res.status(500).json({ message: 'Failed to fetch audit logs stats' });
     }
   });
 
-  // Catch-all for undefined API routes
-  app.all('/api/*', (req, res) => {
-    console.log("❓ Unknown API route:", req.method, req.path);
-    res.status(404).json({ 
-      error: `Route ${req.method} ${req.path} not found`,
-      availableRoutes: [
-        'GET /api/health',
-        'POST /api/auth/login', 
-        'GET /api/auth/user',
-        'POST /api/auth/logout',
-        'GET /api/dashboard/metrics',
-        'GET /api/employees',
-        'GET /api/employees/:id',
-        'POST /api/employees',
-        'PUT /api/employees/:id',
-        'POST /api/employees/:id/company-leave',
-        'POST /api/employees/:id/it-leave',
-        'GET /api/company-leaves',
-        'GET /api/notifications',
-        'POST /api/notifications/:id/process',
-        'GET /api/system-users',
-        'POST /api/system-users',
-        'PUT /api/system-users/:id',
-        'DELETE /api/system-users/:id',
-        'GET /api/audit-logs',
-        'GET /api/audit-logs/stats'
-      ]
-    });
+  // Crear baja IT para un empleado específico
+  app.post('/api/employees/:id/it-leave', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('➕ Create IT leave for employee request');
+    try {
+      const user = req.user;
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para crear bajas IT' });
+      }
+
+      const { id } = req.params;
+      const { fechaIncidencia } = req.body;
+      const now = new Date();
+
+      // Actualizar estado y fecha en employees
+      const updatedEmployee = await storage.setEmployeeItLeave(id, fechaIncidencia);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'set_it_leave',
+        entityType: 'employee',
+        entityId: id,
+        entityName: `${updatedEmployee?.nombre || ''} ${updatedEmployee?.apellido || ''}`,
+        description: `Empleado marcado como baja IT (${id}) con fecha ${fechaIncidencia || now.toISOString()}`,
+        newData: updatedEmployee,
+      });
+
+      res.status(200).json(updatedEmployee);
+    } catch (error) {
+      console.error('❌ Error setting IT leave:', error);
+      res.status(500).json({ message: 'Failed to set IT leave' });
+    }
   });
 
-  const httpServer = createServer(app);
-  
-  console.log("✅ All routes registered successfully");
-  return httpServer;
+  // Create HTTP server
+  const server = createServer(app);
+
+  if (process.env.NODE_ENV !== 'production') console.log('✅ Routes setup completed');
+
+  return server;
 }

@@ -1,67 +1,72 @@
-# Versión de PRODUCCIÓN - docker-compose.prod.yml
-# Para usar: docker-compose -f docker-compose.prod.yml up -d
+# Versión de PRODUCCIÓN con PostgreSQL en Docker
+# Todos los servicios en contenedores Docker
+
+version: '3.8'
 
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:16
-    container_name: employee_management_db
+    image: postgres:15-alpine
+    container_name: solucioning_postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: employee_management
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_this_secure_password}
-      POSTGRES_HOST_AUTH_METHOD: md5
-    ports:
-      - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"  # Permite acceso externo
+      POSTGRES_PASSWORD: SolucioningSecurePass2024!
+      POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./postgres.conf:/etc/postgresql/postgresql.conf  # Configuración personalizada
+    ports:
+      - "5432:5432"
     networks:
-      - employee_network
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+      - solucioning_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Backend API
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: employee_management_backend
+    container_name: solucioning_backend
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-change_this_secure_password}@postgres:5432/employee_management
-      SESSION_SECRET: ${SESSION_SECRET:-change-this-super-secret-key-in-production}
+      DATABASE_URL: postgresql://postgres:SolucioningSecurePass2024!@postgres:5432/employee_management
+      SESSION_SECRET: SolucioningSecretKey2024!
       PORT: 5173
     ports:
-      - "${BACKEND_PORT:-5173}:5173"
+      - "5173:5173"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
-      - employee_network
-    command: npm run start
+      - solucioning_network
 
   # Frontend
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: employee_management_frontend
+    container_name: solucioning_frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: ${API_URL:-http://localhost:5173}
+      NODE_ENV: production
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "3000:3000"
     depends_on:
       - backend
     networks:
-      - employee_network
-    command: npm run start
+      - solucioning_network
 
 volumes:
   postgres_data:
+    driver: local
 
 networks:
-  employee_network:
-    driver: bridge
+  solucioning_network:
+    driver: bridge 
