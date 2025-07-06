@@ -171,10 +171,13 @@ export default function LeaveManagementModal ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px]" aria-describedby="leave-management-description">
         <DialogHeader>
           <DialogTitle>Gestionar Baja</DialogTitle>
         </DialogHeader>
+        <div id="leave-management-description" className="sr-only">
+          Modal para gestionar bajas de empleados. Permite seleccionar entre baja IT o baja empresa, especificar el motivo y la fecha.
+        </div>
 
         <div className="space-y-6">
           {employee && (

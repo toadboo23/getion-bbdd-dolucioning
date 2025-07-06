@@ -507,7 +507,14 @@ export async function registerRoutes (app: Express): Promise<Server> {
       }
 
       const leaveData = req.body;
-      const leave = await storage.createCompanyLeave(leaveData);
+      
+      // Asegurar que leaveRequestedAt esté presente
+      const processedLeaveData = {
+        ...leaveData,
+        leaveRequestedAt: leaveData.leaveRequestedAt || new Date(),
+      };
+      
+      const leave = await storage.createCompanyLeave(processedLeaveData);
 
       // Crear notificación automáticamente
       const notificationData = {
