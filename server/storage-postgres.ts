@@ -336,15 +336,22 @@ export class PostgresStorage {
   async bulkCreateEmployees (employeeDataList: InsertEmployee[]): Promise<Employee[]> {
     if (process.env.NODE_ENV !== 'production') console.log('Bulk creating employees in PostgreSQL:', employeeDataList.length);
 
-    // Calcular CDP para cada empleado
-    const employeesWithCDP = employeeDataList.map(employee => ({
-      ...employee,
-      cdp: calculateCDP(employee.horas),
-    }));
+    try {
+      // Calcular CDP para cada empleado
+      const employeesWithCDP = employeeDataList.map(employee => ({
+        ...employee,
+        cdp: calculateCDP(employee.horas),
+      }));
 
-    const createdEmployees = await db.insert(employees).values(employeesWithCDP as InsertEmployee[]).returning();
-    if (process.env.NODE_ENV !== 'production') console.log('Bulk operation completed. Total employees:', createdEmployees.length);
-    return createdEmployees;
+      if (process.env.NODE_ENV !== 'production') console.log('Processed employees with CDP:', employeesWithCDP.length);
+
+      const createdEmployees = await db.insert(employees).values(employeesWithCDP as InsertEmployee[]).returning();
+      if (process.env.NODE_ENV !== 'production') console.log('Bulk operation completed. Total employees:', createdEmployees.length);
+      return createdEmployees;
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error in bulkCreateEmployees:', error);
+      throw error;
+    }
   }
 
   // Utility methods for data validation and parsing

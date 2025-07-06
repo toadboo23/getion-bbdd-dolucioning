@@ -376,7 +376,11 @@ export async function registerRoutes (app: Express): Promise<Server> {
       }
 
       // Import employees
+      if (process.env.NODE_ENV !== 'production') console.log('📥 Starting bulk import with', processedEmployees.length, 'employees');
+      
       const createdEmployees = await storage.bulkCreateEmployees(processedEmployees);
+
+      if (process.env.NODE_ENV !== 'production') console.log('✅ Bulk import completed successfully');
 
       // Log audit
       await AuditService.logAction({
