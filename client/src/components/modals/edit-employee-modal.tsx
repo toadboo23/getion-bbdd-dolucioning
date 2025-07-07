@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { insertEmployeeSchema, type Employee } from '@shared/schema';
+import { insertEmployeeSchema, type Employee, CIUDADES_DISPONIBLES } from '@shared/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -100,7 +100,6 @@ export default function EditEmployeeModal ({
       fechaIncidencia: '',
       faltasNoCheckInEnDias: 0,
       cruce: '',
-      flota: '',
       status: 'active',
     },
   });
@@ -137,7 +136,6 @@ export default function EditEmployeeModal ({
         fechaIncidencia: employee.fechaIncidencia || '',
         faltasNoCheckInEnDias: employee.faltasNoCheckInEnDias || 0,
         cruce: employee.cruce || '',
-        flota: employee.flota || '',
         status: employee.status || 'active',
       });
     } else {
@@ -171,7 +169,6 @@ export default function EditEmployeeModal ({
         fechaIncidencia: '',
         faltasNoCheckInEnDias: 0,
         cruce: '',
-        flota: '',
         status: 'active',
       });
     }
@@ -300,21 +297,22 @@ export default function EditEmployeeModal ({
 
                 <FormField
                   control={form.control}
-                  name="flota"
+                  name="ciudad"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-red-500">Flota *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <FormLabel className="text-red-500">Ciudad *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('ciudad')}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Selecciona flota" />
+                            <SelectValue placeholder="Selecciona ciudad" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="SOLUCIONING">SOLUCIONING</SelectItem>
-                          <SelectItem value="SOLUCIONING-LM">SOLUCIONING-LM</SelectItem>
-                          <SelectItem value="SOLUCIONING-JJ">SOLUCIONING-JJ</SelectItem>
-                          <SelectItem value="SIN-FLOTA">SIN-FLOTA</SelectItem>
+                          {CIUDADES_DISPONIBLES.map((ciudad) => (
+                            <SelectItem key={ciudad} value={ciudad}>
+                              {ciudad}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -473,12 +471,11 @@ export default function EditEmployeeModal ({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="madrid">Madrid</SelectItem>
-                          <SelectItem value="barcelona">Barcelona</SelectItem>
-                          <SelectItem value="valencia">Valencia</SelectItem>
-                          <SelectItem value="sevilla">Sevilla</SelectItem>
-                          <SelectItem value="bilbao">Bilbao</SelectItem>
-                          <SelectItem value="zaragoza">Zaragoza</SelectItem>
+                          {CIUDADES_DISPONIBLES.map((ciudad) => (
+                            <SelectItem key={ciudad} value={ciudad}>
+                              {ciudad}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -682,19 +679,7 @@ export default function EditEmployeeModal ({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="flota"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Flota</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Nombre de la flota" value={field.value ?? ''} disabled={isFieldDisabled('flota')} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
               </div>
 
               <div className="flex items-center space-x-2">

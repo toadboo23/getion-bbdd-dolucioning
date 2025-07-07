@@ -77,7 +77,6 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
     'Cuenta Divilo',
     'Próxima Asignación Slots',
     'Jefe de Tráfico',
-    'Flota',
     'Comentarios Jefe Tráfico',
     'Incidencias',
     'Fecha Incidencia',
@@ -116,7 +115,6 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
       'juan.divilo', // Cuenta Divilo
       '15/01/2024', // Próxima Asignación Slots
       'Carlos López', // Jefe de Tráfico
-      'Flota A', // Flota
       'Empleado puntual', // Comentarios Jefe Tráfico
       'Ninguna', // Incidencias
       '', // Fecha Incidencia
@@ -151,7 +149,6 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
       'maria.divilo', // Cuenta Divilo
       '20/01/2024', // Próxima Asignación Slots
       'Ana Martínez', // Jefe de Tráfico
-      'Flota B', // Flota
       'Empleada responsable', // Comentarios Jefe Tráfico
       'Ninguna', // Incidencias
       '', // Fecha Incidencia

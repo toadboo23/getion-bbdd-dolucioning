@@ -284,8 +284,8 @@ export default function EmployeeDetailModal ({
                 />
                 <InfoItem
                   icon={Building}
-                  label="Flota"
-                  value={employee.flota}
+                  label="Ciudad"
+                  value={employee.ciudad}
                 />
                 <InfoItem
                   icon={MapPin}

@@ -65,15 +65,15 @@ export async function registerRoutes (app: Express): Promise<Server> {
     }
   });
 
-  // Get unique flotas for filters (protected)
-  app.get('/api/flotas', isAuthenticated, async (req, res) => {
-    if (process.env.NODE_ENV !== 'production') console.log('🚗 Unique flotas request');
+  // Get unique cities for filters (protected)
+  app.get('/api/ciudades', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🏙️ Unique cities request');
     try {
-      const flotas = await storage.getUniqueFlotas();
-      res.json(flotas);
+      const ciudades = await storage.getUniqueCities();
+      res.json(ciudades);
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching flotas:', error);
-      res.status(500).json({ message: 'Failed to fetch flotas' });
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching cities:', error);
+      res.status(500).json({ message: 'Failed to fetch cities' });
     }
   });
 
@@ -81,7 +81,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.get('/api/employees', isAuthenticated, async (req, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('👥 Employees list request with filters:', req.query);
     try {
-      const { city, status, search, flota } = req.query;
+      const { city, status, search } = req.query;
 
       let employees = await storage.getAllEmployees();
 
@@ -92,10 +92,6 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       if (status && status !== 'all') {
         employees = employees.filter(emp => emp.status === status);
-      }
-
-      if (flota && flota !== 'all') {
-        employees = employees.filter(emp => emp.flota === flota);
       }
 
       if (search) {
@@ -305,7 +301,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
         };
 
         const horas = processNumber(emp.horas);
-        const cdp = horas ? Number(((horas / 38) * 100).toFixed(2)) : 0;
+        const cdp = horas ? Math.round((horas / 38) * 100) : 0;
 
         return {
           idGlovo: processString(emp.idGlovo) || `TEMP_${index}`,
@@ -337,7 +333,6 @@ export async function registerRoutes (app: Express): Promise<Server> {
           fechaIncidencia: processDate(emp.fechaIncidencia),
           faltasNoCheckInEnDias: processNumber(emp.faltasNoCheckInEnDias) || 0,
           cruce: processString(emp.cruce),
-          flota: processString(emp.flota) || 'SIN_FLOTA',
           status: (processString(emp.status) as 'active' | 'it_leave' | 'company_leave_pending' | 'company_leave_approved' | 'pending_laboral' | 'pendiente_laboral' | 'penalizado') || 'active',
         };
       });

@@ -13,6 +13,21 @@ import {
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
+// Ciudades disponibles para empleados
+export const CIUDADES_DISPONIBLES = [
+  'Barcelona',
+  'Madrid',
+  'Valencia',
+  'Alicante',
+  'Malaga',
+  'Las Palmas',
+  'Madrid Norte (Majadahonda - Las Rozas - Boadilla - Torrelodones - Galapagar)',
+  'Mostoles - Alcorcon - Arroyomolinos',
+  'Sevilla'
+] as const;
+
+export type CiudadType = typeof CIUDADES_DISPONIBLES[number];
+
 // Session storage table
 export const sessions = pgTable(
   'sessions',
@@ -51,7 +66,7 @@ export const employees = pgTable('employees', {
   horas: integer('horas'),
   cdp: integer('cdp'), // Cumplimiento de Horas (porcentaje basado en 38h = 100%)
   complementaries: text('complementaries'),
-  ciudad: varchar('ciudad', { length: 100 }),
+  ciudad: varchar('ciudad', { length: 200 }), // Aumentado para acomodar nombres largos de ciudades
   cityCode: varchar('citycode', { length: 30 }),
   dniNie: varchar('dni_nie', { length: 30 }).unique(),
   iban: varchar('iban', { length: 34 }),
@@ -84,7 +99,7 @@ export const employees = pgTable('employees', {
   penalizationStartDate: date('penalization_start_date'),
   penalizationEndDate: date('penalization_end_date'),
   originalHours: integer('original_hours'),
-  flota: varchar('flota', { length: 100 }),
+  // flota: varchar('flota', { length: 100 }), // REMOVIDO - reemplazado por ciudad
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

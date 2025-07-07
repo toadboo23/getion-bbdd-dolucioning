@@ -32,7 +32,6 @@ interface EmployeeData {
   vehiculo: string;
   naf: string;
   horas: number;
-  flota: string;
 }
 
 interface ValidationError {
@@ -272,7 +271,6 @@ export default function ImportEmployeesModal ({
           const vehiculoIndex = findColumnIndex(['vehículo', 'vehiculo', 'vehicle', 'transporte']);
           const nafIndex = findColumnIndex(['naf', 'número afiliación', 'numero afiliacion']);
           const horasIndex = findColumnIndex(['horas', 'hours', 'horas semanales']);
-          const flotaIndex = findColumnIndex(['flota', 'fleet', 'grupo']);
 
           // Debug: mostrar mapeo de columnas para la primera fila
           if (i === 1) {
@@ -299,8 +297,7 @@ export default function ImportEmployeesModal ({
             direccion: String(row[direccionIndex] || ''),
             vehiculo: String(row[vehiculoIndex] || ''),
             naf: String(row[nafIndex] || ''),
-            horas: parseFloat(String(row[horasIndex] || '0')) || 0,
-            flota: String(row[flotaIndex] || ''),
+            horas: Math.round(parseFloat(String(row[horasIndex] || '0')) || 0),
           };
 
           // Validar campos requeridos (solo los más importantes)

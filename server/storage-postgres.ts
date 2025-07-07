@@ -8,6 +8,7 @@ import {
   companyLeaves,
   itLeaves,
   notifications,
+  CIUDADES_DISPONIBLES,
   type SystemUser,
   type AuditLog,
   type InsertSystemUser,
@@ -35,7 +36,7 @@ export const db = drizzle(pool);
 // Helper function to calculate CDP
 export const calculateCDP = (horas: number | null | undefined): number => {
   if (!horas || horas <= 0) return 0;
-  return Number(((horas / 38) * 100).toFixed(2));
+  return Math.round((horas / 38) * 100);
 };
 
 // Type for upsert user operation
@@ -382,30 +383,10 @@ export class PostgresStorage {
 
   // City and fleet operations
   async getUniqueCities (): Promise<string[]> {
-    try {
-      const result = await db.select({ ciudad: employees.ciudad }).from(employees);
-      const cities = result.map(row => row.ciudad).filter(Boolean) as string[];
-      return Array.from(new Set(cities)).sort();
-    } catch (error) {
-      console.error('Error in getUniqueCities:', error);
-      return [];
-    }
+    return CIUDADES_DISPONIBLES;
   }
 
-  async getUniqueFleets (): Promise<string[]> {
-    try {
-      const result = await db.select({ flota: employees.flota }).from(employees);
-      const fleets = result.map(row => row.flota).filter(Boolean) as string[];
-      return Array.from(new Set(fleets)).sort();
-    } catch (error) {
-      console.error('Error in getUniqueFleets:', error);
-      return [];
-    }
-  }
 
-  async getUniqueFlotas (): Promise<string[]> {
-    return this.getUniqueFleets(); // Alias for consistency
-  }
 
   // System user operations
   async getAllSystemUsers (): Promise<SystemUser[]> {

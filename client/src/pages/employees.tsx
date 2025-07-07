@@ -17,6 +17,7 @@ import EmployeeDetailModal from '@/components/modals/employee-detail-modal';
 import PenalizationModal from '@/components/modals/penalization-modal';
 import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Employee } from '@shared/schema';
+import { CIUDADES_DISPONIBLES } from '@shared/schema';
 // XLSX import removed as it's not used in this file
 
 export default function Employees () {
@@ -25,7 +26,6 @@ export default function Employees () {
   const [searchTerm, setSearchTerm] = useState('');
   const [cityFilter, setCityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [flotaFilter, setFlotaFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -43,7 +43,7 @@ export default function Employees () {
   // Resetear página cuando cambian los filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, cityFilter, statusFilter, flotaFilter]);
+  }, [searchTerm, cityFilter, statusFilter]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -65,7 +65,6 @@ export default function Employees () {
       search: searchTerm,
       city: cityFilter === 'all' ? '' : cityFilter,
       status: statusFilter === 'all' ? '' : statusFilter,
-      flota: flotaFilter === 'all' ? '' : flotaFilter,
     }],
     retry: false,
   });
@@ -76,11 +75,7 @@ export default function Employees () {
     retry: false,
   });
 
-  // Obtener flotas únicas para el filtro
-  const { data: flotas } = useQuery<string[]>({
-    queryKey: ['/api/flotas'],
-    retry: false,
-  });
+
 
   const createEmployeeMutation = useMutation({
     mutationFn: async (employeeData: Record<string, unknown>) => {
@@ -296,7 +291,6 @@ export default function Employees () {
     setSearchTerm('');
     setCityFilter('all');
     setStatusFilter('all');
-    setFlotaFilter('all');
     setCurrentPage(1);
   };
 
@@ -410,9 +404,9 @@ export default function Employees () {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las ciudades</SelectItem>
-                  {cities?.map((city) => (
-                    <SelectItem key={city} value={city}>
-                      {city}
+                  {CIUDADES_DISPONIBLES.map((ciudad) => (
+                    <SelectItem key={ciudad} value={ciudad}>
+                      {ciudad}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -439,24 +433,7 @@ export default function Employees () {
               </Select>
             </div>
 
-            <div>
-              <label htmlFor="flota-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                Flota
-              </label>
-              <Select value={flotaFilter} onValueChange={setFlotaFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas las flotas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las flotas</SelectItem>
-                  {flotas?.map((flota) => (
-                    <SelectItem key={flota} value={flota}>
-                      {flota}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
           </div>
 
           {/* Botón para limpiar filtros */}
