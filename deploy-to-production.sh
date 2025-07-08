@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Script para desplegar cambios desde Develop-Local a Production
+# Script para desplegar cambios desde Develop-Local a Production y actualizar VPS
 # Uso: ./deploy-to-production.sh [mensaje_commit]
 
-echo "🚀 Iniciando despliegue a Production..."
+echo "🚀 Iniciando despliegue completo a Production..."
 
 # Verificar que estamos en Develop-Local
 current_branch=$(git branch --show-current)
@@ -41,11 +41,31 @@ git push origin Production
 echo "🔄 Volviendo a Develop-Local..."
 git checkout Develop-Local
 
-echo "✅ Despliegue completado!"
-echo "📋 Próximos pasos:"
-echo "   1. Conectarse al VPS"
-echo "   2. Ejecutar: git pull origin Production"
-echo "   3. Ejecutar: docker-compose down && docker-compose up --build -d"
+echo "✅ Despliegue local completado!"
 echo ""
+echo "🌐 Actualizando VPS..."
+echo "📋 Conectándose al VPS y ejecutando actualización..."
+
+# Intentar conectar al VPS y ejecutar actualización
+ssh root@69.62.107.86 << 'EOF'
+    echo "🚀 Conectado al VPS, iniciando actualización..."
+    cd /root/db_local
+    git fetch origin
+    git reset --hard origin/Production
+    docker-compose down
+    docker-compose up --build -d
+    echo "✅ Actualización del VPS completada!"
+    echo "🌐 La aplicación está disponible en: http://69.62.107.86:3000"
+EOF
+
+echo "✅ Despliegue completo finalizado!"
+echo "🌐 La aplicación debería estar disponible en: http://69.62.107.86:3000"
+echo ""
+echo "📋 Para verificar el estado:"
+echo "   ssh root@69.62.107.86 'cd /root/db_local && docker-compose ps'"
+echo ""
+echo "📋 Para ver logs:"
+echo "   ssh root@69.62.107.86 'cd /root/db_local && docker-compose logs -f'"
+
 echo "🔗 Para crear un Pull Request:"
 echo "   https://github.com/toadboo23/db_solucioning/pull/new/Develop-Local" 
