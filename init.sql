@@ -109,7 +109,8 @@ CREATE TABLE IF NOT EXISTS system_users (
   created_by varchar(255) NOT NULL, -- Email of creator
   last_login timestamp,
   created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-  updated_at timestamp DEFAULT CURRENT_TIMESTAMP
+  updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
+  assigned_city varchar(100)
 );
 
 -- Create audit_logs table (for tracking all admin/super_admin actions)
