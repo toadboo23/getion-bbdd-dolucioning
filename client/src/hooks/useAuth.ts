@@ -3,8 +3,8 @@ import type { User } from '@shared/schema';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-// URL base del backend - usar la URL del contenedor Docker
-const API_BASE_URL = 'http://localhost:5173';
+// URL base del backend - usar la URL relativa para que nginx haga proxy
+const API_BASE_URL = '';
 
 // Definir interfaz para notificaciones
 interface Notification {

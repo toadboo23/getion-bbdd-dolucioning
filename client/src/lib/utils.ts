@@ -179,7 +179,7 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
 }
 
 // URL base del backend
-export const API_BASE_URL = 'http://localhost:5173';
+export const API_BASE_URL = '';
 
 // Función para construir URLs del API
 export function apiUrl(path: string): string {
