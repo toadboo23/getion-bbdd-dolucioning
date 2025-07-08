@@ -172,3 +172,6 @@ SELECT * FROM (VALUES
   ('SYSTEM', 'super_admin', 'system_init', 'database', 'db_init', 'Database Initialization', 'Sistema Solucioning inicializado con tablas y super admin users', '127.0.0.1', 'System')
 ) AS v(user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
 WHERE NOT EXISTS (SELECT 1 FROM audit_logs WHERE action = 'system_init');
+
+-- Asegurar que la columna assigned_city exista en system_users (para compatibilidad con versiones anteriores)
+ALTER TABLE system_users ADD COLUMN IF NOT EXISTS assigned_city varchar(100);
