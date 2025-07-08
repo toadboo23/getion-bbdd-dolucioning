@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Users, UserPlus, Edit2, Trash2, Shield, Mail, Calendar, CheckCircle, XCircle, Key } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { CIUDADES_DISPONIBLES } from '@shared/schema';
 
 interface SystemUser {
   id: number;
@@ -36,6 +37,7 @@ interface CreateUserData {
   password: string;
   confirmPassword: string;
   role: 'super_admin' | 'admin' | 'normal';
+  assigned_city?: string;
 }
 
 export default function UserManagement () {
@@ -54,6 +56,7 @@ export default function UserManagement () {
     password: '',
     confirmPassword: '',
     role: 'normal',
+    assigned_city: '',
   });
   const [editForm, setEditForm] = useState({
     firstName: '',
@@ -97,6 +100,7 @@ export default function UserManagement () {
         password: '',
         confirmPassword: '',
         role: 'normal',
+        assigned_city: '',
       });
     },
     onError: () => {
@@ -228,6 +232,7 @@ export default function UserManagement () {
       password: createForm.password,
       confirmPassword: createForm.confirmPassword,
       role: createForm.role,
+      assigned_city: createForm.assigned_city,
     };
     createUserMutation.mutate(userData);
   };
@@ -410,6 +415,25 @@ export default function UserManagement () {
                       <SelectItem value="admin">Administrador</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assigned_city">Ciudad Asignada</Label>
+                  <Select value={createForm.assigned_city || ''} onValueChange={(value: string) => setCreateForm(prev => ({ ...prev, assigned_city: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar ciudad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Sin ciudad asignada</SelectItem>
+                      {CIUDADES_DISPONIBLES.map((ciudad) => (
+                        <SelectItem key={ciudad} value={ciudad}>
+                          {ciudad}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    La ciudad asignada determina qué empleados podrá ver el usuario
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Contraseña *</Label>

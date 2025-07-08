@@ -4,6 +4,16 @@ import connectPg from 'connect-pg-simple';
 import bcrypt from 'bcrypt';
 import { PostgresStorage } from './storage-postgres.js';
 import { AuditService } from './audit-service.js';
+import type { SystemUser } from '../shared/schema.js';
+import type { Request, Response } from 'express';
+
+// Extiende express-session para incluir user en SessionData
+import 'express-session';
+declare module 'express-session' {
+  interface SessionData {
+    user?: any;
+  }
+}
 
 const storage = new PostgresStorage();
 
@@ -12,16 +22,17 @@ const storage = new PostgresStorage();
 
 export function getSession () {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  
+  const isProduction = process.env.NODE_ENV === 'production';
+
   return session({
     secret: process.env.SESSION_SECRET || 'default-secret-key',
     resave: true,
     saveUninitialized: true,
     cookie: {
       httpOnly: true,
-      secure: false, // Cambiar a false para desarrollo
+      secure: isProduction, // true en producción (HTTPS), false en desarrollo
       maxAge: sessionTtl,
-      sameSite: 'lax', // Cambiar a 'lax' para desarrollo
+      sameSite: isProduction ? 'none' : 'lax', // 'none' en producción, 'lax' en desarrollo
     },
   });
 }
@@ -33,7 +44,7 @@ export async function setupAuth (app: Express) {
   console.log('🔐 Setting up authentication routes...');
 
   // LOGIN ROUTE - Enhanced to support database users
-  app.post('/api/auth/login', async (req: { body: { email?: string; password?: string }; session: { user?: Record<string, unknown> } }, res) => {
+  app.post('/api/auth/login', async (req: Request, res: Response) => {
     console.log('📝 Login attempt for:', req.body.email);
 
     try {
@@ -48,32 +59,16 @@ export async function setupAuth (app: Express) {
         });
       }
 
-      let userRecord: {
-        id: string;
-        email: string;
-        firstName: string;
-        lastName: string;
-        role: 'super_admin' | 'admin' | 'normal';
-        password: string;
-        assigned_city?: string;
-      } | null = null;
+      let userRecord: SystemUser | null = null;
 
       // Check database users only (secure production approach)
       console.log('🔍 Checking database for user:', email);
       try {
         const dbUsers = await storage.getAllSystemUsers();
-        const dbUser = dbUsers.find((u: { email: string; isActive: boolean }) => u.email === email && u.isActive);
+        const dbUser = dbUsers.find((u) => u.email === email && u.isActive === true);
 
         if (dbUser) {
-          userRecord = {
-            id: dbUser.id.toString(),
-            email: dbUser.email,
-            firstName: dbUser.firstName,
-            lastName: dbUser.lastName,
-            role: dbUser.role as 'super_admin' | 'admin' | 'normal',
-            password: dbUser.password,
-            assigned_city: dbUser.assigned_city || null,
-          };
+          userRecord = dbUser;
           console.log('✅ Found database user:', email);
         }
       } catch (dbError) {
@@ -120,18 +115,18 @@ export async function setupAuth (app: Express) {
 
       // Create user data without password
       const userData = {
-        id: userRecord.id,
+        id: userRecord.id.toString(),
         email: userRecord.email,
         firstName: userRecord.firstName,
         lastName: userRecord.lastName,
         role: userRecord.role,
-        ciudad: userRecord.assigned_city || null,
+        ciudad: userRecord.assigned_city || undefined,
       };
       console.log('✅ Login successful for:', email);
 
       // Update last login timestamp in database
       try {
-        await storage.updateSystemUserLastLogin(parseInt(userRecord.id));
+        await storage.updateSystemUserLastLogin(Number(userRecord.id));
       } catch (dbError) {
         console.error('⚠️ Could not update last login (continuing anyway):', dbError);
       }
@@ -149,7 +144,7 @@ export async function setupAuth (app: Express) {
         entityName: `${userData.firstName} ${userData.lastName}`,
         description: `Usuario ${userData.email} inició sesión exitosamente`,
         newData: { loginTime: new Date().toISOString() },
-        req,
+        req: { headers: { 'user-agent': req.headers['user-agent'] || '' } },
       });
 
       res.json({
@@ -166,9 +161,8 @@ export async function setupAuth (app: Express) {
   });
 
   // LOGOUT ROUTE
-  app.post('/api/auth/logout', async (req: { session: { destroy: (callback: (err?: Error) => void) => void; user?: Record<string, unknown> } }, res) => {
+  app.post('/api/auth/logout', async (req: Request, res: Response) => {
     console.log('👋 Logout request');
-    
     // Log logout before destroying session
     if (req.session?.user) {
       const user = req.session.user as Record<string, unknown>;
@@ -181,10 +175,9 @@ export async function setupAuth (app: Express) {
         entityName: `${user.firstName as string} ${user.lastName as string}`,
         description: `Usuario ${user.email as string} cerró sesión`,
         newData: { logoutTime: new Date().toISOString() },
-        req,
+        req: { headers: { 'user-agent': req.headers['user-agent'] || '' } },
       });
     }
-    
     req.session.destroy((err?: Error) => {
       if (err) {
         console.error('❌ Error destroying session:', err);
@@ -195,18 +188,16 @@ export async function setupAuth (app: Express) {
   });
 
   // GET USER INFO ROUTE
-  app.get('/api/auth/user', (req: { session?: { user?: Record<string, unknown> } }, res) => {
+  app.get('/api/auth/user', (req: Request, res: Response) => {
     console.log('👤 Get user request, session user:', req.session?.user);
-
     if (!req.session?.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
-
     res.json(req.session.user);
   });
 
   // GET ME ROUTE (alternative)
-  app.get('/api/auth/me', (req: { session?: { user?: Record<string, unknown> } }, res) => {
+  app.get('/api/auth/me', (req: Request, res: Response) => {
     if (req.session?.user) {
       res.json(req.session.user);
     } else {
@@ -217,13 +208,15 @@ export async function setupAuth (app: Express) {
   console.log('✅ Authentication routes set up successfully');
 }
 
-export const isAuthenticated: RequestHandler = async (req: { session?: { user?: Record<string, unknown> }; user?: Record<string, unknown> }, res, next) => {
+export const isAuthenticated: RequestHandler = async (req, res, next) => {
   if (!req.session?.user) {
     console.log('🚫 Authentication required, no session found');
     return res.status(401).json({ message: 'Unauthorized' });
   }
-
   req.user = req.session.user;
+  if (!req.user) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
   console.log('✅ User authenticated:', req.user.email);
   next();
 };
