@@ -322,6 +322,28 @@ export default function Notifications () {
     }
   };
 
+  // Función para extraer datos del empleado del metadata
+  const getEmployeeData = (notification: Notification) => {
+    const metadata = notification.metadata as {
+      employeeId?: string;
+      idGlovo?: string;
+      emailGlovo?: string;
+      dni?: string;
+      nombre?: string;
+      apellido?: string;
+      telefono?: string;
+    };
+
+    return {
+      idGlovo: metadata?.employeeId || metadata?.idGlovo || 'N/A',
+      emailGlovo: metadata?.emailGlovo || 'N/A',
+      dni: metadata?.dni || 'N/A',
+      nombre: metadata?.nombre || 'N/A',
+      apellido: metadata?.apellido || 'N/A',
+      telefono: metadata?.telefono || 'N/A',
+    };
+  };
+
   if (notificationsLoading) {
     return (
       <div className="p-6">
@@ -529,6 +551,7 @@ export default function Notifications () {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Tipo</TableHead>
+                    <TableHead>Empleado</TableHead>
                     <TableHead>Título</TableHead>
                     <TableHead>Solicitante</TableHead>
                     <TableHead>Estado</TableHead>
@@ -537,87 +560,108 @@ export default function Notifications () {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredNotifications.map((notification) => (
-                    <TableRow key={notification.id}>
-                      <TableCell>
-                        <div className="flex items-center">
-                          {getTypeIcon(notification.type)}
-                          <span className="ml-2 text-sm">
-                            {notification.type === 'company_leave_request' ? 'Baja Empresa' :
-                              notification.type === 'employee_update' ? 'Actualización' :
-                                notification.type === 'bulk_upload' ? 'Carga Masiva' : notification.type}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-xs">
-                          <p className="font-medium text-gray-900">{notification.title}</p>
-                          <p className="text-sm text-gray-500 truncate">{notification.message}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-900">{notification.requestedBy}</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusBadgeColor(notification.status)}>
-                          {getStatusText(notification.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-gray-900">
-                          {notification.createdAt ? new Date(notification.createdAt).toLocaleDateString('es-ES') : ''}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          {canProcessNotifications && notification.status === 'pending' && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleTramitar(notification, 'reject')}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                Rechazar
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleTramitar(notification, 'pending_laboral')}
-                                className="text-orange-600 hover:text-orange-700"
-                              >
-                                <AlertTriangle className="h-4 w-4 mr-1" />
-                                Pendiente Laboral
-                              </Button>
-                            </>
-                          )}
-                          {canProcessNotifications && notification.status === 'pending_laboral' && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleTramitar(notification, 'approve')}
-                                className="text-green-600 hover:text-green-700"
-                              >
-                                <Check className="h-4 w-4 mr-1" />
-                                Tramitar
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleTramitar(notification, 'reject')}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                Rechazar
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredNotifications.map((notification) => {
+                    const employeeData = getEmployeeData(notification);
+                    return (
+                      <TableRow key={notification.id}>
+                        <TableCell>
+                          <div className="flex items-center">
+                            {getTypeIcon(notification.type)}
+                            <span className="ml-2 text-sm">
+                              {notification.type === 'company_leave_request' ? 'Baja Empresa' :
+                                notification.type === 'employee_update' ? 'Actualización' :
+                                  notification.type === 'bulk_upload' ? 'Carga Masiva' : notification.type}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-xs">
+                            {['pending', 'pending_laboral'].includes(notification.status) ? (
+                              <>
+                                <p className="font-semibold text-gray-900">{employeeData.nombre} {employeeData.apellido}</p>
+                                <p className="text-xs text-gray-700">DNI/NIE: <span className="font-mono">{employeeData.dni}</span></p>
+                                <p className="text-xs text-gray-700">ID Glovo: <span className="font-mono">{employeeData.idGlovo}</span></p>
+                                <p className="text-xs text-gray-700">Teléfono: <span className="font-mono">{employeeData.telefono}</span></p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-medium text-gray-900">{employeeData.nombre} {employeeData.apellido}</p>
+                                <p className="text-sm text-gray-500">ID: {employeeData.idGlovo}</p>
+                                <p className="text-xs text-gray-400">DNI: {employeeData.dni}</p>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-xs">
+                            <p className="font-medium text-gray-900">{notification.title}</p>
+                            <p className="text-sm text-gray-500 truncate">{notification.message}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-900">{notification.requestedBy}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusBadgeColor(notification.status)}>
+                            {getStatusText(notification.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm text-gray-900">
+                            {notification.createdAt ? new Date(notification.createdAt).toLocaleDateString('es-ES') : ''}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            {canProcessNotifications && notification.status === 'pending' && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleTramitar(notification, 'reject')}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <X className="h-4 w-4 mr-1" />
+                                  Rechazar
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleTramitar(notification, 'pending_laboral')}
+                                  className="text-orange-600 hover:text-orange-700"
+                                >
+                                  <AlertTriangle className="h-4 w-4 mr-1" />
+                                  Pendiente Laboral
+                                </Button>
+                              </>
+                            )}
+                            {canProcessNotifications && notification.status === 'pending_laboral' && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleTramitar(notification, 'approve')}
+                                  className="text-green-600 hover:text-green-700"
+                                >
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Tramitar
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleTramitar(notification, 'reject')}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <X className="h-4 w-4 mr-1" />
+                                  Rechazar
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -652,6 +696,25 @@ export default function Notifications () {
             <div className="text-sm text-gray-600">
               <p><strong>Solicitud:</strong> {tramitationModal.notification?.title}</p>
               <p><strong>Solicitante:</strong> {tramitationModal.notification?.requestedBy}</p>
+              {tramitationModal.notification && (
+                <>
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                    <p className="font-medium text-gray-900 mb-2">Datos del Empleado:</p>
+                    {(() => {
+                      const employeeData = getEmployeeData(tramitationModal.notification!);
+                      return (
+                        <div className="space-y-1">
+                          <p><strong>Nombre:</strong> {employeeData.nombre} {employeeData.apellido}</p>
+                          <p><strong>ID Glovo:</strong> {employeeData.idGlovo}</p>
+                          <p><strong>DNI:</strong> {employeeData.dni}</p>
+                          <p><strong>Email Glovo:</strong> {employeeData.emailGlovo}</p>
+                          <p><strong>Teléfono:</strong> {employeeData.telefono}</p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <div className="flex justify-end space-x-2 mt-6">

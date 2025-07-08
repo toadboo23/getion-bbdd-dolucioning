@@ -608,15 +608,34 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       const notification = await storage.createNotification(notificationData);
 
-      // Log audit
+      // Log audit for company leave creation
       await AuditService.logAction({
         userId: user.email || '',
         userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'create_company_leave',
         entityType: 'company_leave',
         entityId: leave.employeeId,
-        description: `Baja de empresa creada para empleado ${leave.employeeId}`,
-        newData: leave,
+        description: `Usuario ${user.email} SOLICITÓ una baja empresa para el empleado ${leaveData.employeeId} - Tipo: ${leaveData.leaveType} - Fecha: ${leaveData.leaveDate}`,
+        newData: {
+          ...leave,
+          requestedBy: user.email,
+          employeeData: empleadoMetadata,
+        },
+      });
+
+      // Log audit for notification creation
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+        action: 'create_notification',
+        entityType: 'notification',
+        entityId: notification.id.toString(),
+        description: `Usuario ${user.email} CREÓ notificación de baja empresa para empleado ${leaveData.employeeId} - Estado: PENDIENTE`,
+        newData: {
+          ...notification,
+          requestedBy: user.email,
+          employeeData: empleadoMetadata,
+        },
       });
 
       res.status(201).json({ leave, notification });
@@ -824,13 +843,15 @@ export async function registerRoutes (app: Express): Promise<Server> {
             action: 'process_company_leave_notification',
             entityType: 'employee',
             entityId: employeeId,
-            description: `Notificación de baja empresa procesada: ${action} - Empleado ${employeeId} - Estado: ${newEmployeeStatus}`,
+            description: `Usuario ${user.email} ${action === 'approve' ? 'APROBÓ' : action === 'reject' ? 'RECHAZÓ' : 'MOVIÓ A PENDIENTE LABORAL'} la baja empresa del empleado ${employeeId} - Estado final: ${newEmployeeStatus}`,
             newData: {
+              processedBy: user.email,
               action,
               employeeId,
               newEmployeeStatus,
               newCompanyLeaveStatus,
               processingDate,
+              originalRequestedBy: notification.requestedBy,
             },
           });
         }
@@ -850,9 +871,18 @@ export async function registerRoutes (app: Express): Promise<Server> {
         action: 'process_notification',
         entityType: 'notification',
         entityId: notification.id.toString(),
-        description: `Notificación procesada: ${notification.title} - Acción: ${action}`,
-        oldData: { status: notification.status },
-        newData: { action, processingDate, newStatus: updatedNotification.status },
+        description: `Usuario ${user.email} ${action === 'approve' ? 'APROBÓ' : action === 'reject' ? 'RECHAZÓ' : 'MOVIÓ A PENDIENTE LABORAL'} la notificación "${notification.title}" - Estado: ${notification.status} → ${updatedNotification.status}`,
+        oldData: { 
+          status: notification.status,
+          requestedBy: notification.requestedBy,
+        },
+        newData: { 
+          processedBy: user.email,
+          action, 
+          processingDate, 
+          newStatus: updatedNotification.status,
+          originalRequestedBy: notification.requestedBy,
+        },
       });
 
       res.json(updatedNotification);
