@@ -23,9 +23,11 @@ app.use((req, res, next) => {
     'http://employee_management_frontend:3000', // Docker service name
     'http://69.62.107.86:3000', // Production frontend
     'http://solucioning_frontend:3000', // Docker service name
+    'http://localhost:5173', // Backend itself
   ];
 
   const origin = req.headers.origin;
+  
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   }

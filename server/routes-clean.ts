@@ -5,6 +5,22 @@ import { setupAuth, isAuthenticated } from './auth-local.js';
 import { AuditService } from './audit-service.js';
 // XLSX import removed as it's not used in this file
 
+// Extender la interfaz Request para incluir el usuario
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id?: string;
+        email?: string;
+        firstName?: string;
+        lastName?: string;
+        role?: string;
+        ciudad?: string;
+      };
+    }
+  }
+}
+
 const storage = new PostgresStorage();
 
 export async function registerRoutes (app: Express): Promise<Server> {
@@ -23,7 +39,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.get('/api/dashboard/metrics', isAuthenticated, async (req, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('📊 Dashboard metrics request');
     try {
-      const user = req.user as { role?: string };
+      const user = req.user as { role?: string; email?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para ver el dashboard' });
       }
@@ -33,6 +49,16 @@ export async function registerRoutes (app: Express): Promise<Server> {
       if (user?.role !== 'super_admin') {
         metrics.pendingActions = 0; // Ocultar notificaciones pendientes para otros roles
       }
+
+      // Log dashboard access
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: user.role as 'super_admin' | 'admin',
+        action: 'access_dashboard',
+        entityType: 'dashboard',
+        description: `Acceso al dashboard - Usuario: ${user.email}`,
+        newData: { metrics },
+      });
 
       res.json(metrics);
     } catch (error) {
@@ -53,17 +79,17 @@ export async function registerRoutes (app: Express): Promise<Server> {
     }
   });
 
-  // Get unique fleets for filters (protected)
-  app.get('/api/fleets', isAuthenticated, async (req, res) => {
-    if (process.env.NODE_ENV !== 'production') console.log('🛳️ Unique fleets request');
-    try {
-      const fleets = await storage.getUniqueFleets();
-      res.json(fleets);
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching fleets:', error);
-      res.status(500).json({ message: 'Failed to fetch fleets' });
-    }
-  });
+  // Get unique fleets for filters (protected) - REMOVED as fleets are no longer used
+  // app.get('/api/fleets', isAuthenticated, async (req, res) => {
+  //   if (process.env.NODE_ENV !== 'production') console.log('🛳️ Unique fleets request');
+  //   try {
+  //     const fleets = await storage.getUniqueFleets();
+  //     res.json(fleets);
+  //   } catch (error) {
+  //     if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching fleets:', error);
+  //     res.status(500).json({ message: 'Failed to fetch fleets' });
+  //   }
+  // });
 
   // Get unique cities for filters (protected)
   app.get('/api/ciudades', isAuthenticated, async (req, res) => {
@@ -81,9 +107,16 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.get('/api/employees', isAuthenticated, async (req, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('👥 Employees list request with filters:', req.query);
     try {
-      const { city, status, search } = req.query;
+      const { city, status, search, userCity } = req.query;
+      const user = req.user as { role?: string; ciudad?: string; email?: string };
 
       let employees = await storage.getAllEmployees();
+
+      // Si el usuario no es super_admin, filtrar por su ciudad asignada
+      if (user?.role !== 'super_admin' && user?.ciudad) {
+        employees = employees.filter(emp => emp.ciudad === user.ciudad);
+        if (process.env.NODE_ENV !== 'production') console.log(`🔒 Filtrando empleados por ciudad del usuario: ${user.ciudad}`);
+      }
 
       // Apply filters
       if (city && city !== 'all') {
@@ -103,6 +136,20 @@ export async function registerRoutes (app: Express): Promise<Server> {
           emp.email?.toLowerCase().includes(searchTerm),
         );
       }
+
+      // Log employee list access
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: user.role as 'super_admin' | 'admin' | 'normal',
+        action: 'view_employees',
+        entityType: 'employee',
+        description: `Consulta de empleados - Usuario: ${user.email} - Filtros: ciudad=${city || 'all'}, status=${status || 'all'}, search=${search || 'none'}`,
+        newData: { 
+          totalEmployees: employees.length,
+          filters: { city, status, search },
+          userCity: user.ciudad 
+        },
+      });
 
       res.json(employees);
     } catch (error) {
@@ -1023,6 +1070,175 @@ export async function registerRoutes (app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Error setting IT leave:', error);
       res.status(500).json({ message: 'Failed to set IT leave' });
+    }
+  });
+
+  // Export employees to CSV (protected - admin/super_admin only)
+  app.get('/api/employees/export/csv', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('📤 Export employees to CSV request');
+    try {
+      const user = req.user;
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para exportar empleados' });
+      }
+
+      const employees = await storage.getAllEmployees();
+      
+      // Log export action
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'export_employees_csv',
+        entityType: 'employee',
+        description: `Exportación de empleados a CSV - Usuario: ${user.email} - Total: ${employees.length} empleados`,
+        newData: { exportType: 'csv', employeeCount: employees.length },
+      });
+
+      // Set headers for CSV download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="empleados_${new Date().toISOString().split('T')[0]}.csv"`);
+
+      // Create CSV content
+      const csvHeaders = [
+        'ID Glovo',
+        'Email Glovo',
+        'Turno',
+        'Nombre',
+        'Apellido',
+        'Teléfono',
+        'Email',
+        'Horas',
+        'CDP',
+        'Complementarias',
+        'Ciudad',
+        'City Code',
+        'DNI/NIE',
+        'IBAN',
+        'Dirección',
+        'Vehículo',
+        'NAF',
+        'Fecha Alta Seg Soc',
+        'Status Baja',
+        'Estado SS',
+        'Informado Horario',
+        'Cuenta Divilo',
+        'Próxima Asignación Slots',
+        'Jefe Tráfico',
+        'Comentarios Jefe Tráfico',
+        'Incidencias',
+        'Fecha Incidencia',
+        'Faltas No Check In',
+        'Cruce',
+        'Status',
+        'Fecha Inicio Penalización',
+        'Fecha Fin Penalización',
+        'Horas Originales',
+      ].join(',');
+
+      const csvRows = employees.map(emp => [
+        emp.idGlovo,
+        emp.emailGlovo || '',
+        emp.turno || '',
+        emp.nombre,
+        emp.apellido || '',
+        emp.telefono || '',
+        emp.email || '',
+        emp.horas || '',
+        emp.cdp || '',
+        emp.complementaries || '',
+        emp.ciudad || '',
+        emp.cityCode || '',
+        emp.dniNie || '',
+        emp.iban || '',
+        emp.direccion || '',
+        emp.vehiculo || '',
+        emp.naf || '',
+        emp.fechaAltaSegSoc || '',
+        emp.statusBaja || '',
+        emp.estadoSs || '',
+        emp.informadoHorario ? 'Sí' : 'No',
+        emp.cuentaDivilo || '',
+        emp.proximaAsignacionSlots || '',
+        emp.jefeTrafico || '',
+        emp.comentsJefeDeTrafico || '',
+        emp.incidencias || '',
+        emp.fechaIncidencia || '',
+        emp.faltasNoCheckInEnDias || '',
+        emp.cruce || '',
+        emp.status,
+        emp.penalizationStartDate || '',
+        emp.penalizationEndDate || '',
+        emp.originalHours || '',
+      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','));
+
+      const csvContent = [csvHeaders, ...csvRows].join('\n');
+      res.send(csvContent);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error exporting employees to CSV:', error);
+      res.status(500).json({ message: 'Failed to export employees' });
+    }
+  });
+
+  // Reactivate employee (protected - super_admin only)
+  app.post('/api/employees/:id/reactivate', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🔄 Reactivate employee request');
+    try {
+      const user = req.user;
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede reactivar empleados' });
+      }
+
+      const { id } = req.params;
+
+      // Get employee data for audit
+      const employee = await storage.getEmployee(id);
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      const reactivatedEmployee = await storage.reactivateEmployee(id);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'reactivate_employee',
+        entityType: 'employee',
+        entityId: employee.idGlovo,
+        entityName: `${employee.nombre} ${employee.apellido}`,
+        description: `Empleado reactivado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo})`,
+        oldData: employee,
+        newData: reactivatedEmployee,
+      });
+
+      res.json(reactivatedEmployee);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error reactivating employee:', error);
+      res.status(500).json({ message: 'Failed to reactivate employee' });
+    }
+  });
+
+  // Page access logging (protected)
+  app.post('/api/log-page-access', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const { page, action } = req.body;
+
+      // Log page access
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'page_access',
+        entityType: 'page',
+        entityName: page,
+        description: `Acceso a página: ${page} - Usuario: ${user.email}`,
+        newData: { page, action, timestamp: new Date().toISOString() },
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error logging page access:', error);
+      res.status(500).json({ message: 'Failed to log page access' });
     }
   });
 

@@ -47,6 +47,7 @@ export const systemUsers = pgTable('system_users', {
   lastName: varchar('last_name', { length: 100 }).notNull(),
   password: varchar('password', { length: 255 }).notNull(), // Hashed password
   role: varchar('role', { enum: ['super_admin', 'admin', 'normal'] }).notNull(),
+  assigned_city: varchar('assigned_city', { length: 200 }), // Ciudad asignada al usuario
   isActive: boolean('is_active').default(true),
   createdBy: varchar('created_by', { length: 255 }).notNull(), // Email of creator
   lastLogin: timestamp('last_login'),
@@ -152,7 +153,7 @@ export const notifications = pgTable('notifications', {
 export const auditLogs = pgTable('audit_logs', {
   id: serial('id').primaryKey(),
   userId: varchar('user_id', { length: 255 }).notNull(), // Email of user performing action
-  userRole: varchar('user_role', { enum: ['super_admin', 'admin'] }).notNull(),
+  userRole: varchar('user_role', { enum: ['super_admin', 'admin', 'normal'] }).notNull(),
   action: varchar('action', { length: 100 }).notNull(), // create_employee, edit_employee, delete_employee, etc.
   entityType: varchar('entity_type', { length: 50 }).notNull(), // employee, user, notification, etc.
   entityId: varchar('entity_id', { length: 255 }), // ID of affected entity

@@ -20,7 +20,7 @@ export class AuditService {
     req,
   }: {
     userId: string;
-    userRole: 'super_admin' | 'admin';
+    userRole: 'super_admin' | 'admin' | 'normal';
     action: string;
     entityType: string;
     entityId?: string;
@@ -65,7 +65,7 @@ export class AuditService {
 
   static async logEmployeeCreation (
     userId: string,
-    userRole: 'super_admin' | 'admin',
+    userRole: 'super_admin' | 'admin' | 'normal',
     employeeData: Record<string, unknown>,
     req?: { headers?: Record<string, string> },
   ) {
@@ -84,7 +84,7 @@ export class AuditService {
 
   static async logEmployeeUpdate (
     userId: string,
-    userRole: 'super_admin' | 'admin',
+    userRole: 'super_admin' | 'admin' | 'normal',
     employeeId: string,
     oldData: Record<string, unknown>,
     newData: Record<string, unknown>,
@@ -106,7 +106,7 @@ export class AuditService {
 
   static async logEmployeeDelete (
     userId: string,
-    userRole: 'super_admin' | 'admin',
+    userRole: 'super_admin' | 'admin' | 'normal',
     employeeData: Record<string, unknown>,
     req?: { headers?: Record<string, string> },
   ) {
@@ -125,7 +125,7 @@ export class AuditService {
 
   static async logBulkImport (
     userId: string,
-    userRole: 'super_admin' | 'admin',
+    userRole: 'super_admin' | 'admin' | 'normal',
     employeeCount: number,
     req?: { headers?: Record<string, string> },
   ) {
@@ -143,7 +143,7 @@ export class AuditService {
 
   static async logCompanyLeaveRequest (
     userId: string,
-    userRole: 'super_admin' | 'admin',
+    userRole: 'super_admin' | 'admin' | 'normal',
     employeeData: Record<string, unknown>,
     leaveType: string,
     leaveDate: string,
@@ -192,7 +192,7 @@ export class AuditService {
 
   static async logItLeaveRequest (
     userId: string,
-    userRole: 'super_admin' | 'admin',
+    userRole: 'super_admin' | 'admin' | 'normal',
     employeeData: Record<string, unknown>,
     leaveType: string,
     leaveDate: string,

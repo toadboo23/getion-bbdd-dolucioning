@@ -185,6 +185,8 @@ export default function SystemLogsPage () {
       'Nombre de Entidad',
       'Descripción',
       'User Agent',
+      'Datos Anteriores',
+      'Datos Nuevos',
     ];
 
     const csvData = logs.map(log => [
@@ -198,6 +200,8 @@ export default function SystemLogsPage () {
       log.entityName || '',
       log.description,
       log.userAgent || '',
+      log.oldData ? JSON.stringify(log.oldData) : '',
+      log.newData ? JSON.stringify(log.newData) : '',
     ]);
 
     const csvContent = [headers, ...csvData]
@@ -233,6 +237,8 @@ export default function SystemLogsPage () {
       'Nombre de Entidad': log.entityName || '',
       'Descripción': log.description,
       'User Agent': log.userAgent || '',
+      'Datos Anteriores': log.oldData ? JSON.stringify(log.oldData, null, 2) : '',
+      'Datos Nuevos': log.newData ? JSON.stringify(log.newData, null, 2) : '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(excelData);
@@ -251,6 +257,8 @@ export default function SystemLogsPage () {
       { wch: 25 }, // Nombre de Entidad
       { wch: 50 }, // Descripción
       { wch: 30 }, // User Agent
+      { wch: 50 }, // Datos Anteriores
+      { wch: 50 }, // Datos Nuevos
     ];
     ws['!cols'] = colWidths;
 
@@ -308,6 +316,73 @@ export default function SystemLogsPage () {
     }
 
     XLSX.writeFile(wb, `audit-stats-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // Función para exportar todos los logs (sin filtros)
+  const exportAllLogs = async () => {
+    try {
+      setLoading(true);
+      
+      // Obtener todos los logs sin filtros
+      const response = await fetch('/api/audit-logs?limit=10000', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const allLogs = await response.json();
+        
+        if (allLogs.length === 0) {
+          alert('No hay datos para exportar');
+          return;
+        }
+
+        // Exportar a Excel con todos los datos
+        const excelData = allLogs.map((log: AuditLog) => ({
+          'ID': log.id,
+          'Fecha/Hora': formatDate(log.createdAt),
+          'Usuario': log.userId,
+          'Rol': log.userRole,
+          'Acción': log.action,
+          'Tipo de Entidad': log.entityType,
+          'ID de Entidad': log.entityId || '',
+          'Nombre de Entidad': log.entityName || '',
+          'Descripción': log.description,
+          'User Agent': log.userAgent || '',
+          'Datos Anteriores': log.oldData ? JSON.stringify(log.oldData, null, 2) : '',
+          'Datos Nuevos': log.newData ? JSON.stringify(log.newData, null, 2) : '',
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(excelData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Audit Logs Completo');
+
+        // Auto-size columns
+        const colWidths = [
+          { wch: 8 }, // ID
+          { wch: 20 }, // Fecha/Hora
+          { wch: 25 }, // Usuario
+          { wch: 12 }, // Rol
+          { wch: 20 }, // Acción
+          { wch: 15 }, // Tipo de Entidad
+          { wch: 15 }, // ID de Entidad
+          { wch: 25 }, // Nombre de Entidad
+          { wch: 50 }, // Descripción
+          { wch: 30 }, // User Agent
+          { wch: 50 }, // Datos Anteriores
+          { wch: 50 }, // Datos Nuevos
+        ];
+        ws['!cols'] = colWidths;
+
+        XLSX.writeFile(wb, `audit-logs-completo-${new Date().toISOString().split('T')[0]}.xlsx`);
+      } else {
+        alert('Error al obtener los datos para exportar');
+      }
+    } catch (error) {
+      console.error('Error exporting all logs:', error);
+      alert('Error al exportar los logs');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -592,6 +667,16 @@ export default function SystemLogsPage () {
                 >
                   <FileSpreadsheetIcon className="h-4 w-4" />
                   Exportar Excel
+                </Button>
+                <Button
+                  onClick={exportAllLogs}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  disabled={loading}
+                >
+                  <DownloadIcon className="h-4 w-4" />
+                  {loading ? 'Exportando...' : 'Exportar Todo'}
                 </Button>
               </div>
             )}

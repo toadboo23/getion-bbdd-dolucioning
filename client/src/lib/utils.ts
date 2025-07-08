@@ -177,3 +177,11 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
   XLSX.utils.book_append_sheet(wb, ws, 'Plantilla Empleados');
   XLSX.writeFile(wb, `${fileName}.xlsx`);
 }
+
+// URL base del backend
+export const API_BASE_URL = 'http://localhost:5173';
+
+// Función para construir URLs del API
+export function apiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}

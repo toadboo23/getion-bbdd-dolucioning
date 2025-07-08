@@ -15,7 +15,7 @@ import LeaveManagementModal from '@/components/modals/leave-management-modal';
 import ImportEmployeesModal from '@/components/modals/import-employees-modal';
 import EmployeeDetailModal from '@/components/modals/employee-detail-modal';
 import PenalizationModal from '@/components/modals/penalization-modal';
-import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import type { Employee } from '@shared/schema';
 import { CIUDADES_DISPONIBLES } from '@shared/schema';
 // XLSX import removed as it's not used in this file
@@ -36,6 +36,9 @@ export default function Employees () {
   const [isPenalizationModalOpen, setIsPenalizationModalOpen] = useState(false);
   const [penalizationAction, setPenalizationAction] = useState<'penalize' | 'remove'>('penalize');
   const [penalizationEmployee, setPenalizationEmployee] = useState<Employee | null>(null);
+
+  // Nuevo estado para controlar la carga manual de empleados
+  const [employeesLoaded, setEmployeesLoaded] = useState(false);
 
   // Constantes de paginación
   const ITEMS_PER_PAGE = 10;
@@ -60,12 +63,15 @@ export default function Employees () {
     }
   }, [isAuthenticated, isLoading, toast]);
 
+  // Query para obtener empleados - solo se ejecuta cuando employeesLoaded es true
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
     queryKey: ['/api/employees', {
       search: searchTerm,
       city: cityFilter === 'all' ? '' : cityFilter,
       status: statusFilter === 'all' ? '' : statusFilter,
+      userCity: user?.ciudad || '',
     }],
+    enabled: employeesLoaded, // Solo se ejecuta cuando employeesLoaded es true
     retry: false,
   });
 
@@ -75,7 +81,25 @@ export default function Employees () {
     retry: false,
   });
 
+  // Función para cargar empleados
+  const handleLoadEmployees = () => {
+    console.log('🔄 Intentando cargar empleados...');
+    console.log('👤 Usuario actual:', user);
+    console.log('🏙️ Ciudad del usuario:', user?.ciudad);
+    setEmployeesLoaded(true);
+    toast({
+      title: 'Cargando empleados',
+      description: `Cargando empleados de ${user?.ciudad || 'tu ciudad asignada'}...`,
+    });
+  };
 
+  // Debug: Log del estado actual
+  console.log('🔍 Estado actual de la página:');
+  console.log('  - isLoading:', isLoading);
+  console.log('  - isAuthenticated:', isAuthenticated);
+  console.log('  - user:', user);
+  console.log('  - employeesLoaded:', employeesLoaded);
+  console.log('  - employeesLoading:', employeesLoading);
 
   const createEmployeeMutation = useMutation({
     mutationFn: async (employeeData: Record<string, unknown>) => {
@@ -317,6 +341,17 @@ export default function Employees () {
             <p className="mt-1 text-sm text-gray-600">Administra la información de los empleados</p>
           </div>
           <div className="mt-4 sm:mt-0 flex flex-wrap gap-2">
+            {/* Botón Cargar Empleados - Solo visible si no se han cargado aún */}
+            {!employeesLoaded && (
+              <Button
+                onClick={handleLoadEmployees}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Cargar Empleados
+              </Button>
+            )}
+
             {/* Botón Descargar Plantilla - Solo Admin y Super Admin */}
             {canDownloadTemplate && (
               <Button
@@ -373,97 +408,121 @@ export default function Employees () {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
-                Buscar
-              </label>
-              <div className="relative">
-                <Input
-                  id="search"
-                  placeholder="Nombre, apellido, teléfono, email personal o email Glovo..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                  autoFocus
-                />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+      {/* Mostrar mensaje cuando no se han cargado empleados */}
+      {!employeesLoaded && (
+        <Card className="mb-6">
+          <CardContent className="p-8 text-center">
+            <Users className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              No se han cargado empleados
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Haz clic en "Cargar Empleados" para ver los empleados de {user?.ciudad || 'tu ciudad asignada'}
+            </p>
+            <Button
+              onClick={handleLoadEmployees}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Cargar Empleados
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filters - Solo mostrar si los empleados están cargados */}
+      {employeesLoaded && (
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
+                  Buscar
+                </label>
+                <div className="relative">
+                  <Input
+                    id="search"
+                    placeholder="Nombre, apellido, teléfono, email personal o email Glovo..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                    autoFocus
+                  />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="city-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                  Ciudad
+                </label>
+                <Select value={cityFilter} onValueChange={setCityFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas las ciudades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las ciudades</SelectItem>
+                    {CIUDADES_DISPONIBLES.map((ciudad) => (
+                      <SelectItem key={ciudad} value={ciudad}>
+                        {ciudad}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                  Estado
+                </label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="active">Activo</SelectItem>
+                    <SelectItem value="it_leave">Baja IT</SelectItem>
+                    <SelectItem value="company_leave_pending">Baja Empresa Pendiente</SelectItem>
+                    <SelectItem value="company_leave_approved">Baja Empresa Aprobada</SelectItem>
+                    <SelectItem value="pending_laboral">Pendiente Laboral</SelectItem>
+                    <SelectItem value="penalizado">Penalizado</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div>
-              <label htmlFor="city-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                Ciudad
-              </label>
-              <Select value={cityFilter} onValueChange={setCityFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas las ciudades" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las ciudades</SelectItem>
-                  {CIUDADES_DISPONIBLES.map((ciudad) => (
-                    <SelectItem key={ciudad} value={ciudad}>
-                      {ciudad}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Botón para limpiar filtros */}
+            <div className="mt-4 flex justify-end">
+              <Button
+                variant="outline"
+                onClick={handleClearFilters}
+                size="sm"
+                className="text-gray-600 hover:text-gray-800"
+              >
+                Limpiar filtros
+              </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
 
-            <div>
-              <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                Estado
-              </label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="active">Activo</SelectItem>
-                  <SelectItem value="it_leave">Baja IT</SelectItem>
-                  <SelectItem value="company_leave_pending">Baja Empresa Pendiente</SelectItem>
-                  <SelectItem value="company_leave_approved">Baja Empresa Aprobada</SelectItem>
-                  <SelectItem value="pending_laboral">Pendiente Laboral</SelectItem>
-                  <SelectItem value="penalizado">Penalizado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Employee Table - Solo mostrar si los empleados están cargados */}
+      {employeesLoaded && (
+        <EmployeeTable
+          employees={currentEmployees}
+          onEditEmployee={handleEditEmployee}
+          onManageLeave={handleManageLeave}
+          onViewDetails={handleViewDetails}
+          onPenalize={handlePenalize}
+          onRemovePenalization={handleRemovePenalization}
+          canEdit={canEditEmployees}
+          isReadOnlyUser={isReadOnlyUser}
+        />
+      )}
 
-
-          </div>
-
-          {/* Botón para limpiar filtros */}
-          <div className="mt-4 flex justify-end">
-            <Button
-              variant="outline"
-              onClick={handleClearFilters}
-              size="sm"
-              className="text-gray-600 hover:text-gray-800"
-            >
-              Limpiar filtros
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Employee Table */}
-      <EmployeeTable
-        employees={currentEmployees}
-        onEditEmployee={handleEditEmployee}
-        onManageLeave={handleManageLeave}
-        onViewDetails={handleViewDetails}
-        onPenalize={handlePenalize}
-        onRemovePenalization={handleRemovePenalization}
-        canEdit={canEditEmployees}
-        isReadOnlyUser={isReadOnlyUser}
-      />
-
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {/* Pagination - Solo mostrar si los empleados están cargados */}
+      {employeesLoaded && totalPages > 1 && (
         <Card className="mt-6">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">

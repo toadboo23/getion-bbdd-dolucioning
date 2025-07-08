@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Building2, Shield } from 'lucide-react';
 
-export default function Landing () {
+export default function Landing() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [error, setError] = useState<string>('');
   const [loginData, setLoginData] = useState({
@@ -21,7 +21,7 @@ export default function Landing () {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('http://localhost:5173/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -32,6 +32,7 @@ export default function Landing () {
 
       if (response.ok) {
         const data = await response.json();
+        
         if (data.success) {
           // Invalidate auth query to refetch user data
           queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
@@ -52,6 +53,7 @@ export default function Landing () {
         }
       }
     } catch (error) {
+      console.error('❌ Login error:', error);
       setError(error instanceof Error ? error.message : 'Error al iniciar sesión. Por favor, inténtalo de nuevo.');
     } finally {
       setIsLoggingIn(false);

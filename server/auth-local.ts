@@ -3,6 +3,7 @@ import type { Express, RequestHandler } from 'express';
 import connectPg from 'connect-pg-simple';
 import bcrypt from 'bcrypt';
 import { PostgresStorage } from './storage-postgres.js';
+import { AuditService } from './audit-service.js';
 
 const storage = new PostgresStorage();
 
@@ -12,16 +13,15 @@ const storage = new PostgresStorage();
 export function getSession () {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   
-  // Temporalmente usar sesiones en memoria para evitar problemas de conexión
   return session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
+    secret: process.env.SESSION_SECRET || 'default-secret-key',
+    resave: true,
+    saveUninitialized: true,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' ? true : false, // HTTPS solo en prod
+      secure: false, // Cambiar a false para desarrollo
       maxAge: sessionTtl,
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // 'lax' en dev para compatibilidad
+      sameSite: 'lax', // Cambiar a 'lax' para desarrollo
     },
   });
 }
@@ -55,6 +55,7 @@ export async function setupAuth (app: Express) {
         lastName: string;
         role: 'super_admin' | 'admin' | 'normal';
         password: string;
+        assigned_city?: string;
       } | null = null;
 
       // Check database users only (secure production approach)
@@ -71,6 +72,7 @@ export async function setupAuth (app: Express) {
             lastName: dbUser.lastName,
             role: dbUser.role as 'super_admin' | 'admin' | 'normal',
             password: dbUser.password,
+            assigned_city: dbUser.assigned_city || null,
           };
           console.log('✅ Found database user:', email);
         }
@@ -123,8 +125,8 @@ export async function setupAuth (app: Express) {
         firstName: userRecord.firstName,
         lastName: userRecord.lastName,
         role: userRecord.role,
+        ciudad: userRecord.assigned_city || null,
       };
-
       console.log('✅ Login successful for:', email);
 
       // Update last login timestamp in database
@@ -136,6 +138,19 @@ export async function setupAuth (app: Express) {
 
       // Set session
       req.session.user = userData;
+
+      // Log successful login
+      await AuditService.logAction({
+        userId: userData.email,
+        userRole: userData.role as 'super_admin' | 'admin' | 'normal',
+        action: 'login',
+        entityType: 'session',
+        entityId: userData.id,
+        entityName: `${userData.firstName} ${userData.lastName}`,
+        description: `Usuario ${userData.email} inició sesión exitosamente`,
+        newData: { loginTime: new Date().toISOString() },
+        req,
+      });
 
       res.json({
         success: true,
@@ -151,8 +166,25 @@ export async function setupAuth (app: Express) {
   });
 
   // LOGOUT ROUTE
-  app.post('/api/auth/logout', (req: { session: { destroy: (callback: (err?: Error) => void) => void } }, res) => {
+  app.post('/api/auth/logout', async (req: { session: { destroy: (callback: (err?: Error) => void) => void; user?: Record<string, unknown> } }, res) => {
     console.log('👋 Logout request');
+    
+    // Log logout before destroying session
+    if (req.session?.user) {
+      const user = req.session.user as Record<string, unknown>;
+      await AuditService.logAction({
+        userId: user.email as string,
+        userRole: user.role as 'super_admin' | 'admin' | 'normal',
+        action: 'logout',
+        entityType: 'session',
+        entityId: user.id as string,
+        entityName: `${user.firstName as string} ${user.lastName as string}`,
+        description: `Usuario ${user.email as string} cerró sesión`,
+        newData: { logoutTime: new Date().toISOString() },
+        req,
+      });
+    }
+    
     req.session.destroy((err?: Error) => {
       if (err) {
         console.error('❌ Error destroying session:', err);

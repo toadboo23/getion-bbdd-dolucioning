@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { User } from '@shared/schema';
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
-// Use relative URLs for Docker/production, absolute URLs only for local development
-const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:5173' : '';
+// URL base del backend - usar la URL del contenedor Docker
+const API_BASE_URL = 'http://localhost:5173';
 
 // Definir interfaz para notificaciones
 interface Notification {
@@ -15,94 +17,55 @@ interface Notification {
   updatedAt: string;
 }
 
-export function useAuth () {
-  const queryClient = useQueryClient();
-
-  const { data: user, isLoading, error } = useQuery<User | null>({
-    queryKey: ['/api/auth/user'],
-    queryFn: async () => {
-      try {
-        const authUrl = `${API_BASE_URL}/api/auth/user`;
-        console.log('Auth URL:', authUrl);
-
-        const response = await fetch(authUrl, {
-          credentials: 'include',
-        });
-
-        if (response.status === 401) {
-          return null; // Usuario no autenticado
-        }
-
-        if (!response.ok) {
-          throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-
-        return await response.json();
-      } catch (error) {
-        console.error('Error fetching user:', error);
-        return null;
-      }
-    },
-    retry: false,
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const logoutUrl = `${API_BASE_URL}/api/auth/logout`;
-      console.log('Logout URL:', logoutUrl);
-
-      const response = await fetch(logoutUrl, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      // Invalidar la query del usuario y redirigir
-      queryClient.setQueryData(['/api/auth/user'], null);
-      queryClient.clear();
-      window.location.href = '/';
-    },
-    onError: (error) => {
-      console.error('Error during logout:', error);
-      // Aunque haya error, intentamos limpiar y redirigir
-      queryClient.setQueryData(['/api/auth/user'], null);
-      queryClient.clear();
-      window.location.href = '/';
-    },
-  });
-
-  const logout = () => {
-    logoutMutation.mutate();
-  };
-
-  return {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    error,
-    logout,
-    isLoggingOut: logoutMutation.isPending,
-  };
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  setUser: (user: User | null) => void;
+  logout: () => void;
+  logPageAccess: (page: string, action?: string) => Promise<void>;
 }
 
+export const useAuth = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      isAuthenticated: false,
+      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      logout: () => set({ user: null, isAuthenticated: false }),
+      logPageAccess: async (page: string, action?: string) => {
+        try {
+          const { user } = get();
+          if (!user) return;
+
+          await fetch('/api/log-page-access', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ page, action }),
+          });
+        } catch (error) {
+          console.error('Error logging page access:', error);
+        }
+      },
+    }),
+    {
+      name: 'auth-storage',
+    },
+  ),
+);
+
 // Hook para obtener el contador de notificaciones
-export function useNotificationCount () {
+export function useNotificationCount() {
   const { data: notifications } = useQuery<Notification[]>({
     queryKey: ['/api/notifications'],
     queryFn: async () => {
       const response = await fetch(`${API_BASE_URL}/api/notifications`, {
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {

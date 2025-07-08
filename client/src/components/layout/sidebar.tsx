@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth, useNotificationCount } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard,
-  Users,
-  Bell,
-  LogOut,
-  UserX,
-  FileText,
-  UserCog,
+  HomeIcon,
+  UsersIcon,
+  BuildingIcon,
+  BellIcon,
+  SettingsIcon,
+  FileTextIcon,
+  ActivityIcon,
+  LogOutIcon,
 } from 'lucide-react';
 
 // Definir interfaz para los elementos de navegación
@@ -22,12 +24,12 @@ interface NavigationItem {
 }
 
 const navigation: NavigationItem[] = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Empleados', href: '/employees', icon: Users },
-  { name: 'Baja Empresa', href: '/company-leaves', icon: UserX },
-  { name: 'Notificaciones', href: '/notifications', icon: Bell, adminOnly: true }, // Admin y Super Admin
-  { name: 'System Logs', href: '/system-logs', icon: FileText, superAdminOnly: true }, // Solo Super Admin
-  { name: 'Gestión de Usuarios', href: '/user-management', icon: UserCog, superAdminOnly: true }, // Solo Super Admin
+  { name: 'Dashboard', href: '/', icon: HomeIcon },
+  { name: 'Empleados', href: '/employees', icon: UsersIcon },
+  { name: 'Baja Empresa', href: '/company-leaves', icon: BuildingIcon },
+  { name: 'Notificaciones', href: '/notifications', icon: BellIcon, adminOnly: true }, // Admin y Super Admin
+  { name: 'System Logs', href: '/system-logs', icon: FileTextIcon, superAdminOnly: true }, // Solo Super Admin
+  { name: 'Gestión de Usuarios', href: '/user-management', icon: SettingsIcon, superAdminOnly: true }, // Solo Super Admin
 ];
 
 interface SidebarProps {
@@ -37,8 +39,29 @@ interface SidebarProps {
 
 export default function Sidebar ({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, logPageAccess } = useAuth();
   const notificationCount = useNotificationCount();
+
+  // Log page access when location changes
+  useEffect(() => {
+    const currentPage = location;
+    const pageName = getPageName(currentPage);
+    if (pageName) {
+      logPageAccess(pageName, 'navigation');
+    }
+  }, [location, logPageAccess]);
+
+  const getPageName = (pathname: string) => {
+    const pageMap: Record<string, string> = {
+      '/dashboard': 'Dashboard',
+      '/employees': 'Empleados',
+      '/company-leaves': 'Bajas Empresa',
+      '/notifications': 'Notificaciones',
+      '/user-management': 'Gestión de Usuarios',
+      '/system-logs': 'Logs del Sistema',
+    };
+    return pageMap[pathname] || null;
+  };
 
   const canAccess = (item: NavigationItem) => {
     if (item.superAdminOnly) {
@@ -112,7 +135,7 @@ export default function Sidebar ({ isMobileOpen = false, onMobileClose }: Sideba
             onClick={handleLogout}
             className="sidebar-link text-red-600 hover:bg-red-50 w-full text-left"
           >
-            <LogOut className="w-5 h-5 mr-3" />
+            <LogOutIcon className="w-5 h-5 mr-3" />
             <span>Cerrar Sesión</span>
           </button>
         </div>

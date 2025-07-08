@@ -447,7 +447,7 @@ export class PostgresStorage {
     return await db
       .select()
       .from(auditLogs)
-      .orderBy(auditLogs.createdAt)
+      .orderBy(desc(auditLogs.createdAt))
       .limit(limit);
   }
 
@@ -565,52 +565,29 @@ export class PostgresStorage {
   }
 
   async removePenalization (employeeId: string): Promise<Employee> {
-    try {
-      // Get current employee data
-      const employee = await this.getEmployee(employeeId);
-      if (!employee) {
-        throw new Error('Employee not found');
-      }
+    const [employee] = await db
+      .update(employees)
+      .set({
+        penalizationStartDate: null,
+        penalizationEndDate: null,
+        status: 'active',
+        updatedAt: new Date(),
+      })
+      .where(eq(employees.idGlovo, employeeId))
+      .returning();
+    return employee;
+  }
 
-      if (employee.status !== 'penalizado') {
-        throw new Error('Employee is not currently penalized');
-      }
-
-      // Restore original hours
-      const hoursToRestore = employee.originalHours || 0;
-
-      // Update employee to remove penalization
-      const [updatedEmployee] = await db
-        .update(employees)
-        .set({
-          status: 'active',
-          penalizationStartDate: null,
-          penalizationEndDate: null,
-          horas: hoursToRestore, // Restore original hours
-          originalHours: null, // Clear original hours
-          updatedAt: new Date(),
-        } as Record<string, unknown>)
-        .where(eq(employees.idGlovo, employeeId))
-        .returning();
-
-      // Create notification for removing penalization
-      await this.createNotification({
-        type: 'employee_update',
-        title: 'Penalización Removida',
-        message: `La penalización del empleado ${employee.nombre} ${employee.apellido || ''} (${employeeId}) ha sido removida. Horas restauradas: ${hoursToRestore}`,
-        requestedBy: 'SYSTEM',
-        status: 'processed',
-        metadata: {
-          employeeId,
-          restoredHours: hoursToRestore,
-        },
-      });
-
-      return updatedEmployee;
-    } catch (error) {
-      console.error('Error removing penalization:', error);
-      throw error;
-    }
+  async reactivateEmployee (employeeId: string): Promise<Employee> {
+    const [employee] = await db
+      .update(employees)
+      .set({
+        status: 'active',
+        updatedAt: new Date(),
+      })
+      .where(eq(employees.idGlovo, employeeId))
+      .returning();
+    return employee;
   }
 
   async setEmployeeItLeave (employeeId: string, fechaIncidencia: string | Date): Promise<Employee> {
