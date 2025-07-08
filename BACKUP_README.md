@@ -136,9 +136,9 @@ export AWS_DEFAULT_REGION="us-east-1"
 Editar las variables en `backup-automated.sh`:
 ```bash
 BACKUP_DIR="/root/backups"        # Directorio de backups
-DB_NAME="db_local"                # Nombre de la BD
+DB_NAME="solucioning"             # Nombre de la BD
 DB_USER="postgres"                # Usuario de BD
-CONTAINER_NAME="db_local-db-1"    # Nombre del contenedor
+CONTAINER_NAME="solucioning-db-1" # Nombre del contenedor
 RETENTION_DAYS=30                 # Días de retención
 ```
 
@@ -182,7 +182,7 @@ df -h /root/backups
 docker-compose ps
 
 # Verificar conectividad a BD
-docker-compose exec db psql -U postgres -d db_local -c "SELECT 1;"
+docker-compose exec db psql -U postgres -d solucioning -c "SELECT 1;"
 
 # Verificar permisos
 ls -la /root/backups/
@@ -197,7 +197,7 @@ ls -la /root/backups/
 ./backup-automated.sh restore 20241201_143022
 
 # Verificar restauración
-docker-compose exec db psql -U postgres -d db_local -c "SELECT COUNT(*) FROM users;"
+docker-compose exec db psql -U postgres -d solucioning -c "SELECT COUNT(*) FROM users;"
 ```
 
 ### Limpiar Manualmente
