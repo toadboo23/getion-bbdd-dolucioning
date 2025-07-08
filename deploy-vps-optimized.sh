@@ -14,7 +14,7 @@ fi
 # Verificar que estamos en el directorio correcto
 if [ ! -f "docker-compose.yml" ]; then
     echo "❌ Error: No se encontró docker-compose.yml"
-    echo "Asegúrate de estar en el directorio correcto: /root/db_local"
+    echo "Asegúrate de estar en el directorio correcto: /root/solucioning-deploy"
     exit 1
 fi
 

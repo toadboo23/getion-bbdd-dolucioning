@@ -49,7 +49,7 @@ echo "📋 Conectándose al VPS y ejecutando actualización..."
 # Intentar conectar al VPS y ejecutar actualización
 ssh root@69.62.107.86 << 'EOF'
     echo "🚀 Conectado al VPS, iniciando actualización..."
-    cd /root/db_local
+    cd /root/solucioning-deploy
     git fetch origin
     git reset --hard origin/Production
     docker-compose down
@@ -62,10 +62,10 @@ echo "✅ Despliegue completo finalizado!"
 echo "🌐 La aplicación debería estar disponible en: http://69.62.107.86:3000"
 echo ""
 echo "📋 Para verificar el estado:"
-echo "   ssh root@69.62.107.86 'cd /root/db_local && docker-compose ps'"
+echo "   ssh root@69.62.107.86 'cd /root/solucioning-deploy && docker-compose ps'"
 echo ""
 echo "📋 Para ver logs:"
-echo "   ssh root@69.62.107.86 'cd /root/db_local && docker-compose logs -f'"
+echo "   ssh root@69.62.107.86 'cd /root/solucioning-deploy && docker-compose logs -f'"
 
 echo "🔗 Para crear un Pull Request:"
 echo "   https://github.com/toadboo23/db_solucioning/pull/new/Develop-Local" 

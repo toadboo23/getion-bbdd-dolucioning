@@ -33,8 +33,8 @@ fi
 
 # Crear directorio del proyecto
 echo "📁 Creando directorio del proyecto..."
-mkdir -p /root/db_local
-cd /root/db_local
+mkdir -p /root/solucioning-deploy
+cd /root/solucioning-deploy
 
 # Clonar el repositorio
 echo "📥 Clonando repositorio..."
@@ -74,7 +74,7 @@ echo "✅ Instalación completada!"
 echo "🌐 La aplicación está disponible en: http://69.62.107.86:3000"
 echo ""
 echo "📋 Para verificar logs:"
-echo "   cd /root/db_local && docker-compose logs -f"
+echo "   cd /root/solucioning-deploy && docker-compose logs -f"
 echo ""
 echo "📋 Para reiniciar servicios:"
-echo "   cd /root/db_local && docker-compose restart" 
+echo "   cd /root/solucioning-deploy && docker-compose restart" 
