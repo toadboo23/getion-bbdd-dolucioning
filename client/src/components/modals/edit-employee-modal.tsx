@@ -1,14 +1,17 @@
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { insertEmployeeSchema } from "@shared/schema";
-import type { Employee } from "@shared/schema";
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { insertEmployeeSchema, type Employee, CIUDADES_DISPONIBLES } from '@shared/schema';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -16,165 +19,220 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+  FormDescription,
+} from '@/components/ui/form';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
+
+// Definir interfaz para el usuario
+interface User {
+  role: 'super_admin' | 'admin' | 'normal';
+  email: string;
+}
+
+// Definir interfaz para los datos del formulario
+interface FormData {
+  [key: string]: string | number | boolean | null;
+}
 
 interface EditEmployeeModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
-  onSave: (data: any) => void;
+  onSave: (data: FormData) => void;
   isLoading: boolean;
+  user: User | null;
 }
 
-export default function EditEmployeeModal({
+export default function EditEmployeeModal ({
   isOpen,
   onClose,
   employee,
   onSave,
   isLoading,
+  user,
 }: EditEmployeeModalProps) {
+  // Función helper para determinar si un campo debe estar deshabilitado para usuarios admin
+  const isFieldDisabled = (fieldName: string): boolean => {
+    if (user?.role === 'super_admin') return false;
+    if (user?.role === 'admin') {
+      // Solo estos campos son editables para admin
+      const allowedFields = ['telefono', 'email', 'ciudad', 'complementaries'];
+      return !allowedFields.includes(fieldName);
+    }
+    return true; // Usuarios normales no pueden editar nada
+  };
+
   const form = useForm({
     resolver: zodResolver(insertEmployeeSchema),
     defaultValues: {
-      idGlovo: "",
-      emailGlovo: "",
-      turno: "",
-      nombre: "",
-      apellido: "",
-      telefono: "",
-      email: "",
+      idGlovo: '',
+      emailGlovo: '',
+      turno: '',
+      nombre: '',
+      apellido: '',
+      telefono: '',
+      email: '',
       horas: 0,
-      complementaries: "",
-      ciudad: "",
-      cityCode: "",
-      dniNie: "",
-      iban: "",
-      direccion: "",
-      vehiculo: "",
-      naf: "",
-      fechaAltaSegSoc: "",
-      statusBaja: "",
-      estadoSs: "",
+      cdp: 0,
+      complementaries: '',
+      ciudad: '',
+      cityCode: '',
+      dniNie: '',
+      iban: '',
+      direccion: '',
+      vehiculo: '',
+      naf: '',
+      fechaAltaSegSoc: '',
+      statusBaja: '',
+      estadoSs: '',
       informadoHorario: false,
-      cuentaDivilo: "",
-      proximaAsignacionSlots: "",
-      jefeTrafico: "",
-      comentsJefeDeTrafico: "",
-      incidencias: "",
-      fechaIncidencia: "",
+      cuentaDivilo: '',
+      proximaAsignacionSlots: '',
+      jefeTrafico: '',
+      comentsJefeDeTrafico: '',
+      incidencias: '',
+      fechaIncidencia: '',
       faltasNoCheckInEnDias: 0,
-      cruce: "",
-      status: "active",
+      cruce: '',
+      status: 'active',
     },
   });
 
   useEffect(() => {
     if (employee) {
       form.reset({
-        idGlovo: employee.idGlovo || "",
-        emailGlovo: employee.emailGlovo || "",
-        turno: employee.turno || "",
-        nombre: employee.nombre || "",
-        apellido: employee.apellido || "",
-        telefono: employee.telefono || "",
-        email: employee.email || "",
+        idGlovo: employee.idGlovo || '',
+        emailGlovo: employee.emailGlovo || '',
+        turno: employee.turno || '',
+        nombre: employee.nombre || '',
+        apellido: employee.apellido || '',
+        telefono: employee.telefono || '',
+        email: employee.email || '',
         horas: employee.horas || 0,
-        complementaries: employee.complementaries || "",
-        ciudad: employee.ciudad || "",
-        cityCode: employee.cityCode || "",
-        dniNie: employee.dniNie || "",
-        iban: employee.iban || "",
-        direccion: employee.direccion || "",
-        vehiculo: employee.vehiculo || "",
-        naf: employee.naf || "",
-        fechaAltaSegSoc: employee.fechaAltaSegSoc || "",
-        statusBaja: employee.statusBaja || "",
-        estadoSs: employee.estadoSs || "",
+        cdp: employee.cdp || 0,
+        complementaries: employee.complementaries || '',
+        ciudad: employee.ciudad || '',
+        cityCode: employee.cityCode || '',
+        dniNie: employee.dniNie || '',
+        iban: employee.iban || '',
+        direccion: employee.direccion || '',
+        vehiculo: employee.vehiculo || '',
+        naf: employee.naf || '',
+        fechaAltaSegSoc: employee.fechaAltaSegSoc || '',
+        statusBaja: employee.statusBaja || '',
+        estadoSs: employee.estadoSs || '',
         informadoHorario: employee.informadoHorario || false,
-        cuentaDivilo: employee.cuentaDivilo || "",
-        proximaAsignacionSlots: employee.proximaAsignacionSlots || "",
-        jefeTrafico: employee.jefeTrafico || "",
-        comentsJefeDeTrafico: employee.comentsJefeDeTrafico || "",
-        incidencias: employee.incidencias || "",
-        fechaIncidencia: employee.fechaIncidencia || "",
+        cuentaDivilo: employee.cuentaDivilo || '',
+        proximaAsignacionSlots: employee.proximaAsignacionSlots || '',
+        jefeTrafico: employee.jefeTrafico || '',
+        comentsJefeDeTrafico: employee.comentsJefeDeTrafico || '',
+        incidencias: employee.incidencias || '',
+        fechaIncidencia: employee.fechaIncidencia || '',
         faltasNoCheckInEnDias: employee.faltasNoCheckInEnDias || 0,
-        cruce: employee.cruce || "",
-        status: employee.status || "active",
+        cruce: employee.cruce || '',
+        status: employee.status || 'active',
       });
     } else {
       form.reset({
-        idGlovo: "",
-        emailGlovo: "",
-        turno: "",
-        nombre: "",
-        apellido: "",
-        telefono: "",
-        email: "",
+        idGlovo: '',
+        emailGlovo: '',
+        turno: '',
+        nombre: '',
+        apellido: '',
+        telefono: '',
+        email: '',
         horas: 0,
-        complementaries: "",
-        ciudad: "",
-        cityCode: "",
-        dniNie: "",
-        iban: "",
-        direccion: "",
-        vehiculo: "",
-        naf: "",
-        fechaAltaSegSoc: "",
-        statusBaja: "",
-        estadoSs: "",
+        cdp: 0,
+        complementaries: '',
+        ciudad: '',
+        cityCode: '',
+        dniNie: '',
+        iban: '',
+        direccion: '',
+        vehiculo: '',
+        naf: '',
+        fechaAltaSegSoc: '',
+        statusBaja: '',
+        estadoSs: '',
         informadoHorario: false,
-        cuentaDivilo: "",
-        proximaAsignacionSlots: "",
-        jefeTrafico: "",
-        comentsJefeDeTrafico: "",
-        incidencias: "",
-        fechaIncidencia: "",
+        cuentaDivilo: '',
+        proximaAsignacionSlots: '',
+        jefeTrafico: '',
+        comentsJefeDeTrafico: '',
+        incidencias: '',
+        fechaIncidencia: '',
         faltasNoCheckInEnDias: 0,
-        cruce: "",
-        status: "active",
+        cruce: '',
+        status: 'active',
       });
     }
   }, [employee, form]);
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: FormData) => {
+    // Si el usuario es admin, solo permitir editar campos específicos
+    if (user?.role === 'admin' && employee) {
+      // Solo enviar los campos que el admin puede editar
+      const adminEditableData = {
+        telefono: data.telefono,
+        email: data.email,
+        ciudad: data.ciudad,
+        complementaries: data.complementaries,
+      };
 
-    
+      // Convert empty strings to null for optional fields
+      const processedData = Object.entries(adminEditableData).reduce((acc, [key, value]) => {
+        if (value === '' && key !== 'telefono') {
+          acc[key] = null;
+        } else {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as FormData);
+
+      onSave(processedData);
+      return;
+    }
+
+    // Para super_admin, enviar todos los campos como antes
     // Convert empty strings to null for optional fields
     const processedData = Object.entries(data).reduce((acc, [key, value]) => {
-      if (value === "" && !["idGlovo", "nombre", "telefono"].includes(key)) {
+      if (value === '' && !['idGlovo', 'nombre', 'telefono', 'flota'].includes(key)) {
         acc[key] = null;
       } else {
         acc[key] = value;
       }
       return acc;
-    }, {} as any);
+    }, {} as FormData);
 
-
-    
     onSave(processedData);
-
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto" aria-describedby="edit-employee-description">
         <DialogHeader>
           <DialogTitle>
-            {employee ? "Editar Empleado" : "Agregar Empleado"}
+            {employee ? 'Editar Empleado' : 'Agregar Empleado'}
           </DialogTitle>
+          {user?.role === 'admin' && employee && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mt-2">
+              <p className="text-sm text-blue-700">
+                <strong>Permisos de Admin:</strong> Solo puedes editar Teléfono, Email,
+                Ciudad y Horas Complementarias.
+              </p>
+            </div>
+          )}
         </DialogHeader>
-        
+        <div id="edit-employee-description" className="sr-only">
+          Modal para editar información de empleados. Permite modificar datos personales, laborales y adicionales del empleado.
+        </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Información Básica */}
@@ -188,7 +246,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel className="text-red-500">ID Glovo *</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Ej: GLV001" />
+                        <Input {...field} placeholder="Ej: GLV001" disabled={isFieldDisabled('idGlovo')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -202,7 +260,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel className="text-red-500">Nombre *</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Nombre del empleado" />
+                        <Input {...field} placeholder="Nombre del empleado" disabled={isFieldDisabled('nombre')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -216,7 +274,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Apellido</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Apellidos del empleado" />
+                        <Input {...field} placeholder="Apellidos del empleado" disabled={isFieldDisabled('apellido')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -230,8 +288,33 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel className="text-red-500">Teléfono *</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Ej: +34 666 777 888" />
+                        <Input {...field} placeholder="Ej: +34 666 777 888" disabled={isFieldDisabled('telefono')} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="ciudad"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-red-500">Ciudad *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('ciudad')}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona ciudad" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {CIUDADES_DISPONIBLES.map((ciudad) => (
+                            <SelectItem key={ciudad} value={ciudad}>
+                              {ciudad}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -244,7 +327,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Email Personal</FormLabel>
                       <FormControl>
-                        <Input type="email" {...field} placeholder="email@ejemplo.com" />
+                        <Input type="email" {...field} placeholder="email@ejemplo.com" disabled={isFieldDisabled('email')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -258,7 +341,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Email Glovo</FormLabel>
                       <FormControl>
-                        <Input type="email" {...field} placeholder="empleado@glovo.com" />
+                        <Input type="email" {...field} placeholder="empleado@glovo.com" disabled={isFieldDisabled('emailGlovo')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -277,7 +360,7 @@ export default function EditEmployeeModal({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Turno</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('turno')}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecciona turno" />
@@ -302,14 +385,55 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Horas</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          {...field} 
+                        <Input
+                          type="number"
+                          {...field}
                           onChange={(e) => field.onChange(Number(e.target.value))}
                           placeholder="40"
+                          disabled={isFieldDisabled('horas')}
                         />
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormItem>
+                  <FormLabel>CDP%</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      value={form.watch('horas') ? `${Math.round((form.watch('horas') / 38) * 100)}%` : ''}
+                      disabled
+                      placeholder="Calculado automáticamente"
+                    />
+                  </FormControl>
+                </FormItem>
+
+                <FormField
+                  control={form.control}
+                  name="cdp"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CDP (Cumplimiento)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          value={(() => {
+                            const horas = form.watch('horas') || 0;
+                            if (horas <= 0) return 0;
+                            if (horas >= 38) return 100;
+                            return Math.round((horas * 100) / 38);
+                          })()}
+                          disabled={isFieldDisabled('cdp')}
+                          placeholder="Calculado automáticamente"
+                          className="bg-gray-50"
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs text-gray-500">
+                        38 horas = 100%. Se calcula automáticamente.
+                      </FormDescription>
                     </FormItem>
                   )}
                 />
@@ -321,7 +445,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Jefe de Tráfico</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Nombre del jefe" />
+                        <Input {...field} placeholder="Nombre del jefe" disabled={isFieldDisabled('jefeTrafico')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -340,19 +464,18 @@ export default function EditEmployeeModal({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Ciudad</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('ciudad')}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecciona ciudad" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="madrid">Madrid</SelectItem>
-                          <SelectItem value="barcelona">Barcelona</SelectItem>
-                          <SelectItem value="valencia">Valencia</SelectItem>
-                          <SelectItem value="sevilla">Sevilla</SelectItem>
-                          <SelectItem value="bilbao">Bilbao</SelectItem>
-                          <SelectItem value="zaragoza">Zaragoza</SelectItem>
+                          {CIUDADES_DISPONIBLES.map((ciudad) => (
+                            <SelectItem key={ciudad} value={ciudad}>
+                              {ciudad}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -367,7 +490,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Código Ciudad</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="MAD, BCN, VAL..." />
+                        <Input {...field} placeholder="MAD, BCN, VAL..." disabled={isFieldDisabled('cityCode')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -381,7 +504,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Dirección</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Dirección completa" />
+                        <Input {...field} placeholder="Dirección completa" disabled={isFieldDisabled('direccion')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -401,7 +524,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>DNI/NIE</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="12345678A" />
+                        <Input {...field} placeholder="12345678A" disabled={isFieldDisabled('dniNie')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -415,7 +538,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>IBAN</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="ES12 1234 5678 9012 3456 7890" />
+                        <Input {...field} placeholder="ES12 1234 5678 9012 3456 7890" disabled={isFieldDisabled('iban')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -428,17 +551,17 @@ export default function EditEmployeeModal({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Vehículo</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('vehiculo')}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Tipo vehículo" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="bicicleta">Bicicleta</SelectItem>
-                          <SelectItem value="moto">Moto</SelectItem>
-                          <SelectItem value="coche">Coche</SelectItem>
-                          <SelectItem value="a_pie">A pie</SelectItem>
+                          <SelectItem value="Bicicleta">Bicicleta</SelectItem>
+                          <SelectItem value="Patinete">Patinete</SelectItem>
+                          <SelectItem value="Moto">Moto</SelectItem>
+                          <SelectItem value="Otro">Otro</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -459,7 +582,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Complementarios</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Información adicional..." />
+                        <Textarea {...field} placeholder="Información adicional..." disabled={isFieldDisabled('complementaries')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -473,7 +596,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Incidencias</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Notas sobre incidencias..." />
+                        <Textarea {...field} placeholder="Notas sobre incidencias..." disabled={isFieldDisabled('incidencias')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -489,7 +612,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>NAF</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Número de afiliación" />
+                        <Input {...field} placeholder="Número de afiliación" disabled={isFieldDisabled('naf')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -503,7 +626,7 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Cuenta Divilo</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Cuenta en sistema Divilo" />
+                        <Input {...field} placeholder="Cuenta en sistema Divilo" disabled={isFieldDisabled('cuentaDivilo')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -517,11 +640,12 @@ export default function EditEmployeeModal({
                     <FormItem>
                       <FormLabel>Faltas No Check-in</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          {...field} 
+                        <Input
+                          type="number"
+                          {...field}
                           onChange={(e) => field.onChange(Number(e.target.value))}
                           placeholder="0"
+                          disabled={isFieldDisabled('faltasNoCheckInEnDias')}
                         />
                       </FormControl>
                       <FormMessage />
@@ -535,7 +659,7 @@ export default function EditEmployeeModal({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Estado del Empleado</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('status')}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Estado" />
@@ -546,12 +670,16 @@ export default function EditEmployeeModal({
                           <SelectItem value="it_leave">Baja IT</SelectItem>
                           <SelectItem value="company_leave_pending">Baja Empresa Pendiente</SelectItem>
                           <SelectItem value="company_leave_approved">Baja Empresa Aprobada</SelectItem>
+                          <SelectItem value="pending_laboral">Pendiente Laboral</SelectItem>
+                          <SelectItem value="penalizado">Penalizado</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+
               </div>
 
               <div className="flex items-center space-x-2">
@@ -564,6 +692,7 @@ export default function EditEmployeeModal({
                         <Checkbox
                           checked={field.value}
                           onCheckedChange={field.onChange}
+                          disabled={isFieldDisabled('informadoHorario')}
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
@@ -582,7 +711,7 @@ export default function EditEmployeeModal({
                 Cancelar
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Guardando..." : employee ? "Actualizar" : "Crear Empleado"}
+                {isLoading ? 'Guardando...' : employee ? 'Actualizar' : 'Crear Empleado'}
               </Button>
             </div>
           </form>

@@ -6,11 +6,12 @@ import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Separator } from '../components/ui/separator';
-import { CalendarIcon, FilterIcon, SearchIcon, RefreshCwIcon, UserIcon, ActivityIcon, DatabaseIcon } from 'lucide-react';
+import { CalendarIcon, FilterIcon, SearchIcon, RefreshCwIcon, UserIcon, ActivityIcon, DatabaseIcon, DownloadIcon, FileTextIcon, FileSpreadsheetIcon } from 'lucide-react';
 import { Calendar } from '../components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
+import * as XLSX from 'xlsx';
 
 interface AuditLog {
   id: number;
@@ -21,9 +22,8 @@ interface AuditLog {
   entityId?: string;
   entityName?: string;
   description: string;
-  oldData?: any;
-  newData?: any;
-  ipAddress?: string;
+  oldData?: Record<string, unknown>;
+  newData?: Record<string, unknown>;
   userAgent?: string;
   createdAt: string;
 }
@@ -35,7 +35,7 @@ interface AuditStats {
   dailyActivity: Array<{ date: string; count: number }>;
 }
 
-export default function SystemLogsPage() {
+export default function SystemLogsPage () {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<AuditStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,18 +46,18 @@ export default function SystemLogsPage() {
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [limit, setLimit] = useState(100);
-  const [showStats, setShowStats] = useState(true);
+  const [showStats] = useState(true);
 
   const actionTypes = [
     'CREATE_EMPLOYEE', 'UPDATE_EMPLOYEE', 'DELETE_EMPLOYEE', 'BULK_IMPORT', 'REACTIVATE_EMPLOYEE',
     'CREATE_IT_LEAVE', 'APPROVE_IT_LEAVE', 'REJECT_IT_LEAVE',
     'CREATE_COMPANY_LEAVE', 'APPROVE_COMPANY_LEAVE', 'REJECT_COMPANY_LEAVE',
     'PROCESS_NOTIFICATION', 'CREATE_USER', 'UPDATE_USER', 'DELETE_USER',
-    'LOGIN', 'LOGOUT'
+    'LOGIN', 'LOGOUT',
   ];
 
   const entityTypes = [
-    'employee', 'it_leave', 'company_leave', 'notification', 'system_user', 'session'
+    'employee', 'it_leave', 'company_leave', 'notification', 'system_user', 'session',
   ];
 
   const actionColors: Record<string, string> = {
@@ -77,7 +77,7 @@ export default function SystemLogsPage() {
     'UPDATE_USER': 'bg-cyan-100 text-cyan-800',
     'DELETE_USER': 'bg-red-100 text-red-800',
     'LOGIN': 'bg-slate-100 text-slate-800',
-    'LOGOUT': 'bg-gray-100 text-gray-800'
+    'LOGOUT': 'bg-gray-100 text-gray-800',
   };
 
   const fetchLogs = async () => {
@@ -93,7 +93,7 @@ export default function SystemLogsPage() {
       params.append('limit', limit.toString());
 
       const response = await fetch(`/api/audit-logs?${params.toString()}`, {
-        credentials: 'include'
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -112,7 +112,7 @@ export default function SystemLogsPage() {
   const fetchStats = async () => {
     try {
       const response = await fetch('/api/audit-logs/stats', {
-        credentials: 'include'
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -152,7 +152,7 @@ export default function SystemLogsPage() {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     });
   };
 
@@ -165,6 +165,224 @@ export default function SystemLogsPage() {
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
+  };
+
+  // Función para exportar a CSV
+  const exportToCSV = () => {
+    if (logs.length === 0) {
+      alert('No hay datos para exportar');
+      return;
+    }
+
+    const headers = [
+      'ID',
+      'Fecha/Hora',
+      'Usuario',
+      'Rol',
+      'Acción',
+      'Tipo de Entidad',
+      'ID de Entidad',
+      'Nombre de Entidad',
+      'Descripción',
+      'User Agent',
+      'Datos Anteriores',
+      'Datos Nuevos',
+    ];
+
+    const csvData = logs.map(log => [
+      log.id,
+      formatDate(log.createdAt),
+      log.userId,
+      log.userRole,
+      log.action,
+      log.entityType,
+      log.entityId || '',
+      log.entityName || '',
+      log.description,
+      log.userAgent || '',
+      log.oldData ? JSON.stringify(log.oldData) : '',
+      log.newData ? JSON.stringify(log.newData) : '',
+    ]);
+
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `audit-logs-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Función para exportar a Excel
+  const exportToExcel = () => {
+    if (logs.length === 0) {
+      alert('No hay datos para exportar');
+      return;
+    }
+
+    const excelData = logs.map(log => ({
+      'ID': log.id,
+      'Fecha/Hora': formatDate(log.createdAt),
+      'Usuario': log.userId,
+      'Rol': log.userRole,
+      'Acción': log.action,
+      'Tipo de Entidad': log.entityType,
+      'ID de Entidad': log.entityId || '',
+      'Nombre de Entidad': log.entityName || '',
+      'Descripción': log.description,
+      'User Agent': log.userAgent || '',
+      'Datos Anteriores': log.oldData ? JSON.stringify(log.oldData, null, 2) : '',
+      'Datos Nuevos': log.newData ? JSON.stringify(log.newData, null, 2) : '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Audit Logs');
+
+    // Auto-size columns
+    const colWidths = [
+      { wch: 8 }, // ID
+      { wch: 20 }, // Fecha/Hora
+      { wch: 25 }, // Usuario
+      { wch: 12 }, // Rol
+      { wch: 20 }, // Acción
+      { wch: 15 }, // Tipo de Entidad
+      { wch: 15 }, // ID de Entidad
+      { wch: 25 }, // Nombre de Entidad
+      { wch: 50 }, // Descripción
+      { wch: 30 }, // User Agent
+      { wch: 50 }, // Datos Anteriores
+      { wch: 50 }, // Datos Nuevos
+    ];
+    ws['!cols'] = colWidths;
+
+    XLSX.writeFile(wb, `audit-logs-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // Función para exportar estadísticas
+  const exportStatsToExcel = () => {
+    if (!stats) {
+      alert('No hay estadísticas para exportar');
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // Hoja 1: Resumen general
+    const summaryData = [
+      { 'Métrica': 'Total de Acciones', 'Valor': stats.totalActions },
+      { 'Métrica': 'Usuarios Activos', 'Valor': stats.userActivity?.length || 0 },
+      { 'Métrica': 'Tipos de Acción', 'Valor': Object.keys(stats.actionsByType || {}).length },
+      { 'Métrica': 'Acciones Hoy', 'Valor': stats.dailyActivity?.find(d => d.date === new Date().toISOString().split('T')[0])?.count || 0 },
+    ];
+    const ws1 = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, ws1, 'Resumen General');
+
+    // Hoja 2: Acciones por tipo
+    if (stats.actionsByType) {
+      const actionsData = Object.entries(stats.actionsByType).map(([action, count]) => ({
+        'Tipo de Acción': action,
+        'Cantidad': count,
+      }));
+      const ws2 = XLSX.utils.json_to_sheet(actionsData);
+      XLSX.utils.book_append_sheet(wb, ws2, 'Acciones por Tipo');
+    }
+
+    // Hoja 3: Actividad de usuarios
+    if (stats.userActivity) {
+      const userData = stats.userActivity.map(user => ({
+        'Usuario': user.userId,
+        'Cantidad de Acciones': user.count,
+        'Última Acción': formatDate(user.lastAction),
+      }));
+      const ws3 = XLSX.utils.json_to_sheet(userData);
+      XLSX.utils.book_append_sheet(wb, ws3, 'Actividad de Usuarios');
+    }
+
+    // Hoja 4: Actividad diaria
+    if (stats.dailyActivity) {
+      const dailyData = stats.dailyActivity.map(day => ({
+        'Fecha': day.date,
+        'Cantidad de Acciones': day.count,
+      }));
+      const ws4 = XLSX.utils.json_to_sheet(dailyData);
+      XLSX.utils.book_append_sheet(wb, ws4, 'Actividad Diaria');
+    }
+
+    XLSX.writeFile(wb, `audit-stats-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // Función para exportar todos los logs (sin filtros)
+  const exportAllLogs = async () => {
+    try {
+      setLoading(true);
+      
+      // Obtener todos los logs sin filtros
+      const response = await fetch('/api/audit-logs?limit=10000', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const allLogs = await response.json();
+        
+        if (allLogs.length === 0) {
+          alert('No hay datos para exportar');
+          return;
+        }
+
+        // Exportar a Excel con todos los datos
+        const excelData = allLogs.map((log: AuditLog) => ({
+          'ID': log.id,
+          'Fecha/Hora': formatDate(log.createdAt),
+          'Usuario': log.userId,
+          'Rol': log.userRole,
+          'Acción': log.action,
+          'Tipo de Entidad': log.entityType,
+          'ID de Entidad': log.entityId || '',
+          'Nombre de Entidad': log.entityName || '',
+          'Descripción': log.description,
+          'User Agent': log.userAgent || '',
+          'Datos Anteriores': log.oldData ? JSON.stringify(log.oldData, null, 2) : '',
+          'Datos Nuevos': log.newData ? JSON.stringify(log.newData, null, 2) : '',
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(excelData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Audit Logs Completo');
+
+        // Auto-size columns
+        const colWidths = [
+          { wch: 8 }, // ID
+          { wch: 20 }, // Fecha/Hora
+          { wch: 25 }, // Usuario
+          { wch: 12 }, // Rol
+          { wch: 20 }, // Acción
+          { wch: 15 }, // Tipo de Entidad
+          { wch: 15 }, // ID de Entidad
+          { wch: 25 }, // Nombre de Entidad
+          { wch: 50 }, // Descripción
+          { wch: 30 }, // User Agent
+          { wch: 50 }, // Datos Anteriores
+          { wch: 50 }, // Datos Nuevos
+        ];
+        ws['!cols'] = colWidths;
+
+        XLSX.writeFile(wb, `audit-logs-completo-${new Date().toISOString().split('T')[0]}.xlsx`);
+      } else {
+        alert('Error al obtener los datos para exportar');
+      }
+    } catch (error) {
+      console.error('Error exporting all logs:', error);
+      alert('Error al exportar los logs');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -182,46 +400,71 @@ export default function SystemLogsPage() {
 
       {/* Statistics Cards */}
       {showStats && stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Acciones</CardTitle>
-              <ActivityIcon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalActions?.toLocaleString() || '0'}</div>
-            </CardContent>
-          </Card>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Acciones</CardTitle>
+                <ActivityIcon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats?.totalActions?.toLocaleString() || '0'}</div>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Usuarios Activos</CardTitle>
-              <UserIcon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.userActivity?.length || 0}</div>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Usuarios Activos</CardTitle>
+                <UserIcon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats?.userActivity?.length || 0}</div>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tipos de Acción</CardTitle>
-              <DatabaseIcon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{Object.keys(stats?.actionsByType || {}).length}</div>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Tipos de Acción</CardTitle>
+                <DatabaseIcon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{Object.keys(stats?.actionsByType || {}).length}</div>
+              </CardContent>
+            </Card>
 
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Hoy</CardTitle>
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {stats?.dailyActivity?.find(d => d.date === new Date().toISOString().split('T')[0])?.count || 0}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Botones de exportación de estadísticas */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Hoy</CardTitle>
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DownloadIcon className="h-5 w-5" />
+                Exportar Estadísticas
+              </CardTitle>
+              <CardDescription>
+                Descarga las estadísticas de auditoría en formato Excel
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {stats?.dailyActivity?.find(d => d.date === new Date().toISOString().split('T')[0])?.count || 0}
-              </div>
+              <Button
+                onClick={exportStatsToExcel}
+                className="flex items-center gap-2"
+                variant="outline"
+              >
+                <FileSpreadsheetIcon className="h-4 w-4" />
+                Exportar Estadísticas a Excel
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -314,20 +557,20 @@ export default function SystemLogsPage() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !startDate && "text-muted-foreground"
+                      'w-full justify-start text-left font-normal',
+                      !startDate && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {startDate ? (
                       (() => {
                         try {
-                          return format(startDate, "dd/MM/yyyy");
+                          return format(startDate, 'dd/MM/yyyy');
                         } catch {
                           return startDate.toLocaleDateString('es-ES');
                         }
                       })()
-                    ) : "Seleccionar fecha"}
+                    ) : 'Seleccionar fecha'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -348,20 +591,20 @@ export default function SystemLogsPage() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !endDate && "text-muted-foreground"
+                      'w-full justify-start text-left font-normal',
+                      !endDate && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {endDate ? (
                       (() => {
                         try {
-                          return format(endDate, "dd/MM/yyyy");
+                          return format(endDate, 'dd/MM/yyyy');
                         } catch {
                           return endDate.toLocaleDateString('es-ES');
                         }
                       })()
-                    ) : "Seleccionar fecha"}
+                    ) : 'Seleccionar fecha'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -398,10 +641,46 @@ export default function SystemLogsPage() {
       {/* Results */}
       <Card>
         <CardHeader>
-          <CardTitle>Registros de Auditoría</CardTitle>
-          <CardDescription>
-            {logs.length > 0 ? `Mostrando ${logs.length} registros` : 'No se encontraron registros'}
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Registros de Auditoría</CardTitle>
+              <CardDescription>
+                {logs.length > 0 ? `Mostrando ${logs.length} registros` : 'No se encontraron registros'}
+              </CardDescription>
+            </div>
+            {logs.length > 0 && (
+              <div className="flex gap-2">
+                <Button
+                  onClick={exportToCSV}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <FileTextIcon className="h-4 w-4" />
+                  Exportar CSV
+                </Button>
+                <Button
+                  onClick={exportToExcel}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <FileSpreadsheetIcon className="h-4 w-4" />
+                  Exportar Excel
+                </Button>
+                <Button
+                  onClick={exportAllLogs}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  disabled={loading}
+                >
+                  <DownloadIcon className="h-4 w-4" />
+                  {loading ? 'Exportando...' : 'Exportar Todo'}
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -414,7 +693,6 @@ export default function SystemLogsPage() {
                   <TableHead>Acción</TableHead>
                   <TableHead>Entidad</TableHead>
                   <TableHead>Descripción</TableHead>
-                  <TableHead>IP</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -432,8 +710,8 @@ export default function SystemLogsPage() {
                     <TableCell>
                       <Badge variant="outline" className={
                         log.userRole === 'super_admin' ? 'bg-red-50 text-red-700' :
-                        log.userRole === 'admin' ? 'bg-yellow-50 text-yellow-700' :
-                        'bg-green-50 text-green-700'
+                          log.userRole === 'admin' ? 'bg-yellow-50 text-yellow-700' :
+                            'bg-green-50 text-green-700'
                       }>
                         {log.userRole}
                       </Badge>
@@ -461,9 +739,6 @@ export default function SystemLogsPage() {
                         {truncateText(log.description, 50)}
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-gray-500">
-                      {log.ipAddress}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -488,4 +763,4 @@ export default function SystemLogsPage() {
       </Card>
     </div>
   );
-} 
+}

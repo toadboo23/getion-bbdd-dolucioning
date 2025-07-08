@@ -1,27 +1,27 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Users, UserPlus, Edit2, Trash2, Shield, Mail, Calendar, CheckCircle, XCircle } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { queryClient, apiRequest } from '@/lib/queryClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Users, UserPlus, Edit2, Trash2, Shield, Mail, Calendar, CheckCircle, XCircle, Key } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface SystemUser {
   id: number;
   email: string;
   firstName: string;
   lastName: string;
-  role: 'admin' | 'normal';
+  role: 'super_admin' | 'admin' | 'normal';
   isActive: boolean;
   createdBy: string;
   lastLogin?: string;
@@ -35,16 +35,17 @@ interface CreateUserData {
   lastName: string;
   password: string;
   confirmPassword: string;
-  role: 'admin' | 'normal';
+  role: 'super_admin' | 'admin' | 'normal';
 }
 
-export default function UserManagement() {
+export default function UserManagement () {
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   // Estados
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isChangePasswordDialogOpen, setIsChangePasswordDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const [createForm, setCreateForm] = useState<CreateUserData>({
     email: '',
@@ -52,16 +53,128 @@ export default function UserManagement() {
     lastName: '',
     password: '',
     confirmPassword: '',
-    role: 'normal'
+    role: 'normal',
   });
   const [editForm, setEditForm] = useState({
     firstName: '',
     lastName: '',
-    role: 'normal' as 'admin' | 'normal',
-    isActive: true
+    role: 'normal' as 'super_admin' | 'admin' | 'normal',
+    isActive: true,
+  });
+  const [passwordForm, setPasswordForm] = useState<{
+    newPassword: string;
+    confirmPassword: string;
+  }>({
+    newPassword: '',
+    confirmPassword: '',
   });
 
-  // Verificar permisos
+  // Obtener usuarios del sistema
+  const { data: systemUsers = [], isLoading: queryLoading } = useQuery<SystemUser[]>({
+    queryKey: ['/api/system-users'],
+    refetchInterval: 30000,
+    retry: false,
+  });
+
+  // Mutaciones
+  const createUserMutation = useMutation({
+    mutationFn: async (userData: CreateUserData) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { confirmPassword, ...data } = userData;
+      await apiRequest('POST', '/api/system-users', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/system-users'] });
+      toast({
+        title: 'Usuario creado',
+        description: 'El usuario ha sido creado exitosamente',
+      });
+      setIsCreateDialogOpen(false);
+      setCreateForm({
+        email: '',
+        firstName: '',
+        lastName: '',
+        password: '',
+        confirmPassword: '',
+        role: 'normal',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo crear el usuario',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Record<string, unknown> }) => {
+      await apiRequest('PUT', `/api/system-users/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/system-users'] });
+      toast({
+        title: 'Usuario actualizado',
+        description: 'El usuario ha sido actualizado exitosamente',
+      });
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el usuario',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async ({ id, password }: { id: number; password: string }) => {
+      await apiRequest('PUT', `/api/system-users/${id}/password`, { password });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/system-users'] });
+      toast({
+        title: 'Contraseña actualizada',
+        description: 'La contraseña ha sido actualizada exitosamente',
+      });
+      setIsChangePasswordDialogOpen(false);
+      setEditingUser(null);
+      setPasswordForm({ newPassword: '', confirmPassword: '' });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar la contraseña',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      await apiRequest('DELETE', `/api/system-users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/system-users'] });
+      toast({
+        title: 'Usuario eliminado',
+        description: 'El usuario ha sido eliminado exitosamente',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el usuario',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Verificar permisos después de todos los hooks
   if (user?.role !== 'super_admin') {
     return (
       <div className="p-6">
@@ -76,147 +189,46 @@ export default function UserManagement() {
     );
   }
 
-  // Obtener usuarios del sistema
-  const { data: systemUsers = [], isLoading } = useQuery<SystemUser[]>({
-    queryKey: ["/api/system-users"],
-    refetchInterval: 30000,
-    retry: false,
-  });
-
-  // Mutaciones
-  const createUserMutation = useMutation({
-    mutationFn: async (userData: Omit<CreateUserData, 'confirmPassword'>) => {
-      const response = await fetch('/api/system-users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/system-users"] });
-      setIsCreateDialogOpen(false);
-      resetCreateForm();
-      toast({
-        title: "Usuario creado",
-        description: "El nuevo usuario ha sido creado exitosamente",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error al crear usuario",
-        description: error.message || "No se pudo crear el usuario",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateUserMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const response = await fetch(`/api/system-users/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/system-users"] });
-      setIsEditDialogOpen(false);
-      setEditingUser(null);
-      toast({
-        title: "Usuario actualizado",
-        description: "Los datos del usuario han sido actualizados",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error al actualizar usuario",
-        description: error.message || "No se pudo actualizar el usuario",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteUserMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/system-users/${id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/system-users"] });
-      toast({
-        title: "Usuario eliminado",
-        description: "El usuario ha sido eliminado del sistema",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error al eliminar usuario",
-        description: error.message || "No se pudo eliminar el usuario",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Funciones auxiliares
-  const resetCreateForm = () => {
-    setCreateForm({
-      email: '',
-      firstName: '',
-      lastName: '',
-      password: '',
-      confirmPassword: '',
-      role: 'normal'
-    });
-  };
 
   const handleCreateUser = () => {
     // Validaciones
     if (!createForm.email || !createForm.firstName || !createForm.lastName || !createForm.password) {
       toast({
-        title: "Campos requeridos",
-        description: "Por favor complete todos los campos obligatorios",
-        variant: "destructive",
+        title: 'Campos requeridos',
+        description: 'Por favor complete todos los campos obligatorios',
+        variant: 'destructive',
       });
       return;
     }
 
     if (createForm.password !== createForm.confirmPassword) {
       toast({
-        title: "Contraseñas no coinciden",
-        description: "La contraseña y su confirmación deben ser iguales",
-        variant: "destructive",
+        title: 'Contraseñas no coinciden',
+        description: 'La contraseña y su confirmación deben ser iguales',
+        variant: 'destructive',
       });
       return;
     }
 
     if (createForm.password.length < 6) {
       toast({
-        title: "Contraseña muy corta",
-        description: "La contraseña debe tener al menos 6 caracteres",
-        variant: "destructive",
+        title: 'Contraseña muy corta',
+        description: 'La contraseña debe tener al menos 6 caracteres',
+        variant: 'destructive',
       });
       return;
     }
 
     // Crear usuario
-    const { confirmPassword, ...userData } = createForm;
+    const userData = {
+      email: createForm.email,
+      firstName: createForm.firstName,
+      lastName: createForm.lastName,
+      password: createForm.password,
+      confirmPassword: createForm.confirmPassword,
+      role: createForm.role,
+    };
     createUserMutation.mutate(userData);
   };
 
@@ -226,7 +238,7 @@ export default function UserManagement() {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
-      isActive: user.isActive
+      isActive: user.isActive,
     });
     setIsEditDialogOpen(true);
   };
@@ -236,12 +248,55 @@ export default function UserManagement() {
 
     updateUserMutation.mutate({
       id: editingUser.id,
-      data: editForm
+      data: editForm,
     });
   };
 
-  const handleDeleteUser = (id: number) => {
-    deleteUserMutation.mutate(id);
+  const handleChangePassword = (user: SystemUser) => {
+    setEditingUser(user);
+    setPasswordForm({ newPassword: '', confirmPassword: '' });
+    setIsChangePasswordDialogOpen(true);
+  };
+
+  const handleUpdatePassword = () => {
+    if (!editingUser) return;
+
+    // Validaciones
+    if (!passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast({
+        title: 'Campos requeridos',
+        description: 'Por favor complete todos los campos',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: 'Contraseñas no coinciden',
+        description: 'La contraseña y su confirmación deben ser iguales',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      toast({
+        title: 'Contraseña muy corta',
+        description: 'La contraseña debe tener al menos 6 caracteres',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    changePasswordMutation.mutate({
+      id: editingUser.id,
+      password: passwordForm.newPassword,
+    });
+  };
+
+  const handleDeleteUser = (userId: number) => {
+    deleteUserMutation.mutate(userId);
   };
 
   const getRoleBadge = (role: string) => {
@@ -271,7 +326,7 @@ export default function UserManagement() {
     );
   };
 
-  if (isLoading) {
+  if (queryLoading) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
@@ -291,8 +346,8 @@ export default function UserManagement() {
             <Users className="h-8 w-8" />
             Gestión de Usuarios
           </h1>
-          <p className="text-gray-600 mt-2">
-            Administra los usuarios del sistema DVV5
+          <p className="text-gray-600 mb-6">
+            Administra los usuarios del sistema Solucioning
           </p>
         </div>
         <div className="mt-4 sm:mt-0">
@@ -303,13 +358,16 @@ export default function UserManagement() {
                 Crear Usuario
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md" aria-describedby="create-user-description">
               <DialogHeader>
                 <DialogTitle>Crear Nuevo Usuario</DialogTitle>
                 <DialogDescription>
                   Complete los datos para crear un nuevo usuario del sistema
                 </DialogDescription>
               </DialogHeader>
+              <div id="create-user-description" className="sr-only">
+                Modal para crear un nuevo usuario del sistema. Permite ingresar nombre, apellido, email, rol y contraseña.
+              </div>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -343,7 +401,7 @@ export default function UserManagement() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Rol *</Label>
-                  <Select value={createForm.role} onValueChange={(value: 'admin' | 'normal') => setCreateForm(prev => ({ ...prev, role: value }))}>
+                  <Select value={createForm.role} onValueChange={(value: 'super_admin' | 'admin' | 'normal') => setCreateForm(prev => ({ ...prev, role: value }))}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -388,7 +446,7 @@ export default function UserManagement() {
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -398,6 +456,21 @@ export default function UserManagement() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Usuarios</p>
                 <p className="text-2xl font-semibold text-gray-900">{systemUsers.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Shield className="w-8 h-8 text-red-500" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Super Admins</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {systemUsers.filter(u => u.role === 'super_admin').length}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -490,7 +563,7 @@ export default function UserManagement() {
                           {userRow.lastLogin ? (
                             <div className="flex items-center">
                               <Calendar className="h-4 w-4 text-gray-400 mr-1" />
-                              {format(new Date(userRow.lastLogin), "dd/MM/yyyy HH:mm", { locale: es })}
+                              {format(new Date(userRow.lastLogin), 'dd/MM/yyyy HH:mm', { locale: es })}
                             </div>
                           ) : (
                             <span className="text-gray-500">Nunca</span>
@@ -499,19 +572,31 @@ export default function UserManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm text-gray-900">
-                          {format(new Date(userRow.createdAt), "dd/MM/yyyy HH:mm", { locale: es })}
+                          {format(new Date(userRow.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
+                          {/* Botón Cambiar Contraseña - Solo Super Admin */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleChangePassword(userRow)}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <Key className="h-4 w-4" />
+                          </Button>
+
+                          {/* Botón Editar - Solo Super Admin */}
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditUser(userRow)}
+                            className="text-green-600 hover:text-green-700"
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          {userRow.email !== 'admin@dvv5.com' && ( // No permitir borrar super admin
+                          {userRow.email !== 'superadmin@glovo.com' && ( // No permitir borrar super admin
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button
@@ -526,7 +611,7 @@ export default function UserManagement() {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Esta acción no se puede deshacer. Se eliminará permanentemente 
+                                    Esta acción no se puede deshacer. Se eliminará permanentemente
                                     el usuario <strong>{userRow.firstName} {userRow.lastName}</strong> del sistema.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
@@ -555,13 +640,16 @@ export default function UserManagement() {
 
       {/* Dialog de edición */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby="edit-user-description">
           <DialogHeader>
             <DialogTitle>Editar Usuario</DialogTitle>
             <DialogDescription>
               Modifica los datos del usuario {editingUser?.firstName} {editingUser?.lastName}
             </DialogDescription>
           </DialogHeader>
+          <div id="edit-user-description" className="sr-only">
+            Modal para editar datos de usuario. Permite modificar nombre, apellido, rol y estado del usuario.
+          </div>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -583,7 +671,7 @@ export default function UserManagement() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="editRole">Rol</Label>
-              <Select value={editForm.role} onValueChange={(value: 'admin' | 'normal') => setEditForm(prev => ({ ...prev, role: value }))}>
+              <Select value={editForm.role} onValueChange={(value: 'super_admin' | 'admin' | 'normal') => setEditForm(prev => ({ ...prev, role: value }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -595,7 +683,7 @@ export default function UserManagement() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="editActive">Estado</Label>
-              <Select value={editForm.isActive ? "true" : "false"} onValueChange={(value) => setEditForm(prev => ({ ...prev, isActive: value === "true" }))}>
+              <Select value={editForm.isActive ? 'true' : 'false'} onValueChange={(value) => setEditForm(prev => ({ ...prev, isActive: value === 'true' }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -616,6 +704,69 @@ export default function UserManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de cambio de contraseña */}
+      <Dialog open={isChangePasswordDialogOpen} onOpenChange={setIsChangePasswordDialogOpen}>
+        <DialogContent className="max-w-md" aria-describedby="change-password-description">
+          <DialogHeader>
+            <DialogTitle>Cambiar Contraseña</DialogTitle>
+            <DialogDescription>
+              Cambia la contraseña del usuario {editingUser?.firstName} {editingUser?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          <div id="change-password-description" className="sr-only">
+            Modal para cambiar la contraseña de un usuario. Permite ingresar una nueva contraseña y confirmarla.
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">Nueva Contraseña *</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                placeholder="Mínimo 6 caracteres"
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar Contraseña *</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                placeholder="Repite la contraseña"
+                autoComplete="new-password"
+              />
+            </div>
+            {passwordForm.newPassword && passwordForm.confirmPassword && (
+              <div className={`text-sm p-2 rounded ${
+                passwordForm.newPassword === passwordForm.confirmPassword
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                {passwordForm.newPassword === passwordForm.confirmPassword
+                  ? '✓ Las contraseñas coinciden'
+                  : '✗ Las contraseñas no coinciden'
+                }
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsChangePasswordDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleUpdatePassword}
+              disabled={changePasswordMutation.isPending || passwordForm.newPassword !== passwordForm.confirmPassword}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {changePasswordMutation.isPending ? 'Actualizando...' : 'Cambiar Contraseña'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-} 
+}

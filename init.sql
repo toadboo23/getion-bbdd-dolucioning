@@ -1,4 +1,7 @@
--- Initialize PostgreSQL database for Employee Management System
+-- Initialize PostgreSQL database for Solucioning System
+-- IMPORTANTE: Este script debe ejecutarse en la base de datos 'employee_management'
+-- NO en la base de datos 'postgres' por defecto
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create sessions table for authentication
@@ -10,17 +13,6 @@ CREATE TABLE IF NOT EXISTS session (
 
 CREATE INDEX IF NOT EXISTS idx_session_expire ON session(expire);
 
--- Create users table
-CREATE TABLE IF NOT EXISTS users (
-  id varchar(255) PRIMARY KEY,
-  email varchar(255) UNIQUE NOT NULL,
-  "firstName" varchar(255) NOT NULL,
-  "lastName" varchar(255) NOT NULL,
-  role varchar(50) NOT NULL CHECK (role IN ('super_admin', 'admin', 'normal')),
-  created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-  updated_at timestamp DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Create employees table
 CREATE TABLE IF NOT EXISTS employees (
   id_glovo varchar(50) PRIMARY KEY,
@@ -31,6 +23,7 @@ CREATE TABLE IF NOT EXISTS employees (
   telefono varchar(20),
   email varchar(100),
   horas integer,
+  cdp integer, -- Cumplimiento de Horas (porcentaje basado en 38h = 100%)
   complementaries text,
   ciudad varchar(100),
   citycode varchar(20),
@@ -51,7 +44,11 @@ CREATE TABLE IF NOT EXISTS employees (
   fecha_incidencia date,
   faltas_no_check_in_en_dias integer DEFAULT 0,
   cruce text,
-  status varchar(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'it_leave', 'company_leave_pending', 'company_leave_approved')),
+  status varchar(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'it_leave', 'company_leave_pending', 'company_leave_approved', 'pending_laboral', 'penalizado')),
+  penalization_start_date date,
+  penalization_end_date date,
+  original_hours integer,
+  flota varchar(100),
   created_at timestamp DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
@@ -95,6 +92,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   requested_by varchar(255) NOT NULL,
   status varchar(50) DEFAULT 'pending',
   metadata jsonb,
+  processing_date timestamp,
   created_at timestamp DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
@@ -148,96 +146,28 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type ON audit_logs(entity_type);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
 
--- Insert test data only if tables are empty
-INSERT INTO employees (id_glovo, nombre, apellido, telefono, email_glovo, email, status) 
-SELECT * FROM (VALUES 
-  ('TEST001', 'Juan', 'García', '+34600123456', 'juan.garcia@glovo.com', 'juan.garcia@personal.com', 'active'),
-  ('TEST002', 'María', 'López', '+34600654321', 'maria.lopez@glovo.com', 'maria.lopez@personal.com', 'active'),
-  ('TEST003', 'Carlos', 'Martín', '+34600789012', 'carlos.martin@glovo.com', 'carlos.martin@personal.com', 'active')
-) AS v(id_glovo, nombre, apellido, telefono, email_glovo, email, status)
-WHERE NOT EXISTS (SELECT 1 FROM employees);
-
--- Migration: Add status column if it doesn't exist (for existing databases)
+-- Add unique constraint to dni_nie field to prevent duplicates
 DO $$ 
 BEGIN 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'employees' AND column_name = 'status') THEN
-        ALTER TABLE employees ADD COLUMN status varchar(50) NOT NULL DEFAULT 'active' 
-        CHECK (status IN ('active', 'it_leave', 'company_leave_pending', 'company_leave_approved'));
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'employees_dni_nie_unique' 
+        AND conrelid = 'employees'::regclass
+    ) THEN
+        ALTER TABLE employees ADD CONSTRAINT employees_dni_nie_unique UNIQUE (dni_nie);
     END IF;
 END $$;
 
--- Migration: Add created_at and updated_at columns if they don't exist
-DO $$ 
-BEGIN 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'employees' AND column_name = 'created_at') THEN
-        ALTER TABLE employees ADD COLUMN created_at timestamp DEFAULT CURRENT_TIMESTAMP;
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'employees' AND column_name = 'updated_at') THEN
-        ALTER TABLE employees ADD COLUMN updated_at timestamp DEFAULT CURRENT_TIMESTAMP;
-    END IF;
-END $$;
-
--- Migration: Fix it_leaves table structure to match schema
-DO $$ 
-BEGIN 
-    -- Add requested_at column if it doesn't exist
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'it_leaves' AND column_name = 'requested_at') THEN
-        ALTER TABLE it_leaves ADD COLUMN requested_at timestamp DEFAULT CURRENT_TIMESTAMP;
-    END IF;
-    
-    -- Change leave_date from date to timestamp if it exists as date
-    IF EXISTS (SELECT 1 FROM information_schema.columns 
-               WHERE table_name = 'it_leaves' AND column_name = 'leave_date' AND data_type = 'date') THEN
-        ALTER TABLE it_leaves ALTER COLUMN leave_date TYPE timestamp USING leave_date::timestamp;
-    END IF;
-    
-    -- Update status default to 'pending' if column exists with different default
-    IF EXISTS (SELECT 1 FROM information_schema.columns 
-               WHERE table_name = 'it_leaves' AND column_name = 'status') THEN
-        ALTER TABLE it_leaves ALTER COLUMN status SET DEFAULT 'pending';
-    END IF;
-    
-    -- Remove updated_at column if it exists (not in schema)
-    IF EXISTS (SELECT 1 FROM information_schema.columns 
-               WHERE table_name = 'it_leaves' AND column_name = 'updated_at') THEN
-        ALTER TABLE it_leaves DROP COLUMN updated_at;
-    END IF;
-END $$;
-
--- Insert sample data
-INSERT INTO employees (
-    ID_GLOVO, EMAIL_GLOVO, TURNO, NOMBRE, APELLIDO, TELEFONO, EMAIL, 
-    HORAS, CIUDAD, DNI_NIE, IBAN, DIRECCION, VEHICULO, NAF, 
-    FECHA_ALTA_SEG_SOC, STATUS_BAJA, ESTADO_SS, INFORMADO_HORARIO
-) VALUES
-('GLV001', 'maria.garcia@glovo.com', 'MAÑANA', 'María', 'García', '+34 612 345 678', 'maria.garcia@email.com',
- 40, 'Madrid', '12345678A', 'ES91 2100 0418 4502 0005 1332', 'Calle Mayor 123', 'Coche propio', 'NAF001',
- '2020-01-15', 'ACTIVO', 'ALTA', true),
-('GLV002', 'carlos.rodriguez@glovo.com', 'TARDE', 'Carlos', 'Rodríguez', '+34 687 654 321', 'carlos.rodriguez@email.com',
- 35, 'Barcelona', 'X1234567B', 'ES76 0075 0130 4806 0158 1234', 'Passeig de Gràcia 456', 'Transporte público', 'NAF002',
- '2021-03-10', 'ACTIVO', 'ALTA', true);
-
--- Insert sample notifications
-INSERT INTO notifications (type, title, message, requested_by, status) VALUES
-('system', 'Sistema Iniciado', 'El sistema de gestión de empleados ha sido iniciado correctamente', 'Sistema', 'processed'),
-('info', 'Base de Datos Configurada', 'La base de datos PostgreSQL ha sido configurada para el entorno local', 'Sistema', 'processed');
-
--- Insert default super admin user (password: admin123)
--- Note: In production, this should be changed immediately
+-- Insert production super admin users with HASHED passwords (39284756 hasheado con bcrypt)
 INSERT INTO system_users (email, first_name, last_name, password, role, created_by, is_active) 
-SELECT * FROM (VALUES 
-  ('admin@dvv5.com', 'Super', 'Admin', '$2b$10$8R1QkTQZJZGvKb4vJ7QJrOXYR1QkTQZJZGvKb4vJ7QJrOXYR1QkTQ', 'super_admin', 'SYSTEM', true)
-) AS v(email, first_name, last_name, password, role, created_by, is_active)
-WHERE NOT EXISTS (SELECT 1 FROM system_users WHERE email = 'admin@dvv5.com');
+VALUES 
+  ('nmartinez@solucioning.net', 'Nicolas', 'Martinez', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super_admin', 'SYSTEM', true),
+  ('lvega@solucioning.net', 'Luciana', 'Vega', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super_admin', 'SYSTEM', true)
+ON CONFLICT (email) DO NOTHING;
 
 -- Insert initial audit log for system setup
 INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
 SELECT * FROM (VALUES 
-  ('SYSTEM', 'super_admin', 'system_init', 'database', 'db_init', 'Database Initialization', 'Sistema DVV5 inicializado con tablas de usuarios y logs de auditoría', '127.0.0.1', 'System')
+  ('SYSTEM', 'super_admin', 'system_init', 'database', 'db_init', 'Database Initialization', 'Sistema Solucioning inicializado con tablas y super admin users', '127.0.0.1', 'System')
 ) AS v(user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
 WHERE NOT EXISTS (SELECT 1 FROM audit_logs WHERE action = 'system_init');

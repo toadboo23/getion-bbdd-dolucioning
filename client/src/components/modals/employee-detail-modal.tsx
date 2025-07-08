@@ -1,32 +1,24 @@
+import React, { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  CreditCard, 
-  Calendar,
-  Clock,
-  Car,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  CreditCard,
   Building,
-  FileText,
-  Users,
+  Clock,
+  Calendar,
   AlertTriangle,
+  RefreshCw,
   UserCheck,
-  RefreshCw
-} from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import type { Employee } from "@shared/schema";
+} from 'lucide-react';
+import type { Employee } from '@shared/schema';
+import { useAuth } from '@/hooks/useAuth';
 
 interface EmployeeDetailModalProps {
   employee: Employee | null;
@@ -35,7 +27,7 @@ interface EmployeeDetailModalProps {
   onEmployeeUpdate?: () => void;
 }
 
-export default function EmployeeDetailModal({
+export default function EmployeeDetailModal ({
   employee,
   isOpen,
   onClose,
@@ -49,10 +41,10 @@ export default function EmployeeDetailModal({
 
   const handleReactivateEmployee = async () => {
     if (!employee || employee.status !== 'it_leave') return;
-    
+
     setIsReactivating(true);
     try {
-      const response = await fetch(`/api/employees/${employee.id}/reactivate`, {
+      const response = await fetch(`/api/employees/${employee.idGlovo}/reactivate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,30 +54,30 @@ export default function EmployeeDetailModal({
 
       if (response.ok) {
         toast({
-          title: "Empleado reactivado",
+          title: 'Empleado reactivado',
           description: `${employee.nombre} ${employee.apellido} ha sido reactivado exitosamente`,
         });
-        
+
         // Actualizar la lista de empleados
         if (onEmployeeUpdate) {
           onEmployeeUpdate();
         }
-        
+
         // Cerrar el modal
         onClose();
       } else {
         const errorData = await response.json();
         toast({
-          title: "Error al reactivar empleado",
-          description: errorData.message || "No se pudo reactivar el empleado",
-          variant: "destructive",
+          title: 'Error al reactivar empleado',
+          description: errorData.message || 'No se pudo reactivar el empleado',
+          variant: 'destructive',
         });
       }
-    } catch (error) {
+    } catch {
       toast({
-        title: "Error de conexión",
-        description: "No se pudo conectar con el servidor",
-        variant: "destructive",
+        title: 'Error de conexión',
+        description: 'No se pudo conectar con el servidor',
+        variant: 'destructive',
       });
     } finally {
       setIsReactivating(false);
@@ -98,30 +90,35 @@ export default function EmployeeDetailModal({
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "active":
+      case 'active':
         return <Badge className="bg-green-100 text-green-800">Activo</Badge>;
-      case "it_leave":
+      case 'it_leave':
         return <Badge className="bg-orange-100 text-orange-800">Baja IT</Badge>;
-      case "company_leave_pending":
+      case 'company_leave_pending':
         return <Badge className="bg-yellow-100 text-yellow-800">Baja Empresa Pendiente</Badge>;
-      case "company_leave_approved":
+      case 'company_leave_approved':
         return <Badge className="bg-red-100 text-red-800">Baja Empresa Aprobada</Badge>;
+      case 'pending_laboral':
+        return <Badge className="bg-purple-100 text-purple-800">Pendiente Laboral</Badge>;
+      case 'penalizado':
+        return <Badge className="bg-orange-100 text-orange-800">Penalizado</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "No especificado";
+  const formatDate = (dateString?: string | Date | null) => {
+    if (!dateString) return 'No especificada';
     try {
-      return new Date(dateString).toLocaleDateString('es-ES');
+      const date = new Date(dateString);
+      return date.toLocaleDateString('es-ES');
     } catch {
-      return dateString;
+      return 'Fecha inválida';
     }
   };
 
-  const InfoItem = ({ icon: Icon, label, value, className = "" }: {
-    icon: any;
+  const InfoItem = ({ icon: Icon, label, value, className = '' }: {
+    icon: React.ComponentType<{ className?: string }>;
     label: string;
     value: string | number | undefined | null;
     className?: string;
@@ -131,7 +128,7 @@ export default function EmployeeDetailModal({
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-gray-600">{label}</p>
         <p className="text-sm text-gray-900 break-words">
-          {value || "No especificado"}
+          {value || 'No especificado'}
         </p>
       </div>
     </div>
@@ -139,13 +136,16 @@ export default function EmployeeDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto" aria-describedby="employee-detail-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3 text-xl">
             <User className="w-6 h-6 text-blue-600" />
             Detalles del Empleado
           </DialogTitle>
         </DialogHeader>
+        <div id="employee-detail-description" className="sr-only">
+          Modal con detalles completos del empleado. Muestra información personal, laboral y adicional del empleado seleccionado.
+        </div>
 
         <div className="space-y-6 mt-6">
           {/* Header con información principal */}
@@ -183,11 +183,11 @@ export default function EmployeeDetailModal({
                     )}
                   </div>
                   <p className="text-sm text-gray-500">
-                    Turno: {employee.turno || "No especificado"}
+                    Turno: {employee.turno || 'No especificado'}
                   </p>
                 </div>
               </div>
-              
+
               {/* Mostrar alerta especial para empleados en baja IT */}
               {employee.status === 'it_leave' && canReactivateEmployee() && (
                 <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
@@ -198,7 +198,8 @@ export default function EmployeeDetailModal({
                         Empleado en Baja IT
                       </p>
                       <p className="text-sm text-orange-700 mt-1">
-                        Este empleado está actualmente en baja IT. Como Super Admin, puedes reactivarlo usando el botón "Reactivar Empleado" arriba.
+                        Este empleado está actualmente en baja IT. Como Super Admin,
+                        puedes reactivarlo usando el botón &quot;Reactivar Empleado&quot; arriba.
                       </p>
                     </div>
                   </div>
@@ -220,7 +221,7 @@ export default function EmployeeDetailModal({
                 <InfoItem
                   icon={User}
                   label="Nombre Completo"
-                  value={`${employee.nombre} ${employee.apellido || ""}`.trim()}
+                  value={`${employee.nombre} ${employee.apellido || ''}`.trim()}
                 />
                 <InfoItem
                   icon={CreditCard}
@@ -263,13 +264,28 @@ export default function EmployeeDetailModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InfoItem
                   icon={Clock}
-                  label="Horas de Trabajo"
-                  value={employee.horas ? `${employee.horas} horas` : undefined}
+                  label="Turno"
+                  value={employee.turno}
                 />
                 <InfoItem
-                  icon={Users}
+                  icon={Clock}
+                  label="Horas de Trabajo"
+                  value={employee.status === 'penalizado' ? '0 (penalizado)' : `${employee.horas ?? 0} horas`}
+                />
+                <InfoItem
+                  icon={Clock}
+                  label="CDP%"
+                  value={employee.horas ? `${((employee.horas / 38) * 100).toFixed(2)}%` : undefined}
+                />
+                <InfoItem
+                  icon={User}
                   label="Jefe de Tráfico"
                   value={employee.jefeTrafico}
+                />
+                <InfoItem
+                  icon={Building}
+                  label="Ciudad"
+                  value={employee.ciudad}
                 />
                 <InfoItem
                   icon={MapPin}
@@ -282,14 +298,14 @@ export default function EmployeeDetailModal({
                   value={formatDate(employee.fechaAltaSegSoc)}
                 />
                 <InfoItem
-                  icon={FileText}
+                  icon={CreditCard}
                   label="Estado SS"
                   value={employee.estadoSs}
                 />
                 <InfoItem
                   icon={AlertTriangle}
                   label="Informado Horario"
-                  value={employee.informadoHorario ? "Sí" : "No"}
+                  value={employee.informadoHorario ? 'Sí' : 'No'}
                 />
               </div>
             </CardContent>
@@ -299,24 +315,19 @@ export default function EmployeeDetailModal({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-purple-600" />
+                <CreditCard className="w-5 h-5 text-purple-600" />
                 Información Adicional
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InfoItem
-                  icon={Car}
-                  label="Vehículo"
-                  value={employee.vehiculo}
-                />
-                <InfoItem
                   icon={CreditCard}
                   label="IBAN"
                   value={employee.iban}
                 />
                 <InfoItem
-                  icon={FileText}
+                  icon={CreditCard}
                   label="NAF"
                   value={employee.naf}
                 />
@@ -333,7 +344,7 @@ export default function EmployeeDetailModal({
                 <InfoItem
                   icon={AlertTriangle}
                   label="Faltas No Check-in"
-                  value={employee.faltasNoCheckInEnDias ? `${employee.faltasNoCheckInEnDias} días` : "0 días"}
+                  value={employee.faltasNoCheckInEnDias ? `${employee.faltasNoCheckInEnDias} días` : '0 días'}
                 />
               </div>
             </CardContent>
@@ -426,8 +437,41 @@ export default function EmployeeDetailModal({
               </div>
             </CardContent>
           </Card>
+
+          {/* Sección especial para empleados penalizados */}
+          {employee.status === 'penalizado' && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-6 h-6 text-red-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-bold text-red-800 mb-1">Empleado penalizado</h4>
+                  <p className="text-red-700 text-sm mb-2">
+                    Este empleado está penalizado. Sus horas actuales están en <b>0</b> y no podrá
+                    trabajar hasta que finalice la penalización o se reactive manualmente.
+                  </p>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    <li><b>Horas originales:</b> {employee.originalHours ?? 'No registradas'}</li>
+                    <li>
+                      <b>Fecha inicio penalización:</b> {
+                        employee.penalizationStartDate
+                          ? new Date(employee.penalizationStartDate).toLocaleDateString('es-ES')
+                          : 'No especificada'
+                      }
+                    </li>
+                    <li>
+                      <b>Fecha fin penalización:</b> {
+                        employee.penalizationEndDate
+                          ? new Date(employee.penalizationEndDate).toLocaleDateString('es-ES')
+                          : 'No especificada'
+                      }
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
   );
-} 
+}

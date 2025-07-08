@@ -1,479 +1,613 @@
-import { useState, useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { isUnauthorizedError } from "@/lib/authUtils";
+import React, { useState, useRef } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { isUnauthorizedError } from '@/lib/authUtils';
+import { queryClient, apiRequest } from '@/lib/queryClient';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Upload, CheckCircle, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Info } from "lucide-react";
 
 interface ImportEmployeesModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onImported?: () => void;
 }
 
-interface ProcessedEmployee {
+interface EmployeeData {
   idGlovo: string;
-  emailGlovo?: string;
-  turno?: string;
   nombre: string;
-  apellido?: string;
+  apellido: string;
+  email: string; // Email personal
+  emailGlovo: string; // Email corporativo de Glovo
   telefono: string;
-  email?: string;
-  horas?: number;
-  complementaries?: string;
-  ciudad?: string;
-  cityCode?: string;
-  dniNie?: string;
-  iban?: string;
-  direccion?: string;
-  vehiculo?: string;
-  naf?: string;
-  fechaAltaSegSoc?: string;
-  statusBaja?: string;
-  estadoSs?: string;
-  informadoHorario?: boolean;
-  cuentaDivilo?: string;
-  proximaAsignacionSlots?: string;
-  jefeTrafico?: string;
-  comentsJefeDeTrafico?: string;
-  incidencias?: string;
-  fechaIncidencia?: string;
-  faltasNoCheckInEnDias?: number;
-  cruce?: string;
-  status?: string;
+  dniNie: string;
+  iban: string;
+  ciudad: string;
+  cityCode: string;
+  direccion: string;
+  vehiculo: string;
+  naf: string;
+  horas: number;
 }
 
-export default function ImportEmployeesModal({
+interface ValidationError {
+  row: number;
+  field: string;
+  message: string;
+}
+
+export default function ImportEmployeesModal ({
   isOpen,
   onClose,
+  onImported,
 }: ImportEmployeesModalProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [processedData, setProcessedData] = useState<ProcessedEmployee[]>([]);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [showFieldLimits, setShowFieldLimits] = useState(false);
 
-  const importMutation = useMutation({
-    mutationFn: async (employees: ProcessedEmployee[]) => {
-      await apiRequest("POST", "/api/employees/bulk-import", { employees });
+  const [file, setFile] = useState<File | null>(null);
+  const [employees, setEmployees] = useState<EmployeeData[]>([]);
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [, setPreviewMode] = useState(false);
+
+  const uploadMutation = useMutation({
+    mutationFn: async (data: { employees: EmployeeData[], dryRun: boolean }) => {
+      // Procesar en lotes si hay muchos empleados
+      const batchSize = 100;
+      const employees = data.employees;
+
+      if (employees.length <= batchSize) {
+        // Lote pequeño, procesar directamente
+        const response = await apiRequest('POST', '/api/employees/bulk-import', data);
+        return response;
+      } else {
+        // Archivo grande, procesar en lotes
+        console.log(`📦 Procesando ${employees.length} empleados en lotes de ${batchSize}`);
+
+        const batches = [];
+        for (let i = 0; i < employees.length; i += batchSize) {
+          batches.push(employees.slice(i, i + batchSize));
+        }
+
+        const results = [];
+        for (let i = 0; i < batches.length; i++) {
+          const batch = batches[i];
+          console.log(`📦 Procesando lote ${i + 1}/${batches.length} (${batch.length} empleados)`);
+
+          try {
+            const response = await apiRequest('POST', '/api/employees/bulk-import', {
+              employees: batch,
+              dryRun: data.dryRun,
+            });
+            results.push(response);
+
+            // Actualizar progreso
+            const progress = Math.round(((i + 1) / batches.length) * 100);
+            setUploadProgress(progress);
+
+          } catch (error) {
+            console.error(`❌ Error en lote ${i + 1}:`, error);
+            throw new Error(`Error en lote ${i + 1}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+          }
+        }
+
+        // Combinar resultados
+        const totalImported = results.reduce((sum, result: { importedCount?: number }) => {
+          return sum + (result.importedCount || 0);
+        }, 0);
+
+        return {
+          success: true,
+          message: `Se importaron ${totalImported} empleados en ${batches.length} lotes`,
+          importedCount: totalImported,
+        };
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
-      toast({
-        title: "Importación completada",
-        description: `Se han importado ${processedData.length} empleados correctamente`,
-      });
-      onClose();
-      resetState();
-    },
-    onError: (error: any) => {
-      
-      
-      if (isUnauthorizedError(error)) {
+    onSuccess: (data, variables) => {
+      if (variables.dryRun) {
+        // Preview mode - show results
+        setPreviewMode(true);
+        const responseData = data as { validEmployees?: EmployeeData[]; invalidEmployees?: EmployeeData[] };
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
+          title: 'Vista previa completada',
+          description: `Se encontraron ${responseData.validEmployees?.length || 0} empleados válidos y ${
+            responseData.invalidEmployees?.length || 0
+          } con errores`,
+        });
+      } else {
+        // Actual upload
+        const responseData = data as { importedCount?: number };
+        toast({
+          title: 'Importación completada',
+          description: `Se importaron ${responseData.importedCount || 0} empleados exitosamente`,
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+        onImported?.();
+        handleClose();
+      }
+    },
+    onError: (_error) => {
+      if (isUnauthorizedError(_error)) {
+        toast({
+          title: 'Unauthorized',
+          description: 'You are logged out. Logging in again...',
+          variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = '/api/login';
         }, 500);
         return;
       }
-      
-      // Mejorar el manejo de errores específicos
-      let errorMessage = "No se pudo completar la importación";
-      
-      if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error?.message) {
-        errorMessage = error.message;
-      }
-      
-      // Si el error contiene información específica sobre campos
-      if (errorMessage.includes("value too long")) {
-        errorMessage = "Algunos campos contienen valores demasiado largos. Verifique los datos del Excel.";
-      } else if (errorMessage.includes("violates")) {
-        errorMessage = "Error de validación en los datos. Verifique el formato del Excel.";
-      }
-      
       toast({
-        title: "Error en importación",
-        description: errorMessage,
-        variant: "destructive",
+        title: 'Error en la importación',
+        description: _error instanceof Error ? _error.message : 'Error desconocido',
+        variant: 'destructive',
       });
     },
   });
 
-  const resetState = () => {
-    setProcessedData([]);
-    setErrors([]);
-    setProgress(0);
-    setIsProcessing(false);
-  };
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    if (!selectedFile) return;
 
-  const processExcelFile = async (file: File) => {
-    try {
-      setIsProcessing(true);
-      setProgress(10);
-
-      const data = await file.arrayBuffer();
-      setProgress(30);
-
-      const workbook = XLSX.read(data);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      setProgress(50);
-
-      const processed: ProcessedEmployee[] = [];
-      const newErrors: string[] = [];
-
-      jsonData.forEach((row: any, index: number) => {
-        try {
-  
-          
-          // Función helper para truncar y limpiar strings
-          const cleanString = (value: any, maxLength: number = 255): string => {
-            if (!value || value === "" || value === "null" || value === "undefined") {
-              return "";
-            }
-            const cleaned = String(value).trim();
-            if (cleaned.length > maxLength) {
-              return cleaned.substring(0, maxLength);
-            }
-            return cleaned;
-          };
-
-          // Función para validar longitudes y reportar errores específicos
-          const validateFieldLength = (fieldName: string, value: string, maxLength: number, rowIndex: number): boolean => {
-            if (value && value.length > maxLength) {
-              newErrors.push(`Fila ${rowIndex + 2}: El campo "${fieldName}" es demasiado largo (${value.length} caracteres, máximo ${maxLength}). Valor: "${value.substring(0, 50)}..."`);
-              return false;
-            }
-            return true;
-          };
-          
-          // Mapear campos del Excel a nuestro schema con validación de longitud
-          const rawEmployee = {
-            idGlovo: cleanString(row['ID Glovo'], 50),
-            emailGlovo: cleanString(row['Email Glovo'], 100),
-            turno: cleanString(row['Turno'], 50),
-            nombre: cleanString(row['Nombre'], 100),
-            apellido: cleanString(row['Apellido'], 100),
-            telefono: cleanString(row['Teléfono'], 30),
-            email: cleanString(row['Email'], 100),
-            horas: row['Horas'] ? Number(row['Horas']) : undefined,
-            complementaries: cleanString(row['Complementarios']),
-            ciudad: cleanString(row['Ciudad'], 100),
-            cityCode: cleanString(row['Código Ciudad'], 30),
-            dniNie: cleanString(row['DNI/NIE'], 30),
-            iban: cleanString(row['IBAN'], 34),
-            direccion: cleanString(row['Dirección'], 255),
-            vehiculo: cleanString(row['Vehículo'], 50),
-            naf: cleanString(row['NAF'], 30),
-            fechaAltaSegSoc: cleanString(row['Fecha Alta Seg. Social (AAAA-MM-DD)']),
-            statusBaja: cleanString(row['Status Baja'], 100),
-            estadoSs: cleanString(row['Estado SS'], 100),
-            informadoHorario: row['Informado Horario (true/false)'] === 'true' || row['Informado Horario (true/false)'] === true,
-            cuentaDivilo: cleanString(row['Cuenta Divilo'], 100),
-            proximaAsignacionSlots: cleanString(row['Próxima Asignación Slots (AAAA-MM-DD)']),
-            jefeTrafico: cleanString(row['Jefe Tráfico'], 100),
-            comentsJefeDeTrafico: cleanString(row['Comentarios Jefe Tráfico']),
-            incidencias: cleanString(row['Incidencias']),
-            fechaIncidencia: cleanString(row['Fecha Incidencia (AAAA-MM-DD)']),
-            faltasNoCheckInEnDias: row['Faltas No Check-in (días)'] ? Number(row['Faltas No Check-in (días)']) : 0,
-            cruce: cleanString(row['Cruce']),
-            status: cleanString(row['Estado (active/it_leave/company_leave_pending/company_leave_approved)']) || 'active',
-          };
-
-          // Validar campos requeridos
-          if (!rawEmployee.idGlovo || !rawEmployee.nombre || !rawEmployee.telefono) {
-            newErrors.push(`Fila ${index + 2}: Faltan campos requeridos (ID Glovo: "${rawEmployee.idGlovo || 'VACÍO'}", Nombre: "${rawEmployee.nombre || 'VACÍO'}", Teléfono: "${rawEmployee.telefono || 'VACÍO'}")`);
-            return;
-          }
-
-          // Validar longitudes específicas antes de limpiar (para detectar problemas originales)
-          let hasLengthErrors = false;
-          
-          // Validaciones específicas con los valores originales antes de truncar
-          const originalValues = {
-            idGlovo: String(row['ID Glovo'] || '').trim(),
-            emailGlovo: String(row['Email Glovo'] || '').trim(),
-            turno: String(row['Turno'] || '').trim(),
-            nombre: String(row['Nombre'] || '').trim(),
-            apellido: String(row['Apellido'] || '').trim(),
-            telefono: String(row['Teléfono'] || '').trim(),
-            email: String(row['Email'] || '').trim(),
-            ciudad: String(row['Ciudad'] || '').trim(),
-            cityCode: String(row['Código Ciudad'] || '').trim(),
-            dniNie: String(row['DNI/NIE'] || '').trim(),
-            iban: String(row['IBAN'] || '').trim(),
-            direccion: String(row['Dirección'] || '').trim(),
-            vehiculo: String(row['Vehículo'] || '').trim(),
-            naf: String(row['NAF'] || '').trim(),
-            statusBaja: String(row['Status Baja'] || '').trim(),
-            estadoSs: String(row['Estado SS'] || '').trim(),
-            cuentaDivilo: String(row['Cuenta Divilo'] || '').trim(),
-            jefeTrafico: String(row['Jefe Tráfico'] || '').trim(),
-          };
-
-          // Validar cada campo con su longitud máxima
-          if (!validateFieldLength('ID Glovo', originalValues.idGlovo, 50, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Email Glovo', originalValues.emailGlovo, 100, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Turno', originalValues.turno, 50, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Nombre', originalValues.nombre, 100, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Apellido', originalValues.apellido, 100, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Teléfono', originalValues.telefono, 30, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Email', originalValues.email, 100, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Ciudad', originalValues.ciudad, 100, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Código Ciudad', originalValues.cityCode, 30, index)) hasLengthErrors = true;
-          if (!validateFieldLength('DNI/NIE', originalValues.dniNie, 30, index)) hasLengthErrors = true;
-          if (!validateFieldLength('IBAN', originalValues.iban, 34, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Dirección', originalValues.direccion, 255, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Vehículo', originalValues.vehiculo, 50, index)) hasLengthErrors = true;
-          if (!validateFieldLength('NAF', originalValues.naf, 30, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Status Baja', originalValues.statusBaja, 100, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Estado SS', originalValues.estadoSs, 100, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Cuenta Divilo', originalValues.cuentaDivilo, 100, index)) hasLengthErrors = true;
-          if (!validateFieldLength('Jefe Tráfico', originalValues.jefeTrafico, 100, index)) hasLengthErrors = true;
-
-          // Si hay errores de longitud, no procesar este empleado
-          if (hasLengthErrors) {
-            return;
-          }
-
-          const employee: ProcessedEmployee = rawEmployee;
-          processed.push(employee);
-        } catch (error) {
-
-          newErrors.push(`Fila ${index + 2}: Error procesando datos - ${error}`);
-        }
-      });
-
-      setProgress(80);
-      setProcessedData(processed);
-      setErrors(newErrors);
-      setProgress(100);
-
-      if (processed.length === 0) {
-        if (newErrors.length > 0) {
-          throw new Error(`No se pudieron procesar empleados válidos. Se encontraron ${newErrors.length} errores de validación.`);
-        } else {
-          throw new Error("No se pudieron procesar empleados válidos");
-        }
-      }
-
-    } catch (error) {
+    // Validar tipo de archivo
+    if (!selectedFile.name.endsWith('.xlsx') && !selectedFile.name.endsWith('.xls')) {
       toast({
-        title: "Error procesando archivo",
-        description: `Error: ${error}`,
-        variant: "destructive",
-      });
-      resetState();
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleFileSelect = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    
-    const file = files[0];
-    if (!file.name.match(/\.(xlsx|xls)$/)) {
-      toast({
-        title: "Formato incorrecto",
-        description: "Por favor selecciona un archivo Excel (.xlsx o .xls)",
-        variant: "destructive",
+        title: 'Tipo de archivo no válido',
+        description: 'Por favor selecciona un archivo Excel (.xlsx o .xls)',
+        variant: 'destructive',
       });
       return;
     }
 
-    processExcelFile(file);
+    // Validar tamaño de archivo (50MB máximo)
+    const maxSize = 50 * 1024 * 1024; // 50MB en bytes
+    if (selectedFile.size > maxSize) {
+      toast({
+        title: 'Archivo demasiado grande',
+        description: `El archivo excede el límite de 50MB. Tamaño actual: ${
+          (selectedFile.size / 1024 / 1024).toFixed(1)
+        }MB`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    console.log(`📁 Archivo seleccionado: ${selectedFile.name} (${
+      (selectedFile.size / 1024 / 1024).toFixed(1)
+    }MB)`);
+    setFile(selectedFile);
+    processFile(selectedFile);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
+  const processFile = (selectedFile: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          toast({
+            title: 'Error en el archivo',
+            description: 'El archivo Excel no contiene hojas válidas',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+
+        if (!worksheet) {
+          toast({
+            title: 'Error en el archivo',
+            description: 'No se pudo leer la primera hoja del archivo',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (jsonData.length < 2) {
+          toast({
+            title: 'Archivo vacío',
+            description: 'El archivo no contiene datos válidos (mínimo 2 filas: headers + datos)',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        // Obtener headers (primera fila)
+        const headers = jsonData[0] as string[];
+
+        // Debug: mostrar headers encontrados
+        console.log('Headers encontrados:', headers);
+
+        // Mostrar información de debug al usuario
+        toast({
+          title: 'Archivo procesado',
+          description: `Se encontraron ${headers.length} columnas en el archivo`,
+        });
+
+        // Función para encontrar índice de columna de forma flexible
+        const findColumnIndex = (possibleNames: string[]): number => {
+          for (const name of possibleNames) {
+            const index = headers.findIndex(header =>
+              header && header.toString().toLowerCase().includes(name.toLowerCase()),
+            );
+            if (index !== -1) return index;
+          }
+          return -1;
+        };
+
+        // Procesar datos (filas 2 en adelante)
+        const processedEmployees: EmployeeData[] = [];
+        const errors: ValidationError[] = [];
+
+        for (let i = 1; i < jsonData.length; i++) {
+          const row = jsonData[i] as (string | number | null)[];
+          if (!row || row.every(cell => !cell)) continue; // Fila vacía
+
+          // Mapear columnas de forma flexible
+          const idGlovoIndex = findColumnIndex(['id glovo', 'idglovo', 'id_glovo', 'id', 'idglovo']);
+          const nombreIndex = findColumnIndex(['nombre', 'name', 'first name', 'primer nombre']);
+          const apellidoIndex = findColumnIndex(['apellido', 'last name', 'apellidos', 'surname']);
+          const emailIndex = findColumnIndex(['email personal', 'email', 'correo', 'correo personal', 'email_personal']);
+          const emailGlovoIndex = findColumnIndex(['email glovo', 'email_glovo', 'emailglovo', 'correo glovo', 'correo_glovo']);
+          const telefonoIndex = findColumnIndex(['teléfono', 'telefono', 'phone', 'tel', 'móvil', 'movil']);
+          const dniNieIndex = findColumnIndex(['dni/nie', 'dni', 'nie', 'dni_nie', 'documento', 'nif', 'dninie']);
+          const ibanIndex = findColumnIndex(['iban', 'cuenta bancaria', 'bank account']);
+          const ciudadIndex = findColumnIndex(['ciudad', 'city', 'localidad']);
+          const cityCodeIndex = findColumnIndex(['código ciudad', 'citycode', 'city_code', 'codigo ciudad', 'citycode']);
+          const direccionIndex = findColumnIndex(['dirección', 'direccion', 'address', 'domicilio']);
+          const vehiculoIndex = findColumnIndex(['vehículo', 'vehiculo', 'vehicle', 'transporte']);
+          const nafIndex = findColumnIndex(['naf', 'número afiliación', 'numero afiliacion']);
+          const horasIndex = findColumnIndex(['horas', 'hours', 'horas semanales']);
+
+          // Debug: mostrar mapeo de columnas para la primera fila
+          if (i === 1) {
+            console.log('Mapeo de columnas:', {
+              idGlovo: { index: idGlovoIndex, value: row[idGlovoIndex] },
+              nombre: { index: nombreIndex, value: row[nombreIndex] },
+              telefono: { index: telefonoIndex, value: row[telefonoIndex] },
+              email: { index: emailIndex, value: row[emailIndex] },
+              emailGlovo: { index: emailGlovoIndex, value: row[emailGlovoIndex] },
+            });
+          }
+
+          const employee: EmployeeData = {
+            idGlovo: String(row[idGlovoIndex] || ''),
+            nombre: String(row[nombreIndex] || ''),
+            apellido: String(row[apellidoIndex] || ''),
+            email: String(row[emailIndex] || ''),
+            emailGlovo: String(row[emailGlovoIndex] || ''),
+            telefono: String(row[telefonoIndex] || ''),
+            dniNie: String(row[dniNieIndex] || ''),
+            iban: String(row[ibanIndex] || ''),
+            ciudad: String(row[ciudadIndex] || ''),
+            cityCode: String(row[cityCodeIndex] || ''),
+            direccion: String(row[direccionIndex] || ''),
+            vehiculo: String(row[vehiculoIndex] || ''),
+            naf: String(row[nafIndex] || ''),
+            horas: Math.round(parseFloat(String(row[horasIndex] || '0')) || 0),
+          };
+
+          // Validar campos requeridos (solo los más importantes)
+          if (!employee.idGlovo) {
+            errors.push({ row: i + 1, field: 'ID Glovo', message: 'ID Glovo es requerido' });
+          }
+          if (!employee.nombre) {
+            errors.push({ row: i + 1, field: 'Nombre', message: 'Nombre es requerido' });
+          }
+          if (!employee.telefono) {
+            errors.push({ row: i + 1, field: 'Teléfono', message: 'Teléfono es requerido' });
+          }
+
+          processedEmployees.push(employee);
+        }
+
+        setEmployees(processedEmployees);
+        setValidationErrors(errors);
+
+        if (errors.length > 0) {
+          toast({
+            title: 'Errores de validación',
+            description: `Se encontraron ${errors.length} errores en el archivo`,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Archivo procesado',
+            description: `Se procesaron ${processedEmployees.length} empleados correctamente`,
+          });
+        }
+      } catch (error) {
+        console.error('Error procesando archivo:', error);
+        toast({
+          title: 'Error al procesar archivo',
+          description: error instanceof Error ? error.message : 'No se pudo leer el archivo Excel',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    reader.onerror = () => {
+      toast({
+        title: 'Error al leer archivo',
+        description: 'No se pudo leer el archivo seleccionado',
+        variant: 'destructive',
+      });
+    };
+
+    reader.readAsArrayBuffer(selectedFile);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
+  const handlePreview = () => {
+    if (employees.length === 0) {
+      toast({
+        title: 'Sin datos',
+        description: 'No hay empleados para procesar',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    uploadMutation.mutate({ employees, dryRun: true });
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    handleFileSelect(e.dataTransfer.files);
+  const handleUpload = () => {
+    if (employees.length === 0) {
+      toast({
+        title: 'Sin datos',
+        description: 'No hay empleados para importar',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (validationErrors.length > 0) {
+      toast({
+        title: 'Errores de validación',
+        description: 'Por favor corrige los errores antes de importar',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    setUploadProgress(0);
+
+    // Simular progreso
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 200);
+
+    uploadMutation.mutate({ employees, dryRun: false }, {
+      onSettled: () => {
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+        setTimeout(() => {
+          setIsProcessing(false);
+          setUploadProgress(0);
+        }, 500);
+      },
+    });
   };
 
-  const handleImport = () => {
-    if (processedData.length === 0) return;
-    importMutation.mutate(processedData);
+  const handleClose = () => {
+    setFile(null);
+    setEmployees([]);
+    setValidationErrors([]);
+    setPreviewMode(false);
+    setIsProcessing(false);
+    setUploadProgress(0);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby="import-employees-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Upload className="w-5 h-5" />
-            Importar Empleados desde Excel
+            <Upload className="h-5 w-5" />
+            Importar Empleados
           </DialogTitle>
         </DialogHeader>
+        <div id="import-employees-description" className="sr-only">
+          Modal para importar empleados desde un archivo Excel. Permite seleccionar archivo, validar datos y procesar la importación.
+        </div>
 
         <div className="space-y-6">
-          {/* Información de limitaciones de campos */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Info className="w-5 h-5 text-blue-600" />
-                <span className="text-blue-800 font-medium">Limitaciones de campos</span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowFieldLimits(!showFieldLimits)}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                {showFieldLimits ? 'Ocultar' : 'Ver detalles'}
-              </Button>
-            </div>
-            {showFieldLimits && (
-              <div className="mt-3 text-sm text-blue-700">
-                <p className="mb-2">Los siguientes campos tienen limitaciones de longitud:</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-                  <div>• ID Glovo: <strong>50 caracteres</strong></div>
-                  <div>• Email Glovo: <strong>100 caracteres</strong></div>
-                  <div>• Turno: <strong>50 caracteres</strong></div>
-                  <div>• Nombre: <strong>100 caracteres</strong></div>
-                  <div>• Apellido: <strong>100 caracteres</strong></div>
-                  <div>• Teléfono: <strong>30 caracteres</strong></div>
-                  <div>• Email: <strong>100 caracteres</strong></div>
-                  <div>• Ciudad: <strong>100 caracteres</strong></div>
-                  <div>• Código Ciudad: <strong>30 caracteres</strong></div>
-                  <div>• DNI/NIE: <strong>30 caracteres</strong></div>
-                  <div>• IBAN: <strong>34 caracteres</strong></div>
-                  <div>• Dirección: <strong>255 caracteres</strong></div>
-                  <div>• Vehículo: <strong>50 caracteres</strong></div>
-                  <div>• NAF: <strong>30 caracteres</strong></div>
-                  <div>• Status Baja: <strong>100 caracteres</strong></div>
-                  <div>• Estado SS: <strong>100 caracteres</strong></div>
-                  <div>• Cuenta Divilo: <strong>100 caracteres</strong></div>
-                  <div>• Jefe Tráfico: <strong>100 caracteres</strong></div>
+          {/* Paso 1: Selección de archivo */}
+          {!file && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Paso 1: Seleccionar archivo Excel</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 mb-4">
+                    Arrastra y suelta tu archivo Excel aquí, o haz clic para seleccionar
+                  </p>
+                  <Button onClick={() => fileInputRef.current?.click()}>
+                    Seleccionar archivo
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
                 </div>
-                <p className="mt-2 text-blue-600">
-                  Los campos que exceden estos límites serán truncados automáticamente o generarán errores de validación.
-                </p>
-              </div>
-            )}
-          </div>
 
-          {/* Area de drag & drop */}
-          <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragOver
-                ? "border-blue-400 bg-blue-50"
-                : "border-gray-300 hover:border-gray-400"
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <FileSpreadsheet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Arrastra tu archivo Excel aquí
-            </h3>
-            <p className="text-gray-600 mb-4">
-              O haz clic para seleccionar un archivo
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isProcessing}
-            >
-              Seleccionar archivo
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept=".xlsx,.xls"
-              onChange={(e) => handleFileSelect(e.target.files)}
-            />
-          </div>
 
-          {/* Progress */}
-          {isProcessing && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Procesando archivo...</span>
-                <span className="text-sm font-medium">{progress}%</span>
-              </div>
-              <Progress value={progress} className="w-full" />
-            </div>
+              </CardContent>
+            </Card>
           )}
 
-          {/* Resultados */}
-          {processedData.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 p-4 bg-green-50 rounded-lg">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <span className="text-green-800">
-                  {processedData.length} empleados listos para importar
-                </span>
-              </div>
-
-              {errors.length > 0 && (
-                <div className="space-y-2 p-4 bg-yellow-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                    <span className="text-yellow-800 font-medium">
-                      {errors.length} errores encontrados:
-                    </span>
+          {/* Paso 2: Vista previa y validación */}
+          {file && employees.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Paso 2: Vista previa y validación</span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setFile(null)}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Cambiar archivo
+                    </Button>
                   </div>
-                  <div className="max-h-32 overflow-y-auto">
-                    {errors.map((error, index) => (
-                      <div key={index} className="text-sm text-yellow-700">
-                        • {error}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Resumen */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <Upload className="h-5 w-5 text-blue-600 mr-2" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">Total empleados</p>
+                        <p className="text-2xl font-bold text-blue-600">{employees.length}</p>
                       </div>
-                    ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+                      <div>
+                        <p className="text-sm font-medium text-green-900">Válidos</p>
+                        <p className="text-2xl font-bold text-green-600">{employees.length - validationErrors.length}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <XCircle className="h-5 w-5 text-red-600 mr-2" />
+                      <div>
+                        <p className="text-sm font-medium text-red-900">Con errores</p>
+                        <p className="text-2xl font-bold text-red-600">{validationErrors.length}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-          )}
 
-          {/* Botones */}
-          <div className="flex justify-end space-x-3 pt-6 border-t">
-            <Button variant="outline" onClick={onClose} disabled={importMutation.isPending}>
-              Cancelar
-            </Button>
-            {processedData.length > 0 && (
-              <Button 
-                onClick={handleImport} 
-                disabled={importMutation.isPending}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {importMutation.isPending ? "Importando..." : `Importar ${processedData.length} empleados`}
-              </Button>
-            )}
-          </div>
+                {/* Errores de validación */}
+                {validationErrors.length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      <div className="space-y-2">
+                        <p className="font-medium">Se encontraron errores de validación:</p>
+                        <div className="max-h-32 overflow-y-auto">
+                          {validationErrors.slice(0, 10).map((error, index) => (
+                            <p key={index} className="text-sm">
+                              Fila {error.row}: {error.field} - {error.message}
+                            </p>
+                          ))}
+                          {validationErrors.length > 10 && (
+                            <p className="text-sm font-medium">
+                              ... y {validationErrors.length - 10} errores más
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Vista previa de datos */}
+                <div className="space-y-2">
+                  <h4 className="font-medium">Vista previa de los primeros 5 empleados:</h4>
+                  <div className="max-h-64 overflow-y-auto border rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left">ID Glovo</th>
+                          <th className="px-3 py-2 text-left">Nombre</th>
+                          <th className="px-3 py-2 text-left">Email</th>
+                          <th className="px-3 py-2 text-left">DNI/NIE</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {employees.slice(0, 5).map((employee, index) => (
+                          <tr key={index} className="border-t">
+                            <td className="px-3 py-2">{employee.idGlovo}</td>
+                            <td className="px-3 py-2">{employee.nombre} {employee.apellido}</td>
+                            <td className="px-3 py-2">{employee.email}</td>
+                            <td className="px-3 py-2">{employee.dniNie}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Botones de acción */}
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handlePreview}
+                    disabled={uploadMutation.isPending}
+                    variant="outline"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Vista previa
+                  </Button>
+
+                  <Button
+                    onClick={handleUpload}
+                    disabled={uploadMutation.isPending || validationErrors.length > 0}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar empleados
+                  </Button>
+                </div>
+
+                {/* Progreso de carga */}
+                {isProcessing && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>
+                        {employees.length > 100
+                          ? `Procesando ${employees.length} empleados en lotes...`
+                          : 'Procesando importación...'
+                        }
+                      </span>
+                      <span>{uploadProgress}%</span>
+                    </div>
+                    <Progress value={uploadProgress} />
+                    {employees.length > 100 && (
+                      <p className="text-xs text-gray-500">
+                        Archivo grande detectado. Procesando en lotes de 100 empleados para mejor rendimiento.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </DialogContent>
     </Dialog>
   );
-} 
+}

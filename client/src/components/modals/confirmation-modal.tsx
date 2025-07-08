@@ -3,9 +3,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { AlertTriangle } from "lucide-react";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle } from 'lucide-react';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -15,22 +15,22 @@ interface ConfirmationModalProps {
   onCancel: () => void;
   confirmText?: string;
   cancelText?: string;
-  variant?: "default" | "destructive";
+  variant?: 'default' | 'destructive';
 }
 
-export default function ConfirmationModal({
+export default function ConfirmationModal ({
   isOpen,
   title,
   message,
   onConfirm,
   onCancel,
-  confirmText = "Confirmar",
-  cancelText = "Cancelar",
-  variant = "destructive",
+  confirmText = 'Confirmar',
+  cancelText = 'Cancelar',
+  variant = 'destructive',
 }: ConfirmationModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[400px]" aria-describedby="confirmation-description">
         <DialogHeader>
           <div className="flex items-center space-x-3">
             <div className="flex-shrink-0">
@@ -43,6 +43,9 @@ export default function ConfirmationModal({
             </DialogTitle>
           </div>
         </DialogHeader>
+        <div id="confirmation-description" className="sr-only">
+          Modal de confirmación. Permite confirmar o cancelar una acción importante.
+        </div>
 
         <div className="mt-4">
           <p className="text-sm text-gray-600">{message}</p>
