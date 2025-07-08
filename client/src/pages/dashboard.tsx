@@ -32,12 +32,12 @@ interface Notification {
 
 export default function Dashboard () {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
   // Redirect to home if not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!isAuthenticated) {
       toast({
         title: 'Unauthorized',
         description: 'You are logged out. Logging in again...',
@@ -48,7 +48,7 @@ export default function Dashboard () {
       }, 500);
       return;
     }
-  }, [isAuthenticated, isLoading, toast]);
+  }, [isAuthenticated, toast]);
 
   // Tipar correctamente la respuesta de useQuery
   const {
@@ -96,14 +96,14 @@ export default function Dashboard () {
   });
 
   useEffect(() => {
-    if (!isLoading && user?.role === 'normal') {
+    if (user?.role === 'normal') {
       navigate('/employees', { replace: true });
     }
-  }, [user, isLoading, navigate]);
+  }, [user, navigate]);
 
-  if (!isLoading && user?.role === 'normal') return null;
+  if (user?.role === 'normal') return null;
 
-  if (isLoading || metricsLoading) {
+  if (metricsLoading) {
     return (
       <div className="p-6 bg-white min-h-screen">
         <div className="animate-pulse">

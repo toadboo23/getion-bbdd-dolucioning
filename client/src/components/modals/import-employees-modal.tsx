@@ -97,8 +97,8 @@ export default function ImportEmployeesModal ({
         }
 
         // Combinar resultados
-        const totalImported = results.reduce((sum, result: { importedCount?: number }) => {
-          return sum + (result.importedCount || 0);
+        const totalImported = results.reduce((sum: number, result: Response) => {
+          return sum + ((result as any).importedCount || 0);
         }, 0);
 
         return {

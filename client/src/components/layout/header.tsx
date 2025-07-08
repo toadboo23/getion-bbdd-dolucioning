@@ -68,7 +68,7 @@ export default function Header ({ onMobileMenuToggle }: HeaderProps) {
             <div className="flex items-center space-x-3">
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">
-                  {user?.firstName} {user?.lastName}
+                  {user?.email}
                 </p>
                 <div className="text-xs">
                   {user?.role && getRoleBadge(user.role)}

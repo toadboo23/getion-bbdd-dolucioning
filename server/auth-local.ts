@@ -65,9 +65,13 @@ export async function setupAuth (app: Express) {
       console.log('🔍 Checking database for user:', email);
       try {
         const dbUsers = await storage.getAllSystemUsers();
-        const dbUser = dbUsers.find((u) => u.email === email && u.isActive === true);
+        const dbUser = dbUsers.find((u) => u.email === email);
 
-        if (dbUser) {
+        if (!dbUser) {
+          console.log('❌ Usuario no encontrado:', email);
+        } else if (!dbUser.isActive) {
+          console.log('❌ Usuario inactivo:', email);
+        } else {
           userRecord = dbUser;
           console.log('✅ Found database user:', email);
         }
@@ -80,9 +84,8 @@ export async function setupAuth (app: Express) {
       }
 
       if (!userRecord) {
-        console.log('❌ User not found:', email);
         return res.status(401).json({
-          error: 'Usuario no encontrado',
+          error: 'Usuario no encontrado o inactivo',
           success: false,
         });
       }
@@ -92,21 +95,28 @@ export async function setupAuth (app: Express) {
 
       // Check if password is hashed (starts with $2b$)
       if (userRecord.password.startsWith('$2b$')) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('🔑 Hash almacenado (parcial):', userRecord.password.slice(0, 20) + '...');
+        }
         try {
           passwordValid = await bcrypt.compare(password, userRecord.password);
-          console.log('🔍 Password validation result (hashed):', passwordValid ? 'SUCCESS' : 'FAILED');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('🔍 Password validation result (bcrypt.compare):', passwordValid ? 'SUCCESS' : 'FAILED');
+          }
         } catch (bcryptError) {
           console.error('❌ Bcrypt error:', bcryptError);
           passwordValid = false;
         }
       } else {
-        // Plain text password comparison (should be removed in production)
+        // Plain text password comparison (should be removido en producción)
         passwordValid = password === userRecord.password;
-        console.log('🔍 Password validation result (plain text):', passwordValid ? 'SUCCESS' : 'FAILED');
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('🔍 Password validation result (plain text):', passwordValid ? 'SUCCESS' : 'FAILED');
+        }
       }
 
       if (!passwordValid) {
-        console.log('❌ Invalid password for:', email);
+        console.log('❌ Invalid password para:', email);
         return res.status(401).json({
           error: 'Contraseña incorrecta',
           success: false,

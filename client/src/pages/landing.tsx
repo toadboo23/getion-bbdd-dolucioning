@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Building2, Shield } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Landing() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -14,6 +15,7 @@ export default function Landing() {
     password: '',
   });
   const queryClient = useQueryClient();
+  const { setUser } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,10 +36,17 @@ export default function Landing() {
         const data = await response.json();
         
         if (data.success) {
-          // Invalidate auth query to refetch user data
+          // Actualizar el estado local de autenticación
+          setUser(data.user);
+          
+          // Invalidar la query de autenticación para que se actualice
           queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-          // Force a page reload to update the app state
-          window.location.reload();
+          
+          // Limpiar el formulario
+          setLoginData({
+            email: '',
+            password: '',
+          });
         } else {
           throw new Error(data.error || 'Error en el login');
         }

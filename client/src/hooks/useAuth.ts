@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { User } from '@shared/schema';
+// import type { User } from '@shared/schema';
+// Definir tipo User localmente
+type User = { email: string; role: string; ciudad?: string };
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -31,7 +33,20 @@ export const useAuth = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       setUser: (user) => set({ user, isAuthenticated: !!user }),
-      logout: () => set({ user: null, isAuthenticated: false }),
+      logout: async () => {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch (error) {
+          // Mostrar error en consola, pero continuar limpiando el estado
+          console.error('Error al cerrar sesión en backend:', error);
+        }
+        set({ user: null, isAuthenticated: false });
+        window.location.href = '/';
+      },
       logPageAccess: async (page: string, action?: string) => {
         try {
           const { user } = get();
@@ -55,6 +70,36 @@ export const useAuth = create<AuthState>()(
     },
   ),
 );
+
+// Hook para verificar la sesión del servidor
+export function useAuthStatus() {
+  const { data: serverUser, isLoading, error } = useQuery({
+    queryKey: ['/api/auth/user'],
+    queryFn: async () => {
+      const response = await fetch('/api/auth/user', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Not authenticated');
+      }
+
+      return response.json();
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  return {
+    serverUser,
+    isLoading,
+    error,
+    isAuthenticated: !!serverUser,
+  };
+}
 
 // Hook para obtener el contador de notificaciones
 export function useNotificationCount() {

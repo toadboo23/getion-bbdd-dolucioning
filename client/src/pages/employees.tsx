@@ -21,7 +21,7 @@ import { CIUDADES_DISPONIBLES } from '@shared/schema';
 // XLSX import removed as it's not used in this file
 
 export default function Employees () {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [cityFilter, setCityFilter] = useState('all');
@@ -50,7 +50,7 @@ export default function Employees () {
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!isAuthenticated) {
       toast({
         title: 'Unauthorized',
         description: 'You are logged out. Logging in again...',
@@ -61,7 +61,7 @@ export default function Employees () {
       }, 500);
       return;
     }
-  }, [isAuthenticated, isLoading, toast]);
+  }, [isAuthenticated, toast]);
 
   // Query para obtener empleados - solo se ejecuta cuando employeesLoaded es true
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
@@ -95,7 +95,6 @@ export default function Employees () {
 
   // Debug: Log del estado actual
   console.log('🔍 Estado actual de la página:');
-  console.log('  - isLoading:', isLoading);
   console.log('  - isAuthenticated:', isAuthenticated);
   console.log('  - user:', user);
   console.log('  - employeesLoaded:', employeesLoaded);
@@ -249,7 +248,7 @@ export default function Employees () {
         'Cuenta Divilo': emp.cuentaDivilo,
         'Próxima Asignación Slots': emp.proximaAsignacionSlots ? new Date(emp.proximaAsignacionSlots).toLocaleDateString('es-ES') : '',
         'Jefe de Tráfico': emp.jefeTrafico,
-        'Flota': emp.flota,
+        // 'Flota': emp.flota || '', // Comentado porque no existe en el tipo Employee
         'Comentarios Jefe Tráfico': emp.comentsJefeDeTrafico,
         'Incidencias': emp.incidencias,
         'Fecha Incidencia': emp.fechaIncidencia ? new Date(emp.fechaIncidencia).toLocaleDateString('es-ES') : '',
@@ -318,7 +317,7 @@ export default function Employees () {
     setCurrentPage(1);
   };
 
-  if (isLoading || employeesLoading) {
+  if (employeesLoading) {
     return (
       <div className="p-6">
         <div className="animate-pulse">
@@ -604,7 +603,7 @@ export default function Employees () {
           }
         }}
         isLoading={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}
-        user={user}
+        user={user as any}
       />
 
       <LeaveManagementModal

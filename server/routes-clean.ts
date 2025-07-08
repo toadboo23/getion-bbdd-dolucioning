@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 import { createServer, type Server } from 'http';
-import { PostgresStorage } from './storage-postgres.js';
+import { PostgresStorage, getEmpleadoMetadata } from './storage-postgres.js';
 import { setupAuth, isAuthenticated } from './auth-local.js';
 import { AuditService } from './audit-service.js';
 // XLSX import removed as it's not used in this file
@@ -52,8 +52,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log dashboard access
       await AuditService.logAction({
-        userId: user.email || '',
-        userRole: user.role as 'super_admin' | 'admin',
+        userId: user?.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'access_dashboard',
         entityType: 'dashboard',
         description: `Acceso al dashboard - Usuario: ${user.email}`,
@@ -112,15 +112,17 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       let employees = await storage.getAllEmployees();
 
-      // Si el usuario no es super_admin, filtrar por su ciudad asignada
-      if (user?.role !== 'super_admin' && user?.ciudad) {
-        employees = employees.filter(emp => emp.ciudad === user.ciudad);
+      // Si el usuario no es super_admin, filtrar por su ciudad asignada (case-insensitive)
+      if (user?.role !== 'super_admin' && typeof user?.ciudad === 'string') {
+        const userCityLower = user.ciudad.toLowerCase();
+        employees = employees.filter(emp => (emp.ciudad || '').toLowerCase() === userCityLower);
         if (process.env.NODE_ENV !== 'production') console.log(`🔒 Filtrando empleados por ciudad del usuario: ${user.ciudad}`);
       }
 
-      // Apply filters
-      if (city && city !== 'all') {
-        employees = employees.filter(emp => emp.ciudad === city);
+      // Apply filters (case-insensitive)
+      if (typeof city === 'string' && city !== 'all') {
+        const cityLower = city.toLowerCase();
+        employees = employees.filter(emp => (emp.ciudad || '').toLowerCase() === cityLower);
       }
 
       if (status && status !== 'all') {
@@ -139,11 +141,11 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log employee list access
       await AuditService.logAction({
-        userId: user.email || '',
-        userRole: user.role as 'super_admin' | 'admin' | 'normal',
+        userId: user?.email || '',
+        userRole: (user.role as 'super_admin' | 'admin' | 'normal') || 'normal',
         action: 'view_employees',
         entityType: 'employee',
-        description: `Consulta de empleados - Usuario: ${user.email} - Filtros: ciudad=${city || 'all'}, status=${status || 'all'}, search=${search || 'none'}`,
+        description: `Consulta de empleados - Usuario: ${user?.email || ''} - Filtros: ciudad=${city || 'all'}, status=${status || 'all'}, search=${search || 'none'}`,
         newData: { 
           totalEmployees: employees.length,
           filters: { city, status, search },
@@ -168,12 +170,16 @@ export async function registerRoutes (app: Express): Promise<Server> {
       }
 
       const employeeData = req.body as Record<string, unknown>;
+      // Capitalizar ciudad si existe
+      if (employeeData.ciudad && typeof employeeData.ciudad === 'string') {
+        employeeData.ciudad = employeeData.ciudad.charAt(0).toUpperCase() + employeeData.ciudad.slice(1).toLowerCase();
+      }
       const employee = await storage.createEmployee(employeeData as any);
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email || '',
-        userRole: user.role as 'super_admin' | 'admin',
+        userId: user?.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'create_employee',
         entityType: 'employee',
         entityId: employee.idGlovo,
@@ -200,16 +206,18 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       const { id } = req.params;
       const employeeData = req.body as Record<string, unknown>;
-
+      // Capitalizar ciudad si existe
+      if (employeeData.ciudad && typeof employeeData.ciudad === 'string') {
+        employeeData.ciudad = employeeData.ciudad.charAt(0).toUpperCase() + employeeData.ciudad.slice(1).toLowerCase();
+      }
       // Get old data for audit
       const oldEmployee = await storage.getEmployee(id);
-
       const employee = await storage.updateEmployee(id, employeeData as Record<string, unknown>);
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email || '',
-        userRole: user.role as 'super_admin' | 'admin',
+        userId: user?.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'update_employee',
         entityType: 'employee',
         entityId: employee.idGlovo,
@@ -247,8 +255,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: (user as { email?: string }).email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'delete_employee',
         entityType: 'employee',
         entityId: employee.idGlovo,
@@ -268,7 +276,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.delete('/api/employees/all', isAuthenticated, async (req: { user?: { email?: string; role?: string } }, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('🗑️ Delete all employees request');
     try {
-      const user = req.user;
+      const user = req.user as { role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede eliminar todos los empleados' });
       }
@@ -280,8 +288,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: (user as { email?: string }).email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'delete_all_employees',
         entityType: 'employee',
         description: `Todos los empleados eliminados (${employees.length} empleados)`,
@@ -299,7 +307,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.post('/api/employees/bulk-import', isAuthenticated, async (req: { user?: { email?: string; role?: string }; body: { employees: Record<string, unknown>[]; dryRun?: boolean } }, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('📥 Bulk import employees request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede importar empleados' });
       }
@@ -424,10 +432,26 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       if (process.env.NODE_ENV !== 'production') console.log('✅ Bulk import completed successfully');
 
+      // Crear notificación para la importación masiva
+      const notificationData = {
+        type: 'bulk_upload' as const,
+        title: 'Importación Masiva de Empleados',
+        message: `Se han importado ${createdEmployees.length} empleados correctamente desde archivo Excel.`,
+        requestedBy: user.email || '',
+        status: 'processed' as const,
+        metadata: {
+          employeeCount: createdEmployees.length,
+          importType: 'bulk_upload',
+          employees: createdEmployees.map(emp => getEmpleadoMetadata(emp)),
+        },
+      };
+
+      const notification = await storage.createNotification(notificationData);
+
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'bulk_import_employees',
         entityType: 'employee',
         description: `Importación masiva de empleados: ${createdEmployees.length} empleados importados`,
@@ -453,7 +477,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.post('/api/employees/:id/penalize', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('⚠️ Penalize employee request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para penalizar empleados' });
       }
@@ -476,8 +500,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'penalize_employee',
         entityType: 'employee',
         entityId: employee.idGlovo,
@@ -497,7 +521,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.post('/api/employees/:id/remove-penalization', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('✅ Remove employee penalization request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para remover penalizaciones' });
       }
@@ -514,8 +538,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'remove_employee_penalization',
         entityType: 'employee',
         entityId: employee.idGlovo,
@@ -547,7 +571,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.post('/api/company-leaves', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('➕ Create company leave request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para crear bajas de empresa' });
       }
@@ -558,19 +582,23 @@ export async function registerRoutes (app: Express): Promise<Server> {
       const processedLeaveData = {
         ...leaveData,
         leaveRequestedAt: leaveData.leaveRequestedAt || new Date(),
-        leaveRequestedBy: leaveData.leaveRequestedBy || leaveData.requestedBy || user.email,
+        leaveRequestedBy: leaveData.leaveRequestedBy || leaveData.requestedBy || user.email || '',
       };
       
       const leave = await storage.createCompanyLeave(processedLeaveData);
 
       // Crear notificación automáticamente
+      // Obtener datos del empleado
+      const empleado = await storage.getEmployee(leaveData.employeeId);
+      const empleadoMetadata = empleado ? getEmpleadoMetadata(empleado) : {};
       const notificationData = {
         type: 'company_leave_request' as const,
         title: 'Solicitud de Baja Empresa',
         message: `Se ha solicitado una baja empresa para el empleado ${leaveData.employeeId}`,
-        requestedBy: user.email,
+        requestedBy: user.email || '',
         status: 'pending' as const,
         metadata: {
+          ...empleadoMetadata,
           employeeId: leaveData.employeeId,
           leaveType: leaveData.leaveType,
           leaveDate: leaveData.leaveDate,
@@ -582,8 +610,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'create_company_leave',
         entityType: 'company_leave',
         entityId: leave.employeeId,
@@ -613,7 +641,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.post('/api/it-leaves', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('➕ Create IT leave request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para crear bajas IT' });
       }
@@ -623,8 +651,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'create_it_leave',
         entityType: 'it_leave',
         entityId: leave.employeeId,
@@ -654,14 +682,14 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.post('/api/notifications', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('➕ Create notification request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       const notificationData = req.body;
       const notification = await storage.createNotification(notificationData);
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'create_notification',
         entityType: 'notification',
         entityId: notification.id.toString(),
@@ -679,7 +707,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.put('/api/notifications/:id/status', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('✏️ Update notification status request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para actualizar notificaciones' });
       }
@@ -691,8 +719,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'update_notification_status',
         entityType: 'notification',
         entityId: notification.id.toString(),
@@ -712,7 +740,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.post('/api/notifications/:id/process', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('⚙️ Process notification request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede procesar notificaciones' });
       }
@@ -759,23 +787,28 @@ export async function registerRoutes (app: Express): Promise<Server> {
           }
 
           // Update employee status
-          await storage.updateEmployee(employeeId, { status: newEmployeeStatus });
+          await storage.updateEmployee(employeeId, { status: newEmployeeStatus as any });
 
           // Update company leave status if it exists
           if (companyLeaveId) {
-            await storage.updateCompanyLeaveStatus(parseInt(companyLeaveId), newCompanyLeaveStatus, user.email, new Date(processingDate));
+            await storage.updateCompanyLeaveStatus(parseInt(companyLeaveId), newCompanyLeaveStatus, user.email || '', new Date(processingDate));
           }
 
           // If action is pending_laboral, create a new notification for pending laboral
           if (action === 'pending_laboral') {
+            // Obtener datos del empleado para incluir en la notificación
+            const empleado = await storage.getEmployee(employeeId);
+            const empleadoMetadata = empleado ? getEmpleadoMetadata(empleado) : {};
+            
             // Create a new notification for pending laboral
             await storage.createNotification({
               type: 'company_leave_request',
               title: 'Baja Empresa - Pendiente Laboral',
               message: `El empleado ${employeeId} ha sido movido a pendiente laboral. Requiere tramitación.`,
               status: 'pending_laboral',
-              requestedBy: user.email,
+              requestedBy: user.email || '',
               metadata: {
+                ...empleadoMetadata,
                 employeeId,
                 companyLeaveId,
                 originalNotificationId: notification.id,
@@ -786,8 +819,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
           // Log audit for employee status change
           await AuditService.logAction({
-            userId: user.email,
-            userRole: user.role,
+            userId: user.email || '',
+            userRole: (user.role as 'super_admin' | 'admin') || 'normal',
             action: 'process_company_leave_notification',
             entityType: 'employee',
             entityId: employeeId,
@@ -812,8 +845,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit for notification processing
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'process_notification',
         entityType: 'notification',
         entityId: notification.id.toString(),
@@ -833,7 +866,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.get('/api/system-users', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('👥 System users request');
     try {
-      const user = req.user;
+      const user = req.user as { role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede ver usuarios del sistema' });
       }
@@ -849,18 +882,26 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.post('/api/system-users', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('➕ Create system user request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede crear usuarios del sistema' });
       }
 
       const userData = req.body;
-      const newUser = await storage.createSystemUser(userData);
+      // Agregar el campo createdBy con el email del usuario autenticado
+      if (!user.email) {
+        return res.status(400).json({ message: 'Usuario no válido' });
+      }
+      const userDataWithCreatedBy = {
+        ...userData,
+        createdBy: user.email,
+      };
+      const newUser = await storage.createSystemUser(userDataWithCreatedBy);
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'create_system_user',
         entityType: 'system_user',
         entityId: newUser.id.toString(),
@@ -879,7 +920,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.put('/api/system-users/:id', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('✏️ Update system user request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede editar usuarios del sistema' });
       }
@@ -894,8 +935,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'update_system_user',
         entityType: 'system_user',
         entityId: updatedUser.id.toString(),
@@ -915,7 +956,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.delete('/api/system-users/:id', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('🗑️ Delete system user request');
     try {
-      const user = req.user;
+      const user = req.user as { role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede eliminar usuarios del sistema' });
       }
@@ -937,8 +978,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: (user as { email?: string }).email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'delete_system_user',
         entityType: 'system_user',
         entityId: systemUser.id.toString(),
@@ -958,7 +999,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.put('/api/system-users/:id/password', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('🔑 Change system user password request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede cambiar contraseñas' });
       }
@@ -986,8 +1027,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'change_system_user_password',
         entityType: 'system_user',
         entityId: systemUser.id.toString(),
@@ -1008,7 +1049,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.get('/api/audit-logs', isAuthenticated, async (req: { user?: { role?: string }; query: { limit?: string } }, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('📋 Audit logs request');
     try {
-      const user = req.user;
+      const user = req.user as { role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede ver logs de auditoría' });
       }
@@ -1025,7 +1066,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.get('/api/audit-logs/stats', isAuthenticated, async (req: { user?: { role?: string } }, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('📊 Audit logs stats request');
     try {
-      const user = req.user;
+      const user = req.user as { role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede ver estadísticas de auditoría' });
       }
@@ -1042,7 +1083,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.post('/api/employees/:id/it-leave', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('➕ Create IT leave for employee request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para crear bajas IT' });
       }
@@ -1056,8 +1097,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'set_it_leave',
         entityType: 'employee',
         entityId: id,
@@ -1077,7 +1118,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.get('/api/employees/export/csv', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('📤 Export employees to CSV request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role === 'normal') {
         return res.status(403).json({ message: 'No tienes permisos para exportar empleados' });
       }
@@ -1086,8 +1127,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
       
       // Log export action
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'export_employees_csv',
         entityType: 'employee',
         description: `Exportación de empleados a CSV - Usuario: ${user.email} - Total: ${employees.length} empleados`,
@@ -1183,7 +1224,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
   app.post('/api/employees/:id/reactivate', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('🔄 Reactivate employee request');
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       if (user?.role !== 'super_admin') {
         return res.status(403).json({ message: 'Solo el super admin puede reactivar empleados' });
       }
@@ -1200,8 +1241,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Log audit
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'reactivate_employee',
         entityType: 'employee',
         entityId: employee.idGlovo,
@@ -1221,13 +1262,13 @@ export async function registerRoutes (app: Express): Promise<Server> {
   // Page access logging (protected)
   app.post('/api/log-page-access', isAuthenticated, async (req: any, res) => {
     try {
-      const user = req.user;
+      const user = req.user as { email?: string; role?: string };
       const { page, action } = req.body;
 
       // Log page access
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'page_access',
         entityType: 'page',
         entityName: page,

@@ -44,6 +44,9 @@ export default function UserManagement () {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // Debug: Verificar que CIUDADES_DISPONIBLES se importe correctamente
+  console.log('CIUDADES_DISPONIBLES:', CIUDADES_DISPONIBLES);
+
   // Estados
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -82,11 +85,14 @@ export default function UserManagement () {
   // Mutaciones
   const createUserMutation = useMutation({
     mutationFn: async (userData: CreateUserData) => {
+      console.log('🚀 createUserMutation.mutationFn called with:', userData);
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { confirmPassword, ...data } = userData;
+      console.log('📤 Sending to API:', data);
       await apiRequest('POST', '/api/system-users', data);
     },
     onSuccess: () => {
+      console.log('✅ createUserMutation.onSuccess called');
       queryClient.invalidateQueries({ queryKey: ['/api/system-users'] });
       toast({
         title: 'Usuario creado',
@@ -103,7 +109,8 @@ export default function UserManagement () {
         assigned_city: '',
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.log('❌ createUserMutation.onError called:', error);
       toast({
         title: 'Error',
         description: 'No se pudo crear el usuario',
@@ -196,8 +203,12 @@ export default function UserManagement () {
   // Funciones auxiliares
 
   const handleCreateUser = () => {
+    console.log('🔍 handleCreateUser called');
+    console.log('📝 createForm:', createForm);
+    
     // Validaciones
     if (!createForm.email || !createForm.firstName || !createForm.lastName || !createForm.password) {
+      console.log('❌ Validation failed: missing required fields');
       toast({
         title: 'Campos requeridos',
         description: 'Por favor complete todos los campos obligatorios',
@@ -207,6 +218,7 @@ export default function UserManagement () {
     }
 
     if (createForm.password !== createForm.confirmPassword) {
+      console.log('❌ Validation failed: passwords do not match');
       toast({
         title: 'Contraseñas no coinciden',
         description: 'La contraseña y su confirmación deben ser iguales',
@@ -216,6 +228,7 @@ export default function UserManagement () {
     }
 
     if (createForm.password.length < 6) {
+      console.log('❌ Validation failed: password too short');
       toast({
         title: 'Contraseña muy corta',
         description: 'La contraseña debe tener al menos 6 caracteres',
@@ -223,6 +236,8 @@ export default function UserManagement () {
       });
       return;
     }
+
+    console.log('✅ Validation passed, creating user...');
 
     // Crear usuario
     const userData = {
@@ -234,6 +249,8 @@ export default function UserManagement () {
       role: createForm.role,
       assigned_city: createForm.assigned_city,
     };
+    
+    console.log('📤 Sending userData:', userData);
     createUserMutation.mutate(userData);
   };
 
@@ -418,12 +435,12 @@ export default function UserManagement () {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="assigned_city">Ciudad Asignada</Label>
-                  <Select value={createForm.assigned_city || ''} onValueChange={(value: string) => setCreateForm(prev => ({ ...prev, assigned_city: value }))}>
+                  <Select value={createForm.assigned_city || 'none'} onValueChange={(value: string) => setCreateForm(prev => ({ ...prev, assigned_city: value === 'none' ? '' : value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar ciudad" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sin ciudad asignada</SelectItem>
+                      <SelectItem value="none">Sin ciudad asignada</SelectItem>
                       {CIUDADES_DISPONIBLES.map((ciudad) => (
                         <SelectItem key={ciudad} value={ciudad}>
                           {ciudad}

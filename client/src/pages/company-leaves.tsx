@@ -27,13 +27,13 @@ import type { CompanyLeave } from '@shared/schema';
 import * as XLSX from 'xlsx';
 
 export default function CompanyLeaves () {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (!isAuthenticated) {
       toast({
         title: 'Unauthorized',
         description: 'You are logged out. Logging in again...',
@@ -44,7 +44,7 @@ export default function CompanyLeaves () {
       }, 500);
       return;
     }
-  }, [isAuthenticated, authLoading, toast]);
+  }, [isAuthenticated, toast]);
 
   const { data: allCompanyLeaves = [], isLoading } = useQuery<CompanyLeave[]>({
     queryKey: ['/api/company-leaves'],
@@ -62,7 +62,7 @@ export default function CompanyLeaves () {
 
   // Filtrar bajas según los criterios de búsqueda
   const companyLeaves = useMemo(() => {
-    if (!authLoading && user?.role === 'normal') return [];
+    if (user?.role === 'normal') return [];
 
     return allCompanyLeaves.filter(leave => {
       const employeeData = leave.employeeData as Record<string, unknown>;
@@ -85,15 +85,15 @@ export default function CompanyLeaves () {
 
       return searchMatch && statusMatch && leaveTypeMatch;
     });
-  }, [allCompanyLeaves, searchTerm, statusFilter, leaveTypeFilter, authLoading, user?.role]);
+  }, [allCompanyLeaves, searchTerm, statusFilter, leaveTypeFilter, user?.role]);
 
   useEffect(() => {
-    if (!authLoading && user?.role === 'normal') {
+    if (user?.role === 'normal') {
       navigate('/employees', { replace: true });
     }
-  }, [user, authLoading, navigate]);
+  }, [user, navigate]);
 
-  if (!authLoading && user?.role === 'normal') return null;
+  if (user?.role === 'normal') return null;
 
   const getLeaveTypeBadge = (type: string) => {
     const variants = {
@@ -199,7 +199,7 @@ export default function CompanyLeaves () {
         Vehículo: employeeData?.vehiculo || 'N/A',
         NAF: employeeData?.naf || 'N/A',
         Horas: employeeData?.horas || 'N/A',
-        'CDP%': employeeData?.horas ? ((employeeData.horas / 38) * 100).toFixed(2) : 'N/A',
+        'CDP%': employeeData?.horas ? ((Number(employeeData.horas) / 38) * 100).toFixed(2) : 'N/A',
         Flota: employeeData?.flota || 'N/A',
         'Tipo de Baja':
           leave.leaveType === 'despido'
@@ -255,7 +255,7 @@ export default function CompanyLeaves () {
     });
   };
 
-  if (isLoading || authLoading) {
+  if (isLoading) {
     return (
       <div className='p-6'>
         <div className='space-y-4'>
@@ -401,13 +401,13 @@ export default function CompanyLeaves () {
                         <TableCell>
                           <div>
                             <div className='font-medium'>
-                              {employeeData?.nombre} {employeeData?.apellido}
+                              {String(employeeData?.nombre)} {String(employeeData?.apellido)}
                             </div>
-                            <div className='text-sm text-gray-500'>{employeeData?.dniNie}</div>
+                                                          <div className='text-sm text-gray-500'>{String(employeeData?.dniNie)}</div>
                           </div>
                         </TableCell>
-                        <TableCell>{employeeData?.idGlovo}</TableCell>
-                        <TableCell>{employeeData?.email}</TableCell>
+                        <TableCell>{String(employeeData?.idGlovo)}</TableCell>
+                        <TableCell>{String(employeeData?.email)}</TableCell>
                         <TableCell>{getLeaveTypeBadge(leave.leaveType)}</TableCell>
                         <TableCell>
                           {leave.leaveDate

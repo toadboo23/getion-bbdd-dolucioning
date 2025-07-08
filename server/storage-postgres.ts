@@ -42,6 +42,18 @@ export const calculateCDP = (horas: number | null | undefined): number => {
 // Type for upsert user operation
 type UpsertUser = InsertSystemUser & { id: number };
 
+// Función utilitaria para extraer los datos clave del empleado
+export function getEmpleadoMetadata(emp: any) {
+  return {
+    idGlovo: emp.idGlovo,
+    emailGlovo: emp.emailGlovo,
+    dni: emp.dniNie,
+    nombre: emp.nombre,
+    apellido: emp.apellido,
+    telefono: emp.telefono,
+  };
+}
+
 export class PostgresStorage {
   // User operations
   async getUser (id: number): Promise<SystemUser | undefined> {
@@ -383,10 +395,8 @@ export class PostgresStorage {
 
   // City and fleet operations
   async getUniqueCities (): Promise<string[]> {
-    return CIUDADES_DISPONIBLES;
+    return [...CIUDADES_DISPONIBLES];
   }
-
-
 
   // System user operations
   async getAllSystemUsers (): Promise<SystemUser[]> {
@@ -549,6 +559,7 @@ export class PostgresStorage {
         requestedBy: 'SYSTEM',
         status: 'processed',
         metadata: {
+          ...getEmpleadoMetadata(employee),
           employeeId,
           startDate,
           endDate,

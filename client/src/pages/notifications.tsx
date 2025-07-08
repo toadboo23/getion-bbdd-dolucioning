@@ -18,7 +18,7 @@ import type { Notification } from '@shared/schema';
 import { useNavigate } from 'react-router';
 
 export default function Notifications () {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -77,7 +77,7 @@ export default function Notifications () {
 
   // Redirect if not authenticated or not authorized to view notifications
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !canViewNotifications)) {
+    if (!isAuthenticated || !canViewNotifications) {
       toast({
         title: 'Sin permisos',
         description: 'No tienes permisos para acceder a esta sección',
@@ -88,13 +88,13 @@ export default function Notifications () {
       }, 500);
       return;
     }
-  }, [isAuthenticated, isLoading, canViewNotifications, toast]);
+  }, [isAuthenticated, canViewNotifications, toast]);
 
   useEffect(() => {
-    if (!isLoading && user?.role === 'admin') {
+    if (user?.role === 'admin') {
       navigate('/employees', { replace: true });
     }
-  }, [user, isLoading, navigate]);
+  }, [user, navigate]);
 
   const {
     data: notifications,
@@ -179,24 +179,32 @@ export default function Notifications () {
     try {
       // Preparar datos para exportar con nombres de columnas en español
       const exportData = notifications.map(notif => {
-        // Extraer employeeId del metadata si existe
-        const metadata = notif.metadata as { employeeId?: string };
-        const employeeId = metadata?.employeeId || 'N/A';
-
-        // Extraer emailGlovo del mensaje si está disponible
-        // Buscar patrones comunes en el mensaje que contengan el email
-        let emailGlovo = 'N/A';
-        if (notif.message) {
-          // Buscar email en el mensaje (patrón: @solucioning.net)
-          const emailMatch = notif.message.match(/[a-zA-Z0-9._%+-]+@solucioning\.net/g);
-          if (emailMatch && emailMatch.length > 0) {
-            emailGlovo = emailMatch[0];
-          }
-        }
+        // Extraer datos del empleado del metadata si existe
+        const metadata = notif.metadata as { 
+          employeeId?: string;
+          idGlovo?: string;
+          emailGlovo?: string;
+          dni?: string;
+          nombre?: string;
+          apellido?: string;
+          telefono?: string;
+        };
+        
+        // Usar datos del metadata si están disponibles, sino extraer del mensaje
+        const employeeId = metadata?.employeeId || metadata?.idGlovo || 'N/A';
+        const emailGlovo = metadata?.emailGlovo || 'N/A';
+        const dni = metadata?.dni || 'N/A';
+        const nombre = metadata?.nombre || 'N/A';
+        const apellido = metadata?.apellido || 'N/A';
+        const telefono = metadata?.telefono || 'N/A';
 
         return {
           'ID Glovo': employeeId,
           'Email Glovo': emailGlovo,
+          'DNI/NIE': dni,
+          'Nombre': nombre,
+          'Apellido': apellido,
+          'Teléfono': telefono,
           'ID': notif.id,
           'Tipo': notif.type === 'company_leave_request' ? 'Solicitud de Baja Empresa' :
             notif.type === 'employee_update' ? 'Actualización de Empleado' :
@@ -205,7 +213,7 @@ export default function Notifications () {
           'Mensaje': notif.message,
           'Solicitado por': notif.requestedBy,
           'Estado': notif.status === 'pending' ? 'Pendiente' :
-            notif.status === 'pendiente_laboral' ? 'Pendiente Laboral' :
+            notif.status === 'pending_laboral' ? 'Pendiente Laboral' :
               notif.status === 'approved' ? 'Tramitada' :
                 notif.status === 'rejected' ? 'Rechazada' :
                   notif.status === 'processed' ? 'Procesada' : notif.status,
@@ -314,7 +322,7 @@ export default function Notifications () {
     }
   };
 
-  if (isLoading || notificationsLoading) {
+  if (notificationsLoading) {
     return (
       <div className="p-6">
         <div className="animate-pulse">
