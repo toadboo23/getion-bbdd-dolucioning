@@ -371,6 +371,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
           complementaries: processString(emp.complementaries),
           ciudad: processString(emp.ciudad),
           cityCode: processString(emp.cityCode),
+          flota: processString(emp.flota),
           dniNie: processString(emp.dniNie),
           iban: processString(emp.iban),
           direccion: processString(emp.direccion),

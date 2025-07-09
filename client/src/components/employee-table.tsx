@@ -75,6 +75,8 @@ export default function EmployeeTable ({
                 <TableHead>Empleado</TableHead>
                 <TableHead>Emails & Teléfono</TableHead>
                 <TableHead>Ciudad</TableHead>
+                <TableHead>Código Ciudad</TableHead>
+                <TableHead>Flota</TableHead>
                 <TableHead>DNI/NIE</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Horas</TableHead>
@@ -101,6 +103,12 @@ export default function EmployeeTable ({
                   </TableCell>
                   <TableCell className="text-sm text-gray-900 capitalize">
                     {employee.ciudad || 'N/A'}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-900">
+                    {employee.cityCode || 'N/A'}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-900 font-medium">
+                    {employee.flota || 'N/A'}
                   </TableCell>
                   <TableCell className="text-sm text-gray-900">
                     {employee.dniNie || 'N/A'}

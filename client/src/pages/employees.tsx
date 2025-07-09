@@ -26,6 +26,7 @@ export default function Employees () {
   const [searchTerm, setSearchTerm] = useState('');
   const [cityFilter, setCityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [flotaFilter, setFlotaFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -69,6 +70,7 @@ export default function Employees () {
       search: searchTerm,
       city: cityFilter === 'all' ? '' : cityFilter,
       status: statusFilter === 'all' ? '' : statusFilter,
+      flota: flotaFilter === '' ? '' : flotaFilter,
       userCity: user?.ciudad || '',
     }],
     enabled: employeesLoaded, // Solo se ejecuta cuando employeesLoaded es true
@@ -248,7 +250,7 @@ export default function Employees () {
         'Cuenta Divilo': emp.cuentaDivilo,
         'Próxima Asignación Slots': emp.proximaAsignacionSlots ? new Date(emp.proximaAsignacionSlots).toLocaleDateString('es-ES') : '',
         'Jefe de Tráfico': emp.jefeTrafico,
-        // 'Flota': emp.flota || '', // Comentado porque no existe en el tipo Employee
+        'Flota': emp.flota || '',
         'Comentarios Jefe Tráfico': emp.comentsJefeDeTrafico,
         'Incidencias': emp.incidencias,
         'Fecha Incidencia': emp.fechaIncidencia ? new Date(emp.fechaIncidencia).toLocaleDateString('es-ES') : '',
@@ -283,7 +285,12 @@ export default function Employees () {
   };
 
   // Lógica de paginación
-  const filteredEmployees = employees ?? [];
+  // Filtrar empleados por flota además de los otros filtros
+  const filteredEmployees = (employees ?? []).filter(emp => {
+    const flotaMatch = flotaFilter.trim() === '' || (emp.flota ?? '').toLowerCase().includes(flotaFilter.trim().toLowerCase());
+    // Aquí puedes agregar más condiciones de filtrado si lo deseas
+    return flotaMatch;
+  });
   const totalEmployees = filteredEmployees.length;
   const totalPages = Math.ceil(totalEmployees / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -314,6 +321,7 @@ export default function Employees () {
     setSearchTerm('');
     setCityFilter('all');
     setStatusFilter('all');
+    setFlotaFilter('');
     setCurrentPage(1);
   };
 
@@ -488,6 +496,19 @@ export default function Employees () {
                     <SelectItem value="penalizado">Penalizado</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <label htmlFor="flota-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                  Flota
+                </label>
+                <Input
+                  id="flota-filter"
+                  placeholder="Ej: MAD1, BCN1..."
+                  value={flotaFilter}
+                  onChange={e => setFlotaFilter(e.target.value)}
+                  className="pl-4"
+                />
               </div>
             </div>
 

@@ -100,7 +100,7 @@ export const employees = pgTable('employees', {
   penalizationStartDate: date('penalization_start_date'),
   penalizationEndDate: date('penalization_end_date'),
   originalHours: integer('original_hours'),
-  // flota: varchar('flota', { length: 100 }), // REMOVIDO - reemplazado por ciudad
+  flota: varchar('flota', { length: 10 }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

@@ -293,6 +293,11 @@ export default function EmployeeDetailModal ({
                   value={employee.cityCode}
                 />
                 <InfoItem
+                  icon={Building}
+                  label="Flota"
+                  value={employee.flota}
+                />
+                <InfoItem
                   icon={Calendar}
                   label="Fecha Alta Seg. Social"
                   value={formatDate(employee.fechaAltaSegSoc)}

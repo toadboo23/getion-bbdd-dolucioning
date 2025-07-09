@@ -83,6 +83,7 @@ export default function EditEmployeeModal ({
       complementaries: '',
       ciudad: '',
       cityCode: '',
+      flota: '',
       dniNie: '',
       iban: '',
       direccion: '',
@@ -119,6 +120,7 @@ export default function EditEmployeeModal ({
         complementaries: employee.complementaries || '',
         ciudad: employee.ciudad || '',
         cityCode: employee.cityCode || '',
+        flota: employee.flota || '',
         dniNie: employee.dniNie || '',
         iban: employee.iban || '',
         direccion: employee.direccion || '',
@@ -152,6 +154,7 @@ export default function EditEmployeeModal ({
         complementaries: '',
         ciudad: '',
         cityCode: '',
+        flota: '',
         dniNie: '',
         iban: '',
         direccion: '',
@@ -491,6 +494,20 @@ export default function EditEmployeeModal ({
                       <FormLabel>Código Ciudad</FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="MAD, BCN, VAL..." disabled={isFieldDisabled('cityCode')} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="flota"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Flota</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="MAD1, BCN1, VAL1..." disabled={isFieldDisabled('flota')} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

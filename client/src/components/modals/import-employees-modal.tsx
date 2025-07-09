@@ -28,6 +28,7 @@ interface EmployeeData {
   iban: string;
   ciudad: string;
   cityCode: string;
+  flota: string;
   direccion: string;
   vehiculo: string;
   naf: string;
@@ -267,6 +268,7 @@ export default function ImportEmployeesModal ({
           const ibanIndex = findColumnIndex(['iban', 'cuenta bancaria', 'bank account']);
           const ciudadIndex = findColumnIndex(['ciudad', 'city', 'localidad']);
           const cityCodeIndex = findColumnIndex(['código ciudad', 'citycode', 'city_code', 'codigo ciudad', 'citycode']);
+          const flotaIndex = findColumnIndex(['flota', 'fleet', 'flota']);
           const direccionIndex = findColumnIndex(['dirección', 'direccion', 'address', 'domicilio']);
           const vehiculoIndex = findColumnIndex(['vehículo', 'vehiculo', 'vehicle', 'transporte']);
           const nafIndex = findColumnIndex(['naf', 'número afiliación', 'numero afiliacion']);
@@ -294,6 +296,7 @@ export default function ImportEmployeesModal ({
             iban: String(row[ibanIndex] || ''),
             ciudad: String(row[ciudadIndex] || ''),
             cityCode: String(row[cityCodeIndex] || ''),
+            flota: String(row[flotaIndex] || ''),
             direccion: String(row[direccionIndex] || ''),
             vehiculo: String(row[vehiculoIndex] || ''),
             naf: String(row[nafIndex] || ''),

@@ -65,6 +65,7 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
     'Complementarios',
     'Ciudad',
     'Código Ciudad',
+    'Flota',
     'DNI/NIE',
     'IBAN',
     'Dirección',
@@ -103,6 +104,7 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
       'Sí', // Complementarios
       'Madrid', // Ciudad
       'MAD', // Código Ciudad
+      'MAD1', // Flota
       '12345678A', // DNI/NIE
       'ES12345678901234567890', // IBAN
       'Calle Mayor 123', // Dirección
@@ -137,6 +139,7 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
       'No', // Complementarios
       'Barcelona', // Ciudad
       'BCN', // Código Ciudad
+      'BCN1', // Flota
       '87654321B', // DNI/NIE
       'ES09876543210987654321', // IBAN
       'Avenida Diagonal 456', // Dirección
