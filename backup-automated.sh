@@ -7,9 +7,9 @@ set -e
 
 # Configuración
 BACKUP_DIR="/root/backups"
-DB_NAME="solucioning"
+DB_NAME="employee_management"
 DB_USER="postgres"
-CONTAINER_NAME="solucioning-db-1"
+CONTAINER_NAME="solucioning_postgres"
 RETENTION_DAYS=30
 DATE=$(date +%Y%m%d_%H%M%S)
 BACKUP_NAME="backup_$DATE"
