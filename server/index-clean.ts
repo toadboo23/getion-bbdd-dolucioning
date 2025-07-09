@@ -76,6 +76,33 @@ async function initializeSystem () {
   }
 }
 
+// Check expired penalizations on startup
+async function checkExpiredPenalizationsOnStartup () {
+  try {
+    console.log('🔍 Checking expired penalizations on startup...');
+    
+    // Import storage after routes are registered
+    const { PostgresStorage } = await import('./storage-postgres.js');
+    const storage = new PostgresStorage();
+    
+    const result = await storage.checkAndRestoreExpiredPenalizations();
+    
+    if (result.restored > 0) {
+      console.log(`✅ Auto-restored ${result.restored} expired penalizations on startup`);
+      console.log('📋 Restored employees:', result.restoredEmployees.map(emp => `${emp.nombre} ${emp.apellido || ''} (${emp.idGlovo})`));
+    } else {
+      console.log('✅ No expired penalizations found on startup');
+    }
+    
+    if (result.pendingPenalizations.length > 0) {
+      console.log(`⏳ Found ${result.pendingPenalizations.length} active penalizations`);
+    }
+  } catch (error) {
+    console.error('❌ Error checking expired penalizations on startup:', error);
+    console.log('⚠️ Continuing server startup...');
+  }
+}
+
 // Register routes and start server
 async function startServer () {
   try {
@@ -83,6 +110,9 @@ async function startServer () {
     const httpServer = await registerRoutes(app);
 
     await initializeSystem();
+    
+    // Check expired penalizations on startup
+    await checkExpiredPenalizationsOnStartup();
 
     httpServer.listen(PORT, () => {
       console.log('\n🚀 Server running on http://localhost:' + PORT);

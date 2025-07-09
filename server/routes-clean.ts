@@ -557,6 +557,63 @@ export async function registerRoutes (app: Express): Promise<Server> {
     }
   });
 
+  // Check and restore expired penalizations (protected - admin/super_admin only)
+  app.post('/api/employees/check-expired-penalizations', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🔍 Check expired penalizations request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para verificar penalizaciones expiradas' });
+      }
+
+      const result = await storage.checkAndRestoreExpiredPenalizations();
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+        action: 'check_expired_penalizations',
+        entityType: 'system',
+        entityId: 'penalizations',
+        entityName: 'Sistema de Penalizaciones',
+        description: `Verificación automática de penalizaciones expiradas: ${result.checked} verificadas, ${result.restored} restauradas`,
+        oldData: { checked: result.checked },
+        newData: { restored: result.restored, restoredEmployees: result.restoredEmployees },
+      });
+
+      res.json({
+        message: 'Verificación de penalizaciones expiradas completada',
+        ...result,
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error checking expired penalizations:', error);
+      res.status(500).json({ message: 'Failed to check expired penalizations' });
+    }
+  });
+
+  // Get penalizations expiring soon (protected - admin/super_admin only)
+  app.get('/api/employees/penalizations/expiring-soon', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('⏳ Get expiring penalizations request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para ver penalizaciones por expirar' });
+      }
+
+      const days = parseInt(req.query.days as string) || 7;
+      const expiringPenalizations = await storage.getPenalizationsExpiringSoon(days);
+
+      res.json({
+        message: 'Penalizaciones por expirar obtenidas',
+        expiringPenalizations,
+        days,
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error getting expiring penalizations:', error);
+      res.status(500).json({ message: 'Failed to get expiring penalizations' });
+    }
+  });
+
   // Company leaves (protected)
   app.get('/api/company-leaves', isAuthenticated, async (req, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('🏢 Company leaves request');

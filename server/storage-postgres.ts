@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq, and, sql, desc } from 'drizzle-orm';
+import { eq, and, sql, desc, isNotNull, lt } from 'drizzle-orm';
 import {
   systemUsers,
   auditLogs,
@@ -576,17 +576,48 @@ export class PostgresStorage {
   }
 
   async removePenalization (employeeId: string): Promise<Employee> {
-    const [employee] = await db
-      .update(employees)
-      .set({
-        penalizationStartDate: null,
-        penalizationEndDate: null,
-        status: 'active',
-        updatedAt: new Date(),
-      })
-      .where(eq(employees.idGlovo, employeeId))
-      .returning();
-    return employee;
+    try {
+      // Get current employee data to access originalHours
+      const employee = await this.getEmployee(employeeId);
+      if (!employee) {
+        throw new Error('Employee not found');
+      }
+
+      // Restore original hours or keep current hours if no originalHours stored
+      const hoursToRestore = employee.originalHours || employee.horas || 0;
+
+      const [updatedEmployee] = await db
+        .update(employees)
+        .set({
+          penalizationStartDate: null,
+          penalizationEndDate: null,
+          status: 'active',
+          horas: hoursToRestore, // Restore original hours
+          originalHours: null, // Clear original hours after restoration
+          updatedAt: new Date(),
+        })
+        .where(eq(employees.idGlovo, employeeId))
+        .returning();
+
+      // Create notification for the penalization removal
+      await this.createNotification({
+        type: 'employee_update',
+        title: 'Penalización Removida',
+        message: `La penalización del empleado ${employee.nombre} ${employee.apellido || ''} (${employeeId}) ha sido removida. Horas restauradas: ${hoursToRestore}`,
+        requestedBy: 'SYSTEM',
+        status: 'processed',
+        metadata: {
+          ...getEmpleadoMetadata(employee),
+          employeeId,
+          restoredHours: hoursToRestore,
+        },
+      });
+
+      return updatedEmployee;
+    } catch (error) {
+      console.error('Error removing employee penalization:', error);
+      throw error;
+    }
   }
 
   async reactivateEmployee (employeeId: string): Promise<Employee> {
@@ -601,6 +632,74 @@ export class PostgresStorage {
     return employee;
   }
 
+  // Check and auto-restore expired penalizations
+  async checkAndRestoreExpiredPenalizations (): Promise<{
+    checked: number;
+    restored: number;
+    restoredEmployees: Employee[];
+    pendingPenalizations: Employee[];
+  }> {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day for date comparison
+
+      // Get all penalized employees with expired end dates
+      const expiredPenalizations = await db
+        .select()
+        .from(employees)
+        .where(
+          and(
+            eq(employees.status, 'penalizado'),
+            isNotNull(employees.penalizationEndDate),
+            lt(employees.penalizationEndDate, today)
+          )
+        );
+
+      // Get all penalized employees with future end dates (for information)
+      const pendingPenalizations = await db
+        .select()
+        .from(employees)
+        .where(
+          and(
+            eq(employees.status, 'penalizado'),
+            isNotNull(employees.penalizationEndDate),
+            sql`${employees.penalizationEndDate} >= ${today}`
+          )
+        );
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`🔍 [PENALIZATION] Checking ${expiredPenalizations.length} expired penalizations`);
+        console.log(`⏳ [PENALIZATION] Found ${pendingPenalizations.length} pending penalizations`);
+      }
+
+      const restoredEmployees: Employee[] = [];
+
+      // Restore each expired penalization
+      for (const employee of expiredPenalizations) {
+        try {
+          const restoredEmployee = await this.removePenalization(employee.idGlovo);
+          restoredEmployees.push(restoredEmployee);
+
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`✅ [PENALIZATION] Auto-restored penalization for ${employee.nombre} ${employee.apellido || ''} (${employee.idGlovo})`);
+          }
+        } catch (error) {
+          console.error(`❌ [PENALIZATION] Error auto-restoring penalization for ${employee.idGlovo}:`, error);
+        }
+      }
+
+      return {
+        checked: expiredPenalizations.length,
+        restored: restoredEmployees.length,
+        restoredEmployees,
+        pendingPenalizations,
+      };
+    } catch (error) {
+      console.error('❌ [PENALIZATION] Error checking expired penalizations:', error);
+      throw error;
+    }
+  }
+
   async setEmployeeItLeave (employeeId: string, fechaIncidencia: string | Date): Promise<Employee> {
     const now = new Date();
     const [updatedEmployee] = await db
@@ -613,5 +712,33 @@ export class PostgresStorage {
       .where(eq(employees.idGlovo, employeeId))
       .returning();
     return updatedEmployee;
+  }
+
+  // Get penalizations expiring soon (within next 7 days)
+  async getPenalizationsExpiringSoon (days: number = 7): Promise<Employee[]> {
+    try {
+      const today = new Date();
+      const futureDate = new Date();
+      futureDate.setDate(today.getDate() + days);
+      today.setHours(0, 0, 0, 0);
+      futureDate.setHours(23, 59, 59, 999);
+
+      const expiringPenalizations = await db
+        .select()
+        .from(employees)
+        .where(
+          and(
+            eq(employees.status, 'penalizado'),
+            isNotNull(employees.penalizationEndDate),
+            sql`${employees.penalizationEndDate} >= ${today}`,
+            sql`${employees.penalizationEndDate} <= ${futureDate}`
+          )
+        );
+
+      return expiringPenalizations;
+    } catch (error) {
+      console.error('❌ [PENALIZATION] Error getting expiring penalizations:', error);
+      throw error;
+    }
   }
 }

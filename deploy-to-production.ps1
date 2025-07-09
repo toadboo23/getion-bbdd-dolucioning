@@ -46,8 +46,8 @@ git checkout Develop-Local
 Write-Host "✅ Despliegue completado!" -ForegroundColor Green
 Write-Host "📋 Próximos pasos:" -ForegroundColor Cyan
 Write-Host "   1. Conectarse al VPS" -ForegroundColor White
-Write-Host "   2. Ejecutar: cd /root/solucioning-deploy && git pull origin Production" -ForegroundColor White
-Write-Host "   3. Ejecutar: cd /root/solucioning-deploy && docker-compose down && docker-compose up --build -d" -ForegroundColor White
+Write-Host "   2. Ejecutar: cd /root/solucioning-deploy; git pull origin Production" -ForegroundColor White
+Write-Host "   3. Ejecutar: cd /root/solucioning-deploy; docker-compose down; docker-compose up --build -d" -ForegroundColor White
 Write-Host ""
 Write-Host "🔗 Para crear un Pull Request:" -ForegroundColor Cyan
 Write-Host "   https://github.com/toadboo23/db_solucioning/pull/new/Develop-Local" -ForegroundColor White 

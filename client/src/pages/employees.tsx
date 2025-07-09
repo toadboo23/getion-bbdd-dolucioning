@@ -15,7 +15,8 @@ import LeaveManagementModal from '@/components/modals/leave-management-modal';
 import ImportEmployeesModal from '@/components/modals/import-employees-modal';
 import EmployeeDetailModal from '@/components/modals/employee-detail-modal';
 import PenalizationModal from '@/components/modals/penalization-modal';
-import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import PenalizationAlert from '@/components/penalization-alert';
+import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight, Users, AlertTriangle } from 'lucide-react';
 import type { Employee } from '@shared/schema';
 import { CIUDADES_DISPONIBLES } from '@shared/schema';
 // XLSX import removed as it's not used in this file
@@ -210,6 +211,44 @@ export default function Employees () {
     setIsPenalizationModalOpen(true);
   };
 
+  // Mutación para verificar penalizaciones expiradas
+  const checkExpiredPenalizationsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/employees/check-expired-penalizations');
+      return response;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+      toast({
+        title: 'Verificación completada',
+        description: `Se verificaron ${data.checked} penalizaciones y se restauraron ${data.restored} empleados`,
+      });
+    },
+    onError: (_error) => {
+      if (isUnauthorizedError(_error)) {
+        toast({
+          title: 'Error de autorización',
+          description: 'Tu sesión ha expirado. Redirigiendo al login...',
+          variant: 'destructive',
+        });
+        setTimeout(() => {
+          window.location.href = '/api/login';
+        }, 500);
+        return;
+      }
+      toast({
+        title: 'Error al verificar penalizaciones',
+        description: _error instanceof Error ? _error.message : 'Error desconocido',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleCheckExpiredPenalizations = () => {
+    checkExpiredPenalizationsMutation.mutate();
+  };
+
   // Función para exportar empleados a Excel
   const handleExportEmployees = () => {
     if (!employees || employees.length === 0) {
@@ -341,6 +380,9 @@ export default function Employees () {
 
   return (
     <div className="p-6">
+      {/* Alerta de penalizaciones por expirar */}
+      <PenalizationAlert onCheckExpired={handleCheckExpiredPenalizations} />
+      
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -392,6 +434,19 @@ export default function Employees () {
               >
                 <Download className="w-4 h-4 mr-2" />
                 Exportar Excel
+              </Button>
+            )}
+
+            {/* Botón Verificar Penalizaciones Expiradas - Solo Admin y Super Admin */}
+            {canEditEmployees && (
+              <Button
+                variant="outline"
+                onClick={handleCheckExpiredPenalizations}
+                disabled={checkExpiredPenalizationsMutation.isPending}
+                className="border-orange-500 text-orange-600 hover:bg-orange-50"
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                {checkExpiredPenalizationsMutation.isPending ? 'Verificando...' : 'Verificar Penalizaciones'}
               </Button>
             )}
 
