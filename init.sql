@@ -105,12 +105,11 @@ CREATE TABLE IF NOT EXISTS system_users (
   last_name varchar(100) NOT NULL,
   password varchar(255) NOT NULL, -- Hashed password
   role varchar(20) NOT NULL CHECK (role IN ('super_admin', 'admin', 'normal')),
-  is_active boolean NOT NULL DEFAULT true,
+  is_active boolean DEFAULT true,
   created_by varchar(255) NOT NULL, -- Email of creator
   last_login timestamp,
   created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-  updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
-  assigned_city varchar(200)
+  updated_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create audit_logs table (for tracking all admin/super_admin actions)
@@ -146,7 +145,6 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type ON audit_logs(entity_type);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
-CREATE INDEX IF NOT EXISTS idx_system_users_assigned_city ON system_users(assigned_city);
 
 -- Add unique constraint to dni_nie field to prevent duplicates
 DO $$ 
@@ -161,10 +159,10 @@ BEGIN
 END $$;
 
 -- Insert production super admin users with HASHED passwords (39284756 hasheado con bcrypt)
-INSERT INTO system_users (email, first_name, last_name, password, role, is_active, created_by, assigned_city) 
+INSERT INTO system_users (email, first_name, last_name, password, role, created_by, is_active) 
 VALUES 
-  ('nmartinez@solucioning.net', 'Nicolas', 'Martinez', '$2b$10$KunpNfnpDczxVRPB9rxJ4ey2RV2iRGTFtQR0ddIhvWV1.lo8QKidi', 'super_admin', true, 'SYSTEM', NULL),
-  ('lvega@solucioning.net', 'Luciana', 'Vega', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super_admin', true, 'SYSTEM', NULL)
+  ('nmartinez@solucioning.net', 'Nicolas', 'Martinez', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super_admin', 'SYSTEM', true),
+  ('lvega@solucioning.net', 'Luciana', 'Vega', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super_admin', 'SYSTEM', true)
 ON CONFLICT (email) DO NOTHING;
 
 -- Insert initial audit log for system setup
@@ -173,18 +171,3 @@ SELECT * FROM (VALUES
   ('SYSTEM', 'super_admin', 'system_init', 'database', 'db_init', 'Database Initialization', 'Sistema Solucioning inicializado con tablas y super admin users', '127.0.0.1', 'System')
 ) AS v(user_id, user_role, action, entity_type, entity_id, entity_name, description, ip_address, user_agent)
 WHERE NOT EXISTS (SELECT 1 FROM audit_logs WHERE action = 'system_init');
-
--- Asegurar que la columna assigned_city exista en system_users (para compatibilidad con versiones anteriores)
-ALTER TABLE system_users ADD COLUMN IF NOT EXISTS assigned_city varchar(200);
-
--- Normalizar todas las ciudades existentes a formato capitalizado (primera letra mayúscula, resto minúsculas)
-DO $$
-DECLARE
-    rec RECORD;
-    ciudad_normalizada VARCHAR(200);
-BEGIN
-    FOR rec IN SELECT DISTINCT ciudad FROM employees WHERE ciudad IS NOT NULL LOOP
-        ciudad_normalizada := INITCAP(LOWER(rec.ciudad));
-        UPDATE employees SET ciudad = ciudad_normalizada WHERE LOWER(ciudad) = LOWER(rec.ciudad);
-    END LOOP;
-END $$;
