@@ -1,1 +1,0 @@
-const { user, isAuthenticated } = useAuth(); 

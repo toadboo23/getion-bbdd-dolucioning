@@ -648,7 +648,7 @@ export default function UserManagement () {
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </AlertDialogTrigger>
-                              <AlertDialogContent>
+                              <AlertDialogContent aria-describedby="delete-user-description">
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
                                   <AlertDialogDescription>
@@ -656,6 +656,9 @@ export default function UserManagement () {
                                     el usuario <strong>{userRow.firstName} {userRow.lastName}</strong> del sistema.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
+                                <div id="delete-user-description" className="sr-only">
+                                  Modal de confirmación para eliminar usuario. Permite confirmar o cancelar la eliminación permanente del usuario.
+                                </div>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                   <AlertDialogAction

@@ -30,7 +30,8 @@ export default function LeaveManagementModal ({
   const { toast } = useToast();
   const [leaveType, setLeaveType] = useState<'it' | 'company' | ''>('');
   const [itReason, setItReason] = useState<'enfermedad' | 'accidente' | ''>('');
-  const [companyReason, setCompanyReason] = useState<'despido' | 'voluntaria' | 'nspp' | 'anulacion' | ''>('');
+  const [companyReason, setCompanyReason] = useState<'despido' | 'voluntaria' | 'nspp' | 'anulacion' | 'fin_contrato_temporal' | 'agotamiento_it' | 'otras_causas' | ''>('');
+  const [companyComments, setCompanyComments] = useState('');
   const [leaveDate, setLeaveDate] = useState('');
 
   const itLeaveMutation = useMutation({
@@ -92,7 +93,7 @@ export default function LeaveManagementModal ({
   });
 
   const companyLeaveMutation = useMutation({
-    mutationFn: async (data: { leaveType: string; leaveDate: string }) => {
+    mutationFn: async (data: { leaveType: string; leaveDate: string; comments?: string }) => {
       if (!employee) throw new Error('No employee selected');
       await apiRequest('POST', '/api/company-leaves', {
         ...data,
@@ -126,6 +127,7 @@ export default function LeaveManagementModal ({
     setLeaveType('');
     setItReason('');
     setCompanyReason('');
+    setCompanyComments('');
     setLeaveDate('');
   };
 
@@ -162,9 +164,21 @@ export default function LeaveManagementModal ({
         });
         return;
       }
+
+      // Validar comentarios para 'otras_causas'
+      if (companyReason === 'otras_causas' && (!companyComments || companyComments.trim() === '')) {
+        toast({
+          title: 'Error',
+          description: 'El tipo "Otras Causas" requiere un comentario obligatorio',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       companyLeaveMutation.mutate({
         leaveType: companyReason,
         leaveDate: leaveDate,
+        comments: companyReason === 'otras_causas' ? companyComments : undefined,
       });
     }
   };
@@ -233,7 +247,7 @@ export default function LeaveManagementModal ({
               <Label className="text-sm font-medium text-gray-700 mb-3 block">
                 Motivo Baja Empresa
               </Label>
-              <RadioGroup value={companyReason} onValueChange={(value: 'despido' | 'voluntaria' | 'nspp' | 'anulacion') => setCompanyReason(value)}>
+              <RadioGroup value={companyReason} onValueChange={(value: 'despido' | 'voluntaria' | 'nspp' | 'anulacion' | 'fin_contrato_temporal' | 'agotamiento_it' | 'otras_causas') => setCompanyReason(value)}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="despido" id="despido" />
                   <Label htmlFor="despido">Despido</Label>
@@ -250,7 +264,37 @@ export default function LeaveManagementModal ({
                   <RadioGroupItem value="anulacion" id="anulacion" />
                   <Label htmlFor="anulacion">Anulación</Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="fin_contrato_temporal" id="fin_contrato_temporal" />
+                  <Label htmlFor="fin_contrato_temporal">Fin de Contrato Temporal</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="agotamiento_it" id="agotamiento_it" />
+                  <Label htmlFor="agotamiento_it">Agotamiento IT</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="otras_causas" id="otras_causas" />
+                  <Label htmlFor="otras_causas">Otras Causas</Label>
+                </div>
               </RadioGroup>
+
+              {/* Campo de comentarios para "Otras Causas" */}
+              {companyReason === 'otras_causas' && (
+                <div className="mt-4">
+                  <Label htmlFor="companyComments" className="text-sm font-medium text-gray-700">
+                    Comentarios *
+                  </Label>
+                  <textarea
+                    id="companyComments"
+                    value={companyComments}
+                    onChange={(e) => setCompanyComments(e.target.value)}
+                    placeholder="Describe el motivo de la baja..."
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+                    rows={3}
+                    required
+                  />
+                </div>
+              )}
             </div>
           )}
 

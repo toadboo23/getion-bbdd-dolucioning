@@ -636,9 +636,23 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       const leaveData = req.body;
       
+      // Validar el tipo de baja empresa
+      const validLeaveTypes = ['despido', 'voluntaria', 'nspp', 'anulacion', 'fin_contrato_temporal', 'agotamiento_it', 'otras_causas'];
+      if (!validLeaveTypes.includes(leaveData.leaveType)) {
+        return res.status(400).json({ 
+          message: `Tipo de baja inválido. Tipos válidos: ${validLeaveTypes.join(', ')}` 
+        });
+      }
+
+      // Validar que 'otras_causas' tenga comentarios
+      let comments = null;
+      if (leaveData.leaveType === 'otras_causas') {
+        comments = leaveData.comments ? String(leaveData.comments) : '';
+      }
       // Asegurar que leaveRequestedAt y leaveRequestedBy estén presentes
       const processedLeaveData = {
         ...leaveData,
+        comments,
         leaveRequestedAt: leaveData.leaveRequestedAt || new Date(),
         leaveRequestedBy: leaveData.leaveRequestedBy || leaveData.requestedBy || user.email || '',
       };
@@ -700,6 +714,58 @@ export async function registerRoutes (app: Express): Promise<Server> {
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') console.error('❌ Error creating company leave:', error);
       res.status(500).json({ message: 'Failed to create company leave' });
+    }
+  });
+
+  // Cambiar motivo de baja empresa (solo super admin)
+  app.post('/api/company-leaves/:id/change-reason', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede cambiar el motivo de baja empresa' });
+      }
+      const leaveId = parseInt(req.params.id, 10);
+      const { motivoNuevo, comentarios } = req.body;
+      const validLeaveTypes = ['despido', 'voluntaria', 'nspp', 'anulacion', 'fin_contrato_temporal', 'agotamiento_it', 'otras_causas'];
+      if (!validLeaveTypes.includes(motivoNuevo)) {
+        return res.status(400).json({ message: `Motivo inválido. Tipos válidos: ${validLeaveTypes.join(', ')}` });
+      }
+      if (motivoNuevo === 'otras_causas' && (!comentarios || comentarios.trim() === '')) {
+        return res.status(400).json({ message: 'El tipo "Otras Causas" requiere un comentario obligatorio' });
+      }
+      // Obtener la baja actual
+      const leave = await storage.getCompanyLeaveById(leaveId);
+      if (!leave) {
+        return res.status(404).json({ message: 'Baja empresa no encontrada' });
+      }
+      const motivoAnterior = leave.leaveType;
+      // Actualizar motivo y comentarios
+      await storage.updateCompanyLeaveReason(leaveId, motivoNuevo, motivoNuevo === 'otras_causas' ? comentarios : null);
+      // Registrar en historial
+      await storage.createEmployeeLeaveHistory({
+        employeeId: leave.employeeId,
+        leaveType: 'company_leave',
+        motivoAnterior,
+        motivoNuevo,
+        comentarios: motivoNuevo === 'otras_causas' ? comentarios : null,
+        cambiadoPor: user.email,
+        rolUsuario: user.role,
+      });
+      // Registrar en logs
+      await AuditService.logAction({
+        userId: user.email,
+        userRole: user.role,
+        action: 'change_company_leave_reason',
+        entityType: 'company_leave',
+        entityId: leave.employeeId,
+        description: `Cambio de motivo de baja empresa: de ${motivoAnterior} a ${motivoNuevo}`,
+        oldData: leave,
+        newData: { ...leave, leaveType: motivoNuevo, comments: motivoNuevo === 'otras_causas' ? comentarios : null },
+      });
+      res.json({ message: 'Motivo de baja empresa actualizado y registrado en historial' });
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error cambiando motivo de baja empresa:', error);
+      res.status(500).json({ message: 'Error cambiando motivo de baja empresa' });
     }
   });
 
@@ -1368,6 +1434,19 @@ export async function registerRoutes (app: Express): Promise<Server> {
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') console.error('❌ Error logging page access:', error);
       res.status(500).json({ message: 'Failed to log page access' });
+    }
+  });
+
+  // Obtener historial de bajas de un empleado
+  app.get('/api/employees/:id/leave-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      // Permitir que cualquier usuario autenticado consulte el historial
+      const history = await storage.getEmployeeLeaveHistory(id);
+      res.json(history);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error obteniendo historial de bajas:', error);
+      res.status(500).json({ message: 'Error obteniendo historial de bajas' });
     }
   });
 

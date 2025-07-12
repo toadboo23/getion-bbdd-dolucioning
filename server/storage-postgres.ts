@@ -23,6 +23,7 @@ import {
   type InsertItLeave,
   type Notification,
   type InsertNotification,
+  employeeLeaveHistory,
 } from '../shared/schema.js';
 // import { IStorage } from "./storage.js";
 
@@ -740,5 +741,50 @@ export class PostgresStorage {
       console.error('❌ [PENALIZATION] Error getting expiring penalizations:', error);
       throw error;
     }
+  }
+
+  async getCompanyLeaveById (id: number): Promise<CompanyLeave | undefined> {
+    const [leave] = await db.select().from(companyLeaves).where(eq(companyLeaves.id, id));
+    return leave;
+  }
+
+  async updateCompanyLeaveReason (id: number, motivoNuevo: string, comentarios: string | null): Promise<CompanyLeave> {
+    const [leave] = await db
+      .update(companyLeaves)
+      .set({
+        leaveType: motivoNuevo,
+        comments: comentarios,
+        updatedAt: new Date(),
+      })
+      .where(eq(companyLeaves.id, id))
+      .returning();
+    return leave;
+  }
+
+  async createEmployeeLeaveHistory (data: {
+    employeeId: string,
+    leaveType: string,
+    motivoAnterior: string,
+    motivoNuevo: string,
+    comentarios?: string | null,
+    cambiadoPor: string,
+    rolUsuario: string,
+  }): Promise<void> {
+    await db.insert(employeeLeaveHistory).values({
+      employeeId: data.employeeId,
+      leaveType: data.leaveType,
+      motivoAnterior: data.motivoAnterior,
+      motivoNuevo: data.motivoNuevo,
+      comentarios: data.comentarios || null,
+      cambiadoPor: data.cambiadoPor,
+      rolUsuario: data.rolUsuario,
+      fechaCambio: new Date(),
+    });
+  }
+
+  async getEmployeeLeaveHistory (employeeId: string): Promise<any[]> {
+    return await db.select().from(employeeLeaveHistory)
+      .where(eq(employeeLeaveHistory.employeeId, employeeId))
+      .orderBy(desc(employeeLeaveHistory.fechaCambio));
   }
 }

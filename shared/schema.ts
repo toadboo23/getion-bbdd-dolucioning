@@ -110,7 +110,10 @@ export const companyLeaves = pgTable('company_leaves', {
   id: serial('id').primaryKey(),
   employeeId: varchar('employee_id', { length: 50 }).notNull(),
   employeeData: jsonb('employee_data').notNull(),
-  leaveType: varchar('leave_type', { length: 100 }).notNull(),
+  leaveType: varchar('leave_type', { 
+    enum: ['despido', 'voluntaria', 'nspp', 'anulacion', 'fin_contrato_temporal', 'agotamiento_it', 'otras_causas'] 
+  }).notNull(),
+  comments: text('comments'), // Comentarios obligatorios para 'otras_causas'
   leaveDate: date('leave_date').notNull(),
   leaveRequestedAt: timestamp('leave_requested_at').notNull(),
   leaveRequestedBy: varchar('leave_requested_by', { length: 255 }).notNull(),
@@ -171,6 +174,21 @@ export const auditLogs = pgTable('audit_logs', {
   index('idx_audit_created_at').on(table.createdAt),
 ]);
 
+// Tabla de historial de bajas (IT y Empresa)
+export const employeeLeaveHistory = pgTable('employee_leave_history', {
+  id: serial('id').primaryKey(),
+  employeeId: varchar('employee_id', { length: 50 }).notNull(),
+  leaveType: varchar('leave_type', { length: 100 }).notNull(), // 'it_leave' o 'company_leave'
+  motivoAnterior: varchar('motivo_anterior', { length: 100 }),
+  motivoNuevo: varchar('motivo_nuevo', { length: 100 }),
+  comentarios: text('comentarios'),
+  fechaCambio: timestamp('fecha_cambio').defaultNow().notNull(),
+  cambiadoPor: varchar('cambiado_por', { length: 255 }).notNull(),
+  rolUsuario: varchar('rol_usuario', { length: 20 }).notNull(),
+}, (table) => [
+  index('idx_employee_leave_history_employee_id').on(table.employeeId),
+]);
+
 // Schema exports for validation
 export const insertSystemUserSchema = createInsertSchema(systemUsers).omit({
   id: true,
@@ -213,6 +231,9 @@ export type UpdateEmployee = Partial<InsertEmployee>;
 export type CompanyLeave = typeof companyLeaves.$inferSelect;
 export type InsertCompanyLeave = typeof companyLeaves.$inferInsert;
 
+// Company leave reason types
+export type CompanyLeaveReason = 'despido' | 'voluntaria' | 'nspp' | 'anulacion' | 'fin_contrato_temporal' | 'agotamiento_it' | 'otras_causas';
+
 // IT leave types
 export type ItLeave = typeof itLeaves.$inferSelect;
 export type InsertItLeave = typeof itLeaves.$inferInsert;
@@ -220,3 +241,6 @@ export type InsertItLeave = typeof itLeaves.$inferInsert;
 // Notification types
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
+
+export type EmployeeLeaveHistory = typeof employeeLeaveHistory.$inferSelect;
+export type InsertEmployeeLeaveHistory = typeof employeeLeaveHistory.$inferInsert;
