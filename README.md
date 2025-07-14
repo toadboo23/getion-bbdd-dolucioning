@@ -82,10 +82,6 @@ db_local/
 - **Backend API**: http://localhost:5173
 - **Base de datos**: localhost:5432
 
-### Credenciales de Acceso
-- **Usuario**: nmartinez@solucioning.net
-- **Contraseña**: 39284756
-
 ## 🔧 Configuración
 
 ### Variables de Entorno
@@ -122,57 +118,9 @@ Para mantener las credenciales sincronizadas entre el entorno local y el VPS:
 - [Resumen Ejecutivo](RESUMEN_EJECUTIVO.md) - Visión general del proyecto
 - [Backup y Restauración](BACKUP_README.md) - Gestión de respaldos
 
-## 🛠️ Comandos Útiles
+`
 
-### Docker
-```bash
-# Iniciar servicios
-docker-compose up -d
 
-# Detener servicios
-docker-compose down
-
-# Reconstruir imágenes
-docker-compose up -d --build
-
-# Ver logs
-docker-compose logs -f [service-name]
-
-# Acceder a contenedor
-docker-compose exec [service-name] sh
-```
-
-### Base de Datos
-```bash
-# Resetear base de datos local
-./reset-db-local.sh
-
-# Ejecutar migraciones
-docker-compose exec postgres psql -U postgres -d employee_management -f /docker-entrypoint-initdb.d/init.sql
-```
-
-### Desarrollo
-```bash
-# Instalar dependencias
-npm install
-
-# Linting
-npm run lint
-
-# Formatear código
-npm run format
-```
-
-## 🔄 Despliegue a Producción
-
-### Script Automático
-```bash
-# Windows
-.\deploy-to-production.ps1
-
-# Linux/Mac
-./deploy-to-production.sh
-```
 
 ### Manual
 1. Conectar al VPS
@@ -187,13 +135,6 @@ El sistema incluye:
 - Logs de sistema
 - Notificaciones por Telegram
 - Backup automático de base de datos
-
-## 🤝 Contribución
-
-1. Trabajar en la rama `Develop-Local`
-2. Hacer commits regulares
-3. Probar cambios localmente
-4. Desplegar a producción solo cuando esté listo
 
 ## 📝 Notas Importantes
 
