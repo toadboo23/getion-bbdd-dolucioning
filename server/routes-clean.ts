@@ -669,7 +669,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
                             leaveData.leaveType === 'anulacion' ? 'Baja Empresa - Anulación' :
                             leaveData.leaveType === 'fin_contrato_temporal' ? 'Baja Empresa - Fin de Contrato Temporal' :
                             leaveData.leaveType === 'agotamiento_it' ? 'Baja Empresa - Agotamiento IT' :
-                            leaveData.leaveType === 'otras_causas' ? 'Baja Empresa - Otras Causas' :
+                            leaveData.leaveType === 'otras_causas' ? `Baja Empresa - Otras Causas: ${leaveData.otherReasonText || 'No especificado'}` :
                             `Baja Empresa - ${leaveData.leaveType}`;
       
       // Formatear la fecha
@@ -690,6 +690,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
           fechaBaja,
           companyLeaveId: leave.id,
           tipoBaja: 'Empresa',
+          otherReasonText: leaveData.otherReasonText,
         },
       };
 
@@ -930,7 +931,48 @@ export async function registerRoutes (app: Express): Promise<Server> {
               });
             }
           } else {
-            await storage.updateEmployee(employeeId, { status: newEmployeeStatus as any });
+            // Si es rechazo, restaurar las horas originales
+            if (action === 'reject') {
+              const empleado = await storage.getEmployee(employeeId);
+              if (empleado && empleado.originalHours !== null) {
+                await storage.updateEmployee(employeeId, { 
+                  status: newEmployeeStatus as any,
+                  horas: empleado.originalHours,
+                  originalHours: null // Limpiar las horas originales ya que se restauraron
+                });
+                
+                // Log de auditoría para la restauración de horas
+                await AuditService.logAction({
+                  userId: user.email || '',
+                  userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+                  action: 'restore_employee_hours_on_reject',
+                  entityType: 'employee',
+                  entityId: employeeId,
+                  entityName: `${empleado.nombre} ${empleado.apellido || ''}`,
+                  description: `Horas restauradas al rechazar baja empresa: ${empleado.nombre} ${empleado.apellido || ''} (${employeeId}) - Horas restauradas: ${empleado.originalHours}`,
+                  oldData: {
+                    status: empleado.status,
+                    horas: empleado.horas,
+                    originalHours: empleado.originalHours
+                  },
+                  newData: {
+                    status: newEmployeeStatus,
+                    horas: empleado.originalHours,
+                    originalHours: null,
+                    processedBy: user.email,
+                    action: 'reject',
+                    employeeId,
+                    processingDate
+                  },
+                });
+              } else {
+                // Si no tiene horas originales, solo cambiar el estado
+                await storage.updateEmployee(employeeId, { status: newEmployeeStatus as any });
+              }
+            } else {
+              // Para otras acciones, solo cambiar el estado
+              await storage.updateEmployee(employeeId, { status: newEmployeeStatus as any });
+            }
           }
 
           // Update company leave status if it exists
