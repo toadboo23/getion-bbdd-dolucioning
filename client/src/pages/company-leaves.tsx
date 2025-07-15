@@ -408,11 +408,17 @@ export default function CompanyLeaves () {
                         </TableCell>
                         <TableCell>{String(employeeData?.idGlovo)}</TableCell>
                         <TableCell>{String(employeeData?.email)}</TableCell>
-                        <TableCell>{getLeaveTypeBadge(leave.leaveType)}</TableCell>
                         <TableCell>
-                          {leave.leaveDate
-                            ? new Date(leave.leaveDate).toLocaleDateString('es-ES')
-                            : 'N/A'}
+                          {getLeaveTypeBadge(leave.leaveType)}
+                          {leave.motivoCompleto && (
+                            <div className="text-xs text-blue-700 font-semibold">Motivo: {leave.motivoCompleto}</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {leave.leaveDate ? new Date(leave.leaveDate).toLocaleDateString('es-ES') : 'N/A'}
+                          {leave.fechaBaja && (
+                            <div className="text-xs text-blue-700 font-semibold">Fecha de baja: {leave.fechaBaja}</div>
+                          )}
                         </TableCell>
                         <TableCell>{getStatusBadge(leave.status)}</TableCell>
                         <TableCell>{leave.leaveRequestedBy}</TableCell>

@@ -16,7 +16,7 @@ import ImportEmployeesModal from '@/components/modals/import-employees-modal';
 import EmployeeDetailModal from '@/components/modals/employee-detail-modal';
 import PenalizationModal from '@/components/modals/penalization-modal';
 import PenalizationAlert from '@/components/penalization-alert';
-import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight, Users, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight, Users, AlertTriangle, Trash2 } from 'lucide-react';
 import type { Employee } from '@shared/schema';
 import { CIUDADES_DISPONIBLES } from '@shared/schema';
 // XLSX import removed as it's not used in this file
@@ -249,6 +249,46 @@ export default function Employees () {
     checkExpiredPenalizationsMutation.mutate();
   };
 
+  // Mutación para limpieza masiva de empleados dados de baja aprobada
+  const cleanLeavesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/employees/clean-leaves');
+      return response;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+      toast({
+        title: 'Limpieza completada',
+        description: `Se eliminaron ${data.total} empleados dados de baja aprobada.`,
+      });
+    },
+    onError: (_error) => {
+      if (isUnauthorizedError(_error)) {
+        toast({
+          title: 'Error de autorización',
+          description: 'Tu sesión ha expirado. Redirigiendo al login...',
+          variant: 'destructive',
+        });
+        setTimeout(() => {
+          window.location.href = '/api/login';
+        }, 500);
+        return;
+      }
+      toast({
+        title: 'Error al limpiar empleados',
+        description: _error instanceof Error ? _error.message : 'Error desconocido',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleCleanLeaves = () => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar todos los empleados con baja aprobada que ya existen en company leaves? Esta acción no se puede deshacer.')) {
+      cleanLeavesMutation.mutate();
+    }
+  };
+
   // Función para exportar empleados a Excel
   const handleExportEmployees = () => {
     if (!employees || employees.length === 0) {
@@ -447,6 +487,21 @@ export default function Employees () {
               >
                 <AlertTriangle className="w-4 h-4 mr-2" />
                 {checkExpiredPenalizationsMutation.isPending ? 'Verificando...' : 'Verificar Penalizaciones'}
+              </Button>
+            )}
+
+            {/* Botón Limpieza Masiva - Solo Super Admin */}
+            {user?.role === 'super_admin' && (
+              <Button
+                variant="destructive"
+                onClick={handleCleanLeaves}
+                disabled={cleanLeavesMutation.isPending}
+                className="border-red-500 text-red-600 hover:bg-red-50"
+                aria-label="Limpiar empleados dados de baja"
+                tabIndex={0}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {cleanLeavesMutation.isPending ? 'Limpiando...' : 'Limpiar empleados dados de baja'}
               </Button>
             )}
 

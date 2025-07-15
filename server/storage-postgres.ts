@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq, and, sql, desc, isNotNull, lt } from 'drizzle-orm';
+import { eq, and, sql, desc, isNotNull, lt, inArray } from 'drizzle-orm';
 import {
   systemUsers,
   auditLogs,
@@ -104,6 +104,65 @@ export class PostgresStorage {
   }
 
   async updateEmployee (id: string, employeeData: UpdateEmployee): Promise<Employee> {
+    // Obtener el empleado actual antes de la actualización
+    const [currentEmployee] = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.idGlovo, id));
+    
+    if (!currentEmployee) {
+      throw new Error(`Employee with ID ${id} not found`);
+    }
+    
+    // Verificar si se está cambiando de it_leave a active
+    const isReactivatingFromItLeave = currentEmployee.status === 'it_leave' && 
+                                     employeeData.status === 'active';
+    
+    // Verificar si se está cambiando a company_leave_approved (baja empresa)
+    const isGoingToCompanyLeave = employeeData.status === 'company_leave_approved';
+    
+    // Si se está reactivando desde baja IT, restaurar las horas originales
+    if (isReactivatingFromItLeave && currentEmployee.originalHours !== null) {
+      console.log(`🔄 Reactivating employee ${id} from IT leave. Restoring hours from ${currentEmployee.horas} to ${currentEmployee.originalHours}`);
+      
+      // Restaurar las horas originales
+      employeeData.horas = currentEmployee.originalHours;
+      
+      // Limpiar las horas originales ya que ya no son necesarias
+      employeeData.originalHours = null;
+    }
+    
+    // Si se está cambiando a baja empresa, guardar las horas originales y poner las actuales a 0
+    if (isGoingToCompanyLeave) {
+      // Siempre guardar las horas actuales como originales si no están ya guardadas
+      const originalHours = currentEmployee.originalHours !== null ? currentEmployee.originalHours : currentEmployee.horas || 0;
+      console.log(`🏢 Employee ${id} going to company leave. Saving original hours: ${originalHours}, setting current hours to 0`);
+      
+      // Guardar las horas originales
+      employeeData.originalHours = originalHours;
+      
+      // Poner las horas actuales a 0
+      employeeData.horas = 0;
+      
+      // Crear notificación de auditoría para el cambio de horas
+      await this.createNotification({
+        type: 'employee_update',
+        title: 'Empleado en Baja Empresa - Horas Guardadas',
+        message: `El empleado ${currentEmployee.nombre} ${currentEmployee.apellido || ''} (${id}) ha sido puesto en baja empresa. Horas originales guardadas: ${originalHours}, horas actuales: 0`,
+        requestedBy: 'SYSTEM',
+        status: 'processed',
+        metadata: {
+          ...getEmpleadoMetadata(currentEmployee),
+          employeeId: id,
+          action: 'company_leave_hours_saved',
+          originalHours,
+          currentHours: 0,
+          previousStatus: currentEmployee.status,
+          newStatus: 'company_leave_approved',
+        },
+      });
+    }
+    
     // Calcular CDP automáticamente si se actualizan las horas
     const cdp = calculateCDP(employeeData.horas);
     const employeeDataWithCDP = { ...employeeData, cdp };
@@ -209,11 +268,26 @@ export class PostgresStorage {
       // Insert IT leave
       const [leave] = await db.insert(itLeaves).values(processedData).returning();
 
+      // Obtener el empleado actual para guardar sus horas originales
+      const [currentEmployee] = await db
+        .select()
+        .from(employees)
+        .where(eq(employees.idGlovo, leaveData.employeeId));
+      
+      if (!currentEmployee) {
+        throw new Error(`Employee with ID ${leaveData.employeeId} not found`);
+      }
+      
+      // Siempre guardar las horas actuales como original_hours si no están ya guardadas
+      const originalHours = currentEmployee.originalHours !== null ? currentEmployee.originalHours : currentEmployee.horas || 0;
+
       // Update employee status to 'it_leave' and set fechaIncidencia
       await db.update(employees)
         .set({
           status: 'it_leave',
           fechaIncidencia: processedData.leaveDate,
+          originalHours: originalHours, // Guardar las horas originales
+          horas: 0, // Poner las horas actuales a 0
           updatedAt: now,
         } as Record<string, unknown>)
         .where(eq(employees.idGlovo, leaveData.employeeId));
@@ -622,12 +696,38 @@ export class PostgresStorage {
   }
 
   async reactivateEmployee (employeeId: string): Promise<Employee> {
+    // Obtener el empleado actual antes de la reactivación
+    const [currentEmployee] = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.idGlovo, employeeId));
+    
+    if (!currentEmployee) {
+      throw new Error(`Employee with ID ${employeeId} not found`);
+    }
+    
+    // Verificar si el empleado está en baja IT o baja empresa
+    if (currentEmployee.status !== 'it_leave' && currentEmployee.status !== 'company_leave_approved') {
+      throw new Error(`Employee ${employeeId} is not in IT leave or company leave status`);
+    }
+    
+    // Preparar los datos de actualización
+    const updateData: Record<string, unknown> = {
+      status: 'active',
+      updatedAt: new Date(),
+    };
+    
+    // Si tiene horas originales guardadas, restaurarlas
+    if (currentEmployee.originalHours !== null) {
+      const leaveType = currentEmployee.status === 'it_leave' ? 'IT leave' : 'company leave';
+      console.log(`🔄 Reactivating employee ${employeeId} from ${leaveType}. Restoring hours from ${currentEmployee.horas} to ${currentEmployee.originalHours}`);
+      updateData.horas = currentEmployee.originalHours;
+      updateData.originalHours = null; // Limpiar las horas originales
+    }
+    
     const [employee] = await db
       .update(employees)
-      .set({
-        status: 'active',
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(employees.idGlovo, employeeId))
       .returning();
     return employee;
@@ -703,11 +803,27 @@ export class PostgresStorage {
 
   async setEmployeeItLeave (employeeId: string, fechaIncidencia: string | Date): Promise<Employee> {
     const now = new Date();
+    
+    // Primero obtener el empleado actual para guardar sus horas originales
+    const [currentEmployee] = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.idGlovo, employeeId));
+    
+    if (!currentEmployee) {
+      throw new Error(`Employee with ID ${employeeId} not found`);
+    }
+    
+    // Guardar las horas actuales como original_hours si no están ya guardadas
+    const originalHours = currentEmployee.originalHours || currentEmployee.horas;
+    
     const [updatedEmployee] = await db
       .update(employees)
       .set({
         status: 'it_leave',
         fechaIncidencia: fechaIncidencia || now,
+        originalHours: originalHours, // Guardar las horas originales
+        horas: 0, // Poner las horas actuales a 0
         updatedAt: now,
       } as Record<string, unknown>)
       .where(eq(employees.idGlovo, employeeId))
@@ -739,6 +855,287 @@ export class PostgresStorage {
       return expiringPenalizations;
     } catch (error) {
       console.error('❌ [PENALIZATION] Error getting expiring penalizations:', error);
+      throw error;
+    }
+  }
+
+<<<<<<< HEAD
+  async getCompanyLeaveById (id: number): Promise<CompanyLeave | undefined> {
+    const [leave] = await db.select().from(companyLeaves).where(eq(companyLeaves.id, id));
+    return leave;
+  }
+
+  async updateCompanyLeaveReason (id: number, motivoNuevo: string, comentarios: string | null): Promise<CompanyLeave> {
+    const [leave] = await db
+      .update(companyLeaves)
+      .set({
+        leaveType: motivoNuevo,
+        comments: comentarios,
+        updatedAt: new Date(),
+      })
+      .where(eq(companyLeaves.id, id))
+      .returning();
+    return leave;
+  }
+
+  async createEmployeeLeaveHistory (data: {
+    employeeId: string,
+    leaveType: string,
+    motivoAnterior: string,
+    motivoNuevo: string,
+    comentarios?: string | null,
+    cambiadoPor: string,
+    rolUsuario: string,
+  }): Promise<void> {
+    await db.insert(employeeLeaveHistory).values({
+      employeeId: data.employeeId,
+      leaveType: data.leaveType,
+      motivoAnterior: data.motivoAnterior,
+      motivoNuevo: data.motivoNuevo,
+      comentarios: data.comentarios || null,
+      cambiadoPor: data.cambiadoPor,
+      rolUsuario: data.rolUsuario,
+      fechaCambio: new Date(),
+    });
+  }
+
+  async getEmployeeLeaveHistory (employeeId: string): Promise<any[]> {
+    return await db.select().from(employeeLeaveHistory)
+      .where(eq(employeeLeaveHistory.employeeId, employeeId))
+      .orderBy(desc(employeeLeaveHistory.fechaCambio));
+=======
+  /**
+   * Elimina empleados con status 'company_leave_approved' que ya existen en company_leaves.
+   * Retorna un resumen de los empleados eliminados.
+   */
+  async cleanCompanyLeaveApprovedEmployees(): Promise<{ deleted: string[]; total: number }> {
+    // Obtener todos los empleados con status 'company_leave_approved'
+    const empleados = await db.select().from(employees).where(eq(employees.status, 'company_leave_approved'));
+    if (!empleados.length) return { deleted: [], total: 0 };
+
+    // Obtener todos los employee_id de company_leaves
+    const leaves = await db.select({ employeeId: companyLeaves.employeeId }).from(companyLeaves);
+    const leavesIds = new Set(leaves.map(l => l.employeeId));
+
+    // Filtrar empleados que existen en company_leaves
+    const empleadosAEliminar = empleados.filter(emp => leavesIds.has(emp.idGlovo));
+    if (!empleadosAEliminar.length) return { deleted: [], total: 0 };
+
+    // Eliminar empleados
+    await db.delete(employees).where(
+      and(
+        eq(employees.status, 'company_leave_approved'),
+        inArray(employees.idGlovo, empleadosAEliminar.map(e => e.idGlovo))
+      )
+    );
+
+    return { deleted: empleadosAEliminar.map(e => e.idGlovo), total: empleadosAEliminar.length };
+  }
+
+  async fixItLeaveHours (employeeId: string): Promise<Employee> {
+    const now = new Date();
+    
+    // Obtener el empleado actual
+    const [currentEmployee] = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.idGlovo, employeeId));
+    
+    if (!currentEmployee) {
+      throw new Error(`Employee with ID ${employeeId} not found`);
+    }
+    
+    if (currentEmployee.status !== 'it_leave') {
+      throw new Error(`Employee ${employeeId} is not in IT leave status`);
+    }
+    
+    // Si ya tiene original_hours, no hacer nada
+    if (currentEmployee.originalHours !== null) {
+      console.log(`Employee ${employeeId} already has original_hours: ${currentEmployee.originalHours}`);
+      return currentEmployee;
+    }
+    
+    // Guardar las horas actuales como original_hours y poner horas a 0
+    const originalHours = currentEmployee.horas;
+    
+    const [updatedEmployee] = await db
+      .update(employees)
+      .set({
+        originalHours: originalHours,
+        horas: 0,
+        updatedAt: now,
+      } as Record<string, unknown>)
+      .where(eq(employees.idGlovo, employeeId))
+      .returning();
+    
+    console.log(`Fixed IT leave hours for employee ${employeeId}: original=${originalHours}, current=0`);
+    return updatedEmployee;
+  }
+
+  /**
+   * Verifica y corrige las horas originales de empleados en baja empresa
+   * que podrían no tenerlas registradas correctamente
+   */
+  async fixCompanyLeaveHours (employeeId: string): Promise<Employee> {
+    const now = new Date();
+    
+    // Obtener el empleado actual
+    const [currentEmployee] = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.idGlovo, employeeId));
+    
+    if (!currentEmployee) {
+      throw new Error(`Employee with ID ${employeeId} not found`);
+    }
+    
+    if (currentEmployee.status !== 'company_leave_approved') {
+      throw new Error(`Employee ${employeeId} is not in company leave approved status`);
+    }
+    
+    // Si ya tiene original_hours y horas = 0, no hacer nada
+    if (currentEmployee.originalHours !== null && currentEmployee.horas === 0) {
+      console.log(`Employee ${employeeId} already has correct company leave hours: original=${currentEmployee.originalHours}, current=0`);
+      return currentEmployee;
+    }
+    
+    // Guardar las horas actuales como original_hours si no están guardadas
+    const originalHours = currentEmployee.originalHours !== null ? currentEmployee.originalHours : currentEmployee.horas || 0;
+    
+    const [updatedEmployee] = await db
+      .update(employees)
+      .set({
+        originalHours: originalHours,
+        horas: 0,
+        updatedAt: now,
+      } as Record<string, unknown>)
+      .where(eq(employees.idGlovo, employeeId))
+      .returning();
+    
+    console.log(`Fixed company leave hours for employee ${employeeId}: original=${originalHours}, current=0`);
+    
+    // Crear notificación de auditoría
+    await this.createNotification({
+      type: 'employee_update',
+      title: 'Corrección de Horas en Baja Empresa',
+      message: `Se corrigieron las horas del empleado ${currentEmployee.nombre} ${currentEmployee.apellido || ''} (${employeeId}) en baja empresa. Horas originales: ${originalHours}, horas actuales: 0`,
+      requestedBy: 'SYSTEM',
+      status: 'processed',
+      metadata: {
+        ...getEmpleadoMetadata(currentEmployee),
+        employeeId,
+        action: 'fix_company_leave_hours',
+        originalHours,
+        currentHours: 0,
+        previousHours: currentEmployee.horas,
+        previousOriginalHours: currentEmployee.originalHours,
+      },
+    });
+    
+    return updatedEmployee;
+  }
+
+  /**
+   * Verifica y corrige las horas de todos los empleados que podrían tener inconsistencias
+   * en sus horas originales vs actuales
+   */
+  async verifyAndFixAllEmployeeHours(): Promise<{
+    checked: number;
+    fixed: number;
+    fixedEmployees: string[];
+    errors: string[];
+  }> {
+    const results = {
+      checked: 0,
+      fixed: 0,
+      fixedEmployees: [] as string[],
+      errors: [] as string[],
+    };
+
+    try {
+      // Obtener todos los empleados en estados que requieren horas originales
+      const employeesToCheck = await db
+        .select()
+        .from(employees)
+        .where(
+          or(
+            eq(employees.status, 'it_leave'),
+            eq(employees.status, 'company_leave_approved'),
+            eq(employees.status, 'penalizado')
+          )
+        );
+
+      results.checked = employeesToCheck.length;
+      console.log(`🔍 Checking ${results.checked} employees for hours consistency...`);
+
+      for (const employee of employeesToCheck) {
+        try {
+          let needsFix = false;
+          let fixReason = '';
+
+          // Verificar inconsistencias según el estado
+          switch (employee.status) {
+            case 'it_leave':
+              if (employee.originalHours === null || employee.horas !== 0) {
+                needsFix = true;
+                fixReason = 'IT leave: missing original_hours or horas not 0';
+              }
+              break;
+            case 'company_leave_approved':
+              if (employee.originalHours === null || employee.horas !== 0) {
+                needsFix = true;
+                fixReason = 'Company leave: missing original_hours or horas not 0';
+              }
+              break;
+            case 'penalizado':
+              if (employee.originalHours === null || employee.horas !== 0) {
+                needsFix = true;
+                fixReason = 'Penalized: missing original_hours or horas not 0';
+              }
+              break;
+          }
+
+          if (needsFix) {
+            console.log(`🔧 Fixing employee ${employee.idGlovo}: ${fixReason}`);
+            
+            // Aplicar la corrección según el estado
+            switch (employee.status) {
+              case 'it_leave':
+                await this.fixItLeaveHours(employee.idGlovo);
+                break;
+              case 'company_leave_approved':
+                await this.fixCompanyLeaveHours(employee.idGlovo);
+                break;
+              case 'penalizado':
+                // Para penalizados, solo verificar que tengan original_hours
+                if (employee.originalHours === null) {
+                  const originalHours = employee.horas || 0;
+                  await db
+                    .update(employees)
+                    .set({
+                      originalHours: originalHours,
+                      horas: 0,
+                      updatedAt: new Date(),
+                    } as Record<string, unknown>)
+                    .where(eq(employees.idGlovo, employee.idGlovo));
+                }
+                break;
+            }
+            
+            results.fixed++;
+            results.fixedEmployees.push(employee.idGlovo);
+          }
+        } catch (error) {
+          const errorMsg = `Error fixing employee ${employee.idGlovo}: ${error}`;
+          console.error(errorMsg);
+          results.errors.push(errorMsg);
+        }
+      }
+
+      console.log(`✅ Hours verification completed: ${results.fixed} employees fixed out of ${results.checked} checked`);
+      return results;
+    } catch (error) {
+      console.error('❌ Error in verifyAndFixAllEmployeeHours:', error);
       throw error;
     }
   }

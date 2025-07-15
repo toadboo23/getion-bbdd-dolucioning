@@ -214,15 +214,27 @@ export async function registerRoutes (app: Express): Promise<Server> {
       const oldEmployee = await storage.getEmployee(id);
       const employee = await storage.updateEmployee(id, employeeData as Record<string, unknown>);
 
+      // Determinar si se está reactivando desde baja IT
+      const isReactivatingFromItLeave = oldEmployee?.status === 'it_leave' && 
+                                       employeeData.status === 'active';
+      
+      // Crear mensaje de auditoría más descriptivo
+      let auditDescription = `Empleado actualizado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo})`;
+      
+      if (isReactivatingFromItLeave) {
+        const hoursRestored = oldEmployee?.originalHours || 0;
+        auditDescription = `Empleado REACTIVADO desde baja IT: ${employee.nombre} ${employee.apellido} (${employee.idGlovo}) - Horas restauradas: ${hoursRestored}`;
+      }
+
       // Log audit
       await AuditService.logAction({
         userId: user?.email || '',
         userRole: (user.role as 'super_admin' | 'admin') || 'normal',
-        action: 'update_employee',
+        action: isReactivatingFromItLeave ? 'reactivate_employee_from_it_leave' : 'update_employee',
         entityType: 'employee',
         entityId: employee.idGlovo,
         entityName: `${employee.nombre} ${employee.apellido}`,
-        description: `Empleado actualizado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo})`,
+        description: auditDescription,
         oldData: oldEmployee,
         newData: employee,
       });
@@ -655,6 +667,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
         comments,
         leaveRequestedAt: leaveData.leaveRequestedAt || new Date(),
         leaveRequestedBy: leaveData.leaveRequestedBy || leaveData.requestedBy || user.email || '',
+        // Si hay otherReasonText, guardarlo en comments
+        comments: leaveData.otherReasonText || null,
       };
       
       const leave = await storage.createCompanyLeave(processedLeaveData);
@@ -663,10 +677,24 @@ export async function registerRoutes (app: Express): Promise<Server> {
       // Obtener datos del empleado
       const empleado = await storage.getEmployee(leaveData.employeeId);
       const empleadoMetadata = empleado ? getEmpleadoMetadata(empleado) : {};
+      
+      // Formatear el motivo de baja empresa para mostrar completo
+      const motivoCompleto = leaveData.leaveType === 'despido' ? 'Baja Empresa - Despido' :
+                            leaveData.leaveType === 'voluntaria' ? 'Baja Empresa - Baja Voluntaria' :
+                            leaveData.leaveType === 'nspp' ? 'Baja Empresa - NSPP' :
+                            leaveData.leaveType === 'anulacion' ? 'Baja Empresa - Anulación' :
+                            leaveData.leaveType === 'fin_contrato_temporal' ? 'Baja Empresa - Fin de Contrato Temporal' :
+                            leaveData.leaveType === 'agotamiento_it' ? 'Baja Empresa - Agotamiento IT' :
+                            leaveData.leaveType === 'otras_causas' ? `Baja Empresa - Otras Causas: ${leaveData.otherReasonText || 'No especificado'}` :
+                            `Baja Empresa - ${leaveData.leaveType}`;
+      
+      // Formatear la fecha
+      const fechaBaja = new Date(leaveData.leaveDate).toLocaleDateString('es-ES');
+      
       const notificationData = {
         type: 'company_leave_request' as const,
-        title: 'Solicitud de Baja Empresa',
-        message: `Se ha solicitado una baja empresa para el empleado ${leaveData.employeeId}`,
+        title: motivoCompleto,
+        message: `Se ha solicitado una ${motivoCompleto} para el empleado ${leaveData.employeeId} con fecha ${fechaBaja}. Pendiente de aprobación.`,
         requestedBy: user.email || '',
         status: 'pending' as const,
         metadata: {
@@ -674,7 +702,11 @@ export async function registerRoutes (app: Express): Promise<Server> {
           employeeId: leaveData.employeeId,
           leaveType: leaveData.leaveType,
           leaveDate: leaveData.leaveDate,
+          motivoCompleto,
+          fechaBaja,
           companyLeaveId: leave.id,
+          tipoBaja: 'Empresa',
+          otherReasonText: leaveData.otherReasonText,
         },
       };
 
@@ -687,11 +719,13 @@ export async function registerRoutes (app: Express): Promise<Server> {
         action: 'create_company_leave',
         entityType: 'company_leave',
         entityId: leave.employeeId,
-        description: `Usuario ${user.email} SOLICITÓ una baja empresa para el empleado ${leaveData.employeeId} - Tipo: ${leaveData.leaveType} - Fecha: ${leaveData.leaveDate}`,
+        description: `Usuario ${user.email} SOLICITÓ una ${motivoCompleto} para el empleado ${leaveData.employeeId} - Fecha: ${fechaBaja}`,
         newData: {
           ...leave,
           requestedBy: user.email,
           employeeData: empleadoMetadata,
+          motivoCompleto,
+          fechaBaja,
         },
       });
 
@@ -702,11 +736,13 @@ export async function registerRoutes (app: Express): Promise<Server> {
         action: 'create_notification',
         entityType: 'notification',
         entityId: notification.id.toString(),
-        description: `Usuario ${user.email} CREÓ notificación de baja empresa para empleado ${leaveData.employeeId} - Estado: PENDIENTE`,
+        description: `Usuario ${user.email} CREÓ notificación de ${motivoCompleto} para empleado ${leaveData.employeeId} - Estado: PENDIENTE`,
         newData: {
           ...notification,
           requestedBy: user.email,
           employeeData: empleadoMetadata,
+          motivoCompleto,
+          fechaBaja,
         },
       });
 
@@ -792,14 +828,14 @@ export async function registerRoutes (app: Express): Promise<Server> {
       const leaveData = req.body;
       const leave = await storage.createItLeave(leaveData);
 
-      // Log audit
+      // Log audit for IT leave creation
       await AuditService.logAction({
         userId: user.email || '',
         userRole: (user.role as 'super_admin' | 'admin') || 'normal',
         action: 'create_it_leave',
         entityType: 'it_leave',
         entityId: leave.employeeId,
-        description: `Baja IT creada para empleado ${leave.employeeId}`,
+        description: `Baja IT creada para empleado ${leave.employeeId} - Tipo: ${leaveData.leaveType} - Fecha: ${new Date(leaveData.leaveDate).toLocaleDateString('es-ES')}`,
         newData: leave,
       });
 
@@ -910,6 +946,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
         if (employeeId) {
           let newEmployeeStatus: string;
           let newCompanyLeaveStatus: string;
+          let shouldDeleteEmployee = false;
 
           switch (action) {
             case 'approve':
@@ -924,13 +961,128 @@ export async function registerRoutes (app: Express): Promise<Server> {
               newEmployeeStatus = 'pending_laboral';
               newCompanyLeaveStatus = 'pending';
               break;
+            case 'processed':
+              // Cuando se procesa una notificación de pending_laboral como "tramitado",
+              // el empleado debe ser eliminado de la tabla employees
+              newEmployeeStatus = 'deleted'; // Para el audit log, aunque no se use
+              newCompanyLeaveStatus = 'approved';
+              shouldDeleteEmployee = true;
+              break;
             default:
               newEmployeeStatus = 'company_leave_pending';
               newCompanyLeaveStatus = 'pending';
           }
 
-          // Update employee status
-          await storage.updateEmployee(employeeId, { status: newEmployeeStatus as any });
+          // Si la acción es 'processed', eliminar el empleado de employees sin actualizar status
+          if (shouldDeleteEmployee) {
+            // Obtener datos del empleado antes de eliminarlo para el audit log
+            const empleado = await storage.getEmployee(employeeId);
+            if (empleado) {
+              await storage.deleteEmployee(employeeId);
+              await AuditService.logAction({
+                userId: user.email || '',
+                userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+                action: 'delete_employee_pending_laboral_processed',
+                entityType: 'employee',
+                entityId: employeeId,
+                entityName: `${empleado.nombre} ${empleado.apellido || ''}`,
+                description: `Empleado eliminado de tabla employees tras tramitación de pendiente laboral: ${empleado.nombre} ${empleado.apellido || ''} (${employeeId})`,
+                oldData: empleado,
+                newData: {
+                  processedBy: user.email,
+                  action,
+                  employeeId,
+                  processingDate,
+                  originalRequestedBy: notification.requestedBy,
+                  reason: 'pending_laboral_processed',
+                },
+              });
+            }
+          } else {
+            // Si es rechazo, restaurar las horas originales
+            if (action === 'reject') {
+              const empleado = await storage.getEmployee(employeeId);
+              let horasRestaurar = null;
+              // 1. Si el empleado tiene originalHours, usarlo
+              if (empleado && empleado.originalHours !== null) {
+                horasRestaurar = empleado.originalHours;
+              } else {
+                // 2. Buscar en metadata de la notificación
+                if (metadata && metadata.originalHours !== undefined && metadata.originalHours !== null) {
+                  horasRestaurar = metadata.originalHours;
+                } else {
+                  // 3. Buscar en el registro de company_leaves
+                  const companyLeaves = await storage.getAllCompanyLeaves();
+                  const leave = companyLeaves.find(l => l.employeeId === employeeId && l.status === 'approved');
+                  if (leave && leave.employeeData && leave.employeeData.horas !== undefined && leave.employeeData.horas !== null) {
+                    horasRestaurar = leave.employeeData.horas;
+                  }
+                }
+              }
+              if (horasRestaurar !== null && empleado) {
+                await storage.updateEmployee(employeeId, { 
+                  status: newEmployeeStatus as any,
+                  horas: horasRestaurar,
+                  originalHours: null // Limpiar las horas originales ya que se restauraron
+                });
+                // Log de auditoría para la restauración de horas
+                await AuditService.logAction({
+                  userId: user.email || '',
+                  userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+                  action: 'restore_employee_hours_on_reject',
+                  entityType: 'employee',
+                  entityId: employeeId,
+                  entityName: `${empleado.nombre} ${empleado.apellido || ''}`,
+                  description: `Horas restauradas al rechazar baja empresa: ${empleado.nombre} ${empleado.apellido || ''} (${employeeId}) - Horas restauradas: ${horasRestaurar}`,
+                  oldData: {
+                    status: empleado.status,
+                    horas: empleado.horas,
+                    originalHours: empleado.originalHours
+                  },
+                  newData: {
+                    status: newEmployeeStatus,
+                    horas: horasRestaurar,
+                    originalHours: null,
+                    processedBy: user.email,
+                    action: 'reject',
+                    employeeId,
+                    processingDate
+                  },
+                });
+              } else {
+                // Si no se encuentra valor, solo cambiar el estado y dejar horas en 0
+                await storage.updateEmployee(employeeId, { status: newEmployeeStatus as any });
+                if (empleado) {
+                  await AuditService.logAction({
+                    userId: user.email || '',
+                    userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+                    action: 'restore_employee_hours_on_reject_failed',
+                    entityType: 'employee',
+                    entityId: employeeId,
+                    entityName: `${empleado.nombre} ${empleado.apellido || ''}`,
+                    description: `No se pudo restaurar horas originales al rechazar baja empresa: ${empleado.nombre} ${empleado.apellido || ''} (${employeeId}) - Horas actuales: 0`,
+                    oldData: {
+                      status: empleado.status,
+                      horas: empleado.horas,
+                      originalHours: empleado.originalHours
+                    },
+                    newData: {
+                      status: newEmployeeStatus,
+                      horas: 0,
+                      originalHours: null,
+                      processedBy: user.email,
+                      action: 'reject',
+                      employeeId,
+                      processingDate
+                    },
+                  });
+                }
+              }
+            } else {
+              // Para otras acciones, solo cambiar el estado
+              await storage.updateEmployee(employeeId, { status: newEmployeeStatus as any });
+            }
+          }
 
           // Update company leave status if it exists
           if (companyLeaveId) {
@@ -943,11 +1095,15 @@ export async function registerRoutes (app: Express): Promise<Server> {
             const empleado = await storage.getEmployee(employeeId);
             const empleadoMetadata = empleado ? getEmpleadoMetadata(empleado) : {};
             
+            // Obtener el motivo completo del metadata original
+            const motivoCompleto = metadata.motivoCompleto || 'Baja Empresa';
+            const fechaBaja = metadata.fechaBaja || new Date().toLocaleDateString('es-ES');
+            
             // Create a new notification for pending laboral
             await storage.createNotification({
               type: 'company_leave_request',
-              title: 'Baja Empresa - Pendiente Laboral',
-              message: `El empleado ${employeeId} ha sido movido a pendiente laboral. Requiere tramitación.`,
+              title: `${motivoCompleto} - Pendiente Laboral`,
+              message: `El empleado ${employeeId} con ${motivoCompleto} del ${fechaBaja} ha sido movido a pendiente laboral. Requiere tramitación.`,
               status: 'pending_laboral',
               requestedBy: user.email || '',
               metadata: {
@@ -956,28 +1112,39 @@ export async function registerRoutes (app: Express): Promise<Server> {
                 companyLeaveId,
                 originalNotificationId: notification.id,
                 action: 'pending_laboral',
+                motivoCompleto,
+                fechaBaja,
+                tipoBaja: 'Empresa',
               },
             });
           }
 
-          // Log audit for employee status change
-          await AuditService.logAction({
-            userId: user.email || '',
-            userRole: (user.role as 'super_admin' | 'admin') || 'normal',
-            action: 'process_company_leave_notification',
-            entityType: 'employee',
-            entityId: employeeId,
-            description: `Usuario ${user.email} ${action === 'approve' ? 'APROBÓ' : action === 'reject' ? 'RECHAZÓ' : 'MOVIÓ A PENDIENTE LABORAL'} la baja empresa del empleado ${employeeId} - Estado final: ${newEmployeeStatus}`,
-            newData: {
-              processedBy: user.email,
-              action,
-              employeeId,
-              newEmployeeStatus,
-              newCompanyLeaveStatus,
-              processingDate,
-              originalRequestedBy: notification.requestedBy,
-            },
-          });
+          // Log audit for employee status change (solo si no se eliminó)
+          if (!shouldDeleteEmployee) {
+            // Obtener el motivo completo del metadata
+            const motivoCompleto = metadata.motivoCompleto || 'Baja Empresa';
+            const fechaBaja = metadata.fechaBaja || 'Fecha no especificada';
+            
+            await AuditService.logAction({
+              userId: user.email || '',
+              userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+              action: 'process_company_leave_notification',
+              entityType: 'employee',
+              entityId: employeeId,
+              description: `Usuario ${user.email} ${action === 'approve' ? 'APROBÓ' : action === 'reject' ? 'RECHAZÓ' : 'MOVIÓ A PENDIENTE LABORAL'} la ${motivoCompleto} del empleado ${employeeId} (${fechaBaja}) - Estado final: ${newEmployeeStatus}`,
+              newData: {
+                processedBy: user.email,
+                action,
+                employeeId,
+                newEmployeeStatus,
+                newCompanyLeaveStatus,
+                processingDate,
+                originalRequestedBy: notification.requestedBy,
+                motivoCompleto,
+                fechaBaja,
+              },
+            });
+          }
         }
       }
 
@@ -999,6 +1166,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
         oldData: { 
           status: notification.status,
           requestedBy: notification.requestedBy,
+          motivoCompleto: (notification.metadata as any)?.motivoCompleto,
+          fechaBaja: (notification.metadata as any)?.fechaBaja,
         },
         newData: { 
           processedBy: user.email,
@@ -1006,6 +1175,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
           processingDate, 
           newStatus: updatedNotification.status,
           originalRequestedBy: notification.requestedBy,
+          motivoCompleto: (notification.metadata as any)?.motivoCompleto,
+          fechaBaja: (notification.metadata as any)?.fechaBaja,
         },
       });
 
@@ -1243,13 +1414,13 @@ export async function registerRoutes (app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
-      const { fechaIncidencia } = req.body;
+      const { leaveType, leaveDate } = req.body;
       const now = new Date();
 
       // Actualizar estado y fecha en employees
-      const updatedEmployee = await storage.setEmployeeItLeave(id, fechaIncidencia);
+      const updatedEmployee = await storage.setEmployeeItLeave(id, leaveDate || now);
 
-      // Log audit
+      // Log audit for IT leave creation
       await AuditService.logAction({
         userId: user.email || '',
         userRole: (user.role as 'super_admin' | 'admin') || 'normal',
@@ -1257,11 +1428,15 @@ export async function registerRoutes (app: Express): Promise<Server> {
         entityType: 'employee',
         entityId: id,
         entityName: `${updatedEmployee?.nombre || ''} ${updatedEmployee?.apellido || ''}`,
-        description: `Empleado marcado como baja IT (${id}) con fecha ${fechaIncidencia || now.toISOString()}`,
-        newData: updatedEmployee,
+        description: `Usuario ${user.email} CREÓ una ${leaveType === 'enfermedad' ? 'Baja IT - Enfermedad' : leaveType === 'accidente' ? 'Baja IT - Accidente' : `Baja IT - ${leaveType || 'No especificado'}`} para el empleado ${id} - Fecha: ${new Date(leaveDate || now).toLocaleDateString('es-ES')}`,
+        newData: {
+          ...updatedEmployee,
+          motivoCompleto: leaveType === 'enfermedad' ? 'Baja IT - Enfermedad' : leaveType === 'accidente' ? 'Baja IT - Accidente' : `Baja IT - ${leaveType || 'No especificado'}`,
+          fechaBaja: new Date(leaveDate || now).toLocaleDateString('es-ES'),
+        },
       });
 
-      res.status(200).json(updatedEmployee);
+      res.status(200).json({ employee: updatedEmployee });
     } catch (error) {
       console.error('❌ Error setting IT leave:', error);
       res.status(500).json({ message: 'Failed to set IT leave' });
@@ -1447,6 +1622,155 @@ export async function registerRoutes (app: Express): Promise<Server> {
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') console.error('❌ Error obteniendo historial de bajas:', error);
       res.status(500).json({ message: 'Error obteniendo historial de bajas' });
+    }
+  });
+
+  // Limpieza de empleados dados de baja aprobada (solo superadmin)
+  app.post('/api/employees/clean-leaves', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede limpiar empleados dados de baja' });
+      }
+      const result = await storage.cleanCompanyLeaveApprovedEmployees();
+      // Log audit
+      await AuditService.logAction({
+        userId: user?.email || '',
+        userRole: 'super_admin',
+        action: 'clean_company_leave_approved_employees',
+        entityType: 'employee',
+        description: `Limpieza masiva de empleados dados de baja aprobada (${result.total} eliminados)`,
+        newData: result,
+      });
+      res.json({ success: true, ...result });
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error en limpieza de empleados dados de baja:', error);
+      res.status(500).json({ message: 'Error al limpiar empleados dados de baja' });
+    }
+  });
+
+  // Corregir horas de empleados en baja IT
+  app.post('/api/employees/:id/fix-it-leave-hours', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🔧 Fix IT leave hours request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para corregir horas de baja IT' });
+      }
+
+      const { id } = req.params;
+      
+      // Corregir las horas del empleado
+      const updatedEmployee = await storage.fixItLeaveHours(id);
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+        action: 'fix_it_leave_hours',
+        entityType: 'employee',
+        entityId: id,
+        entityName: `${updatedEmployee?.nombre || ''} ${updatedEmployee?.apellido || ''}`,
+        description: `Usuario ${user.email} CORRIGIÓ las horas de baja IT para el empleado ${id} - Horas originales: ${updatedEmployee.originalHours}, Horas actuales: ${updatedEmployee.horas}`,
+        newData: updatedEmployee,
+      });
+
+      res.status(200).json({ 
+        message: 'Horas de baja IT corregidas correctamente',
+        employee: updatedEmployee 
+      });
+    } catch (error) {
+      console.error('❌ Error fixing IT leave hours:', error);
+      res.status(500).json({ message: 'Failed to fix IT leave hours' });
+    }
+  });
+
+  // Verificar y corregir horas de todos los empleados (solo superadmin)
+  app.post('/api/employees/verify-hours', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🔍 Verify and fix all employee hours request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede verificar horas de empleados' });
+      }
+
+      const result = await storage.verifyAndFixAllEmployeeHours();
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+        action: 'verify_and_fix_all_employee_hours',
+        entityType: 'system',
+        entityId: 'verify-hours',
+        description: `Verificación masiva de horas de empleados: ${result.checked} verificados, ${result.fixed} corregidos`,
+        newData: result,
+      });
+
+      res.status(200).json({ 
+        message: 'Verificación de horas completada',
+        result 
+      });
+    } catch (error) {
+      console.error('❌ Error verifying employee hours:', error);
+      res.status(500).json({ message: 'Failed to verify employee hours' });
+    }
+  });
+
+  // Corregir horas de empleado específico (solo superadmin)
+  app.post('/api/employees/:id/fix-hours', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🔧 Fix specific employee hours request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede corregir horas de empleados' });
+      }
+
+      const { id } = req.params;
+
+      // Obtener el empleado para determinar qué tipo de corrección aplicar
+      const employee = await storage.getEmployee(id);
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      let result;
+      let actionType = '';
+      switch (employee.status) {
+        case 'it_leave':
+          result = await storage.fixItLeaveHours(id);
+          actionType = 'fix_it_leave_hours';
+          break;
+        case 'company_leave_approved':
+          result = await storage.fixCompanyLeaveHours(id);
+          actionType = 'fix_company_leave_hours';
+          break;
+        default:
+          return res.status(400).json({ message: 'Employee is not in a status that requires hours fixing' });
+      }
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+        action: actionType,
+        entityType: 'employee',
+        entityId: id,
+        entityName: `${employee.nombre} ${employee.apellido || ''}`,
+        description: `Corrección de horas para empleado ${employee.nombre} ${employee.apellido || ''} (${id}) - Estado: ${employee.status}`,
+        oldData: employee,
+        newData: result,
+      });
+
+      res.status(200).json({ 
+        message: 'Horas corregidas correctamente',
+        employee: result 
+      });
+    } catch (error) {
+      console.error('❌ Error fixing employee hours:', error);
+      res.status(500).json({ message: 'Failed to fix employee hours' });
+    }
+  });
     }
   });
 

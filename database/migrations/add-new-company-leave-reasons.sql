@@ -1,34 +1,39 @@
--- Migración para agregar nuevos motivos de baja empresa
--- Fecha: 2024-12-19
--- Descripción: Agregar 3 nuevos tipos de motivo de baja empresa y campo de comentarios
+-- Migración para documentar las nuevas causas de baja empresa
+-- Fecha: 2025-07-15
+-- Descripción: Documentar las causas de baja empresa que están disponibles en el sistema
 
--- Agregar campo de comentarios a la tabla company_leaves
-ALTER TABLE company_leaves 
-ADD COLUMN IF NOT EXISTS comments TEXT;
+-- Esta migración documenta las causas de baja empresa que están disponibles:
+-- 1. despido - Despido
+-- 2. voluntaria - Baja Voluntaria  
+-- 3. nspp - NSPP
+-- 4. anulacion - Anulación
+-- 5. fin_contrato_temporal - Fin de Contrato Temporal
+-- 6. agotamiento_it - Agotamiento IT
+-- 7. otras_causas - Otras Causas
 
--- Crear un tipo ENUM para los motivos de baja empresa (si no existe)
--- Nota: PostgreSQL no permite modificar ENUMs fácilmente, por lo que usamos VARCHAR con CHECK constraint
-
--- Agregar constraint para validar los nuevos motivos de baja empresa
--- Los motivos válidos ahora son: 'despido', 'voluntaria', 'nspp', 'anulacion', 'fin_contrato_temporal', 'agotamiento_it', 'otras_causas'
-ALTER TABLE company_leaves 
-DROP CONSTRAINT IF EXISTS company_leaves_leave_type_check;
-
-ALTER TABLE company_leaves 
-ADD CONSTRAINT company_leaves_leave_type_check 
-CHECK (leave_type IN ('despido', 'voluntaria', 'nspp', 'anulacion', 'fin_contrato_temporal', 'agotamiento_it', 'otras_causas'));
-
--- Agregar constraint para asegurar que 'otras_causas' tenga comentarios
-ALTER TABLE company_leaves 
-ADD CONSTRAINT company_leaves_otras_causas_comments_check 
-CHECK (
-  (leave_type != 'otras_causas') OR 
-  (leave_type = 'otras_causas' AND comments IS NOT NULL AND TRIM(comments) != '')
+-- Log de la migración
+INSERT INTO audit_logs (
+  user_id,
+  user_role,
+  action,
+  entity_type,
+  entity_id,
+  description,
+  old_data,
+  new_data,
+  created_at
+) VALUES (
+  'SYSTEM',
+  'super_admin',
+  'migration_add_company_leave_reasons',
+  'migration',
+  'add-new-company-leave-reasons',
+  'Migración ejecutada: Documentación de causas de baja empresa disponibles en el sistema.',
+  '{}',
+  '{"migration": "add-new-company-leave-reasons", "date": "2025-07-15", "reasons": ["despido", "voluntaria", "nspp", "anulacion", "fin_contrato_temporal", "agotamiento_it", "otras_causas"]}',
+  CURRENT_TIMESTAMP
 );
 
--- Crear índice para mejorar performance en consultas por tipo de baja
-CREATE INDEX IF NOT EXISTS idx_company_leaves_leave_type ON company_leaves(leave_type);
-
--- Comentarios para documentar los nuevos tipos
-COMMENT ON COLUMN company_leaves.leave_type IS 'Tipos de baja empresa: despido, voluntaria, nspp, anulacion, fin_contrato_temporal, agotamiento_it, otras_causas';
-COMMENT ON COLUMN company_leaves.comments IS 'Comentarios obligatorios cuando leave_type es otras_causas'; 
+-- Comentario: Las causas de baja empresa están manejadas en el frontend y backend
+-- No se requieren cambios en la base de datos ya que el campo leaveType es VARCHAR
+-- y puede almacenar cualquier valor de texto.

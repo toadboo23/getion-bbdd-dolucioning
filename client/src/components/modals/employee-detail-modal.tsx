@@ -85,7 +85,7 @@ export default function EmployeeDetailModal ({
   };
 
   const canReactivateEmployee = () => {
-    return user?.role === 'super_admin' && employee?.status === 'it_leave';
+    return user?.role === 'super_admin' && (employee?.status === 'it_leave' || employee?.status === 'company_leave_approved');
   };
 
   const getStatusBadge = (status: string) => {
@@ -188,18 +188,29 @@ export default function EmployeeDetailModal ({
                 </div>
               </div>
 
-              {/* Mostrar alerta especial para empleados en baja IT */}
-              {employee.status === 'it_leave' && canReactivateEmployee() && (
-                <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              {/* Mostrar alerta especial para empleados en baja IT o baja empresa */}
+              {(employee.status === 'it_leave' || employee.status === 'company_leave_approved') && canReactivateEmployee() && (
+                <div className={`mt-4 p-3 border rounded-lg ${
+                  employee.status === 'it_leave' 
+                    ? 'bg-orange-50 border-orange-200' 
+                    : 'bg-red-50 border-red-200'
+                }`}>
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                    <AlertTriangle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                      employee.status === 'it_leave' ? 'text-orange-600' : 'text-red-600'
+                    }`} />
                     <div>
-                      <p className="text-sm font-medium text-orange-800">
-                        Empleado en Baja IT
+                      <p className={`text-sm font-medium ${
+                        employee.status === 'it_leave' ? 'text-orange-800' : 'text-red-800'
+                      }`}>
+                        Empleado en {employee.status === 'it_leave' ? 'Baja IT' : 'Baja Empresa'}
                       </p>
-                      <p className="text-sm text-orange-700 mt-1">
-                        Este empleado está actualmente en baja IT. Como Super Admin,
+                      <p className={`text-sm mt-1 ${
+                        employee.status === 'it_leave' ? 'text-orange-700' : 'text-red-700'
+                      }`}>
+                        Este empleado está actualmente en {employee.status === 'it_leave' ? 'baja IT' : 'baja empresa'}. Como Super Admin,
                         puedes reactivarlo usando el botón &quot;Reactivar Empleado&quot; arriba.
+                        {employee.status === 'company_leave_approved' && ' Al reactivarlo, se restaurarán sus horas originales.'}
                       </p>
                     </div>
                   </div>

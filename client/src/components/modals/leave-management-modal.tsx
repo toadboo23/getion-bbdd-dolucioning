@@ -31,8 +31,8 @@ export default function LeaveManagementModal ({
   const [leaveType, setLeaveType] = useState<'it' | 'company' | ''>('');
   const [itReason, setItReason] = useState<'enfermedad' | 'accidente' | ''>('');
   const [companyReason, setCompanyReason] = useState<'despido' | 'voluntaria' | 'nspp' | 'anulacion' | 'fin_contrato_temporal' | 'agotamiento_it' | 'otras_causas' | ''>('');
-  const [companyComments, setCompanyComments] = useState('');
   const [leaveDate, setLeaveDate] = useState('');
+  const [otherReasonText, setOtherReasonText] = useState('');
 
   const itLeaveMutation = useMutation({
     mutationFn: async (data: { leaveType: string; leaveDate: Date }) => {
@@ -93,7 +93,7 @@ export default function LeaveManagementModal ({
   });
 
   const companyLeaveMutation = useMutation({
-    mutationFn: async (data: { leaveType: string; leaveDate: string; comments?: string }) => {
+    mutationFn: async (data: { leaveType: string; leaveDate: string; otherReasonText?: string }) => {
       if (!employee) throw new Error('No employee selected');
       await apiRequest('POST', '/api/company-leaves', {
         ...data,
@@ -127,8 +127,8 @@ export default function LeaveManagementModal ({
     setLeaveType('');
     setItReason('');
     setCompanyReason('');
-    setCompanyComments('');
     setLeaveDate('');
+    setOtherReasonText('');
   };
 
   const handleSubmit = () => {
@@ -164,21 +164,24 @@ export default function LeaveManagementModal ({
         });
         return;
       }
+<<<<<<< HEAD
 
       // Validar comentarios para 'otras_causas'
-      if (companyReason === 'otras_causas' && (!companyComments || companyComments.trim() === '')) {
+      // Validar que se ingrese texto para "otras_causas"
+      if (companyReason === 'otras_causas' && !otherReasonText.trim()) {
         toast({
           title: 'Error',
-          description: 'El tipo "Otras Causas" requiere un comentario obligatorio',
+          description: 'Por favor ingresa el motivo específico de la baja',
           variant: 'destructive',
         });
         return;
       }
-
+      
       companyLeaveMutation.mutate({
         leaveType: companyReason,
         leaveDate: leaveDate,
-        comments: companyReason === 'otras_causas' ? companyComments : undefined,
+        otherReasonText: companyReason === 'otras_causas' ? otherReasonText.trim() : undefined,
+      });
       });
     }
   };
@@ -270,28 +273,27 @@ export default function LeaveManagementModal ({
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="agotamiento_it" id="agotamiento_it" />
-                  <Label htmlFor="agotamiento_it">Agotamiento IT</Label>
+                  <Label htmlFor="agotamiento_it">Agotamiento de IT</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="otras_causas" id="otras_causas" />
                   <Label htmlFor="otras_causas">Otras Causas</Label>
                 </div>
               </RadioGroup>
-
-              {/* Campo de comentarios para "Otras Causas" */}
+              
+              {/* Textarea para Otras Causas */}
               {companyReason === 'otras_causas' && (
                 <div className="mt-4">
-                  <Label htmlFor="companyComments" className="text-sm font-medium text-gray-700">
-                    Comentarios *
+                  <Label htmlFor="otherReasonText" className="text-sm font-medium text-gray-700">
+                    Especificar Motivo
                   </Label>
                   <textarea
-                    id="companyComments"
-                    value={companyComments}
-                    onChange={(e) => setCompanyComments(e.target.value)}
-                    placeholder="Describe el motivo de la baja..."
+                    id="otherReasonText"
+                    value={otherReasonText}
+                    onChange={(e) => setOtherReasonText(e.target.value)}
                     className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                     rows={3}
-                    required
+                    placeholder="Describe el motivo específico de la baja..."
                   />
                 </div>
               )}
