@@ -164,8 +164,6 @@ export default function LeaveManagementModal ({
         });
         return;
       }
-<<<<<<< HEAD
-
       // Validar comentarios para 'otras_causas'
       // Validar que se ingrese texto para "otras_causas"
       if (companyReason === 'otras_causas' && !otherReasonText.trim()) {
@@ -181,7 +179,6 @@ export default function LeaveManagementModal ({
         leaveType: companyReason,
         leaveDate: leaveDate,
         otherReasonText: companyReason === 'otras_causas' ? otherReasonText.trim() : undefined,
-      });
       });
     }
   };
