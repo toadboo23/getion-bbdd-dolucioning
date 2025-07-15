@@ -1052,46 +1052,6 @@ export class PostgresStorage {
       errors: [] as string[],
     };
 
-  async fixItLeaveHours (employeeId: string): Promise<Employee> {
-    const now = new Date();
-    
-    // Obtener el empleado actual
-    const [currentEmployee] = await db
-      .select()
-      .from(employees)
-      .where(eq(employees.idGlovo, employeeId));
-    
-    if (!currentEmployee) {
-      throw new Error(`Employee with ID ${employeeId} not found`);
-    }
-    
-    if (currentEmployee.status !== 'it_leave') {
-      throw new Error(`Employee ${employeeId} is not in IT leave status`);
-    }
-    
-    // Si ya tiene original_hours, no hacer nada
-    if (currentEmployee.originalHours !== null) {
-      console.log(`Employee ${employeeId} already has original_hours: ${currentEmployee.originalHours}`);
-      return currentEmployee;
-    }
-    
-    // Guardar las horas actuales como original_hours y poner horas a 0
-    const originalHours = currentEmployee.horas;
-    
-    const [updatedEmployee] = await db
-      .update(employees)
-      .set({
-        originalHours: originalHours,
-        horas: 0,
-        updatedAt: now,
-      } as Record<string, unknown>)
-      .where(eq(employees.idGlovo, employeeId))
-      .returning();
-    
-    console.log(`Fixed IT leave hours for employee ${employeeId}: original=${originalHours}, current=0`);
-    return updatedEmployee;
-  }
-
   /**
    * Verifica y corrige las horas originales de empleados en baja empresa
    * que podrían no tenerlas registradas correctamente
