@@ -653,6 +653,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
         ...leaveData,
         leaveRequestedAt: leaveData.leaveRequestedAt || new Date(),
         leaveRequestedBy: leaveData.leaveRequestedBy || leaveData.requestedBy || user.email || '',
+        // Si hay otherReasonText, guardarlo en comments
+        comments: leaveData.otherReasonText || null,
       };
       
       const leave = await storage.createCompanyLeave(processedLeaveData);

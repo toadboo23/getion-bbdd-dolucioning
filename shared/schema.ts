@@ -119,6 +119,7 @@ export const companyLeaves = pgTable('company_leaves', {
   status: varchar('status', { length: 50 }).notNull().default('approved'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  comments: text('comments'), // Campo para comentarios adicionales (especialmente para "otras_causas")
 });
 
 // IT leaves table
