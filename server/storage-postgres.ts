@@ -1052,23 +1052,6 @@ export class PostgresStorage {
       errors: [] as string[],
     };
 
-  /**
-   * Verifica y corrige las horas de todos los empleados que podrían tener inconsistencias
-   * en sus horas originales vs actuales
-   */
-  async verifyAndFixAllEmployeeHours(): Promise<{
-    checked: number;
-    fixed: number;
-    fixedEmployees: string[];
-    errors: string[];
-  }> {
-    const results = {
-      checked: 0,
-      fixed: 0,
-      fixedEmployees: [] as string[],
-      errors: [] as string[],
-    };
-
     try {
       // Obtener todos los empleados en estados que requieren horas originales
       const employeesToCheck = await db
