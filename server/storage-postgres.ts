@@ -1053,69 +1053,6 @@ export class PostgresStorage {
     };
 
   /**
-   * Verifica y corrige las horas originales de empleados en baja empresa
-   * que podrían no tenerlas registradas correctamente
-   */
-  async fixCompanyLeaveHours (employeeId: string): Promise<Employee> {
-    const now = new Date();
-    
-    // Obtener el empleado actual
-    const [currentEmployee] = await db
-      .select()
-      .from(employees)
-      .where(eq(employees.idGlovo, employeeId));
-    
-    if (!currentEmployee) {
-      throw new Error(`Employee with ID ${employeeId} not found`);
-    }
-    
-    if (currentEmployee.status !== 'company_leave_approved') {
-      throw new Error(`Employee ${employeeId} is not in company leave approved status`);
-    }
-    
-    // Si ya tiene original_hours y horas = 0, no hacer nada
-    if (currentEmployee.originalHours !== null && currentEmployee.horas === 0) {
-      console.log(`Employee ${employeeId} already has correct company leave hours: original=${currentEmployee.originalHours}, current=0`);
-      return currentEmployee;
-    }
-    
-    // Guardar las horas actuales como original_hours si no están guardadas
-    const originalHours = currentEmployee.originalHours !== null ? currentEmployee.originalHours : currentEmployee.horas || 0;
-    
-    const [updatedEmployee] = await db
-      .update(employees)
-      .set({
-        originalHours: originalHours,
-        horas: 0,
-        updatedAt: now,
-      } as Record<string, unknown>)
-      .where(eq(employees.idGlovo, employeeId))
-      .returning();
-    
-    console.log(`Fixed company leave hours for employee ${employeeId}: original=${originalHours}, current=0`);
-    
-    // Crear notificación de auditoría
-    await this.createNotification({
-      type: 'employee_update',
-      title: 'Corrección de Horas en Baja Empresa',
-      message: `Se corrigieron las horas del empleado ${currentEmployee.nombre} ${currentEmployee.apellido || ''} (${employeeId}) en baja empresa. Horas originales: ${originalHours}, horas actuales: 0`,
-      requestedBy: 'SYSTEM',
-      status: 'processed',
-      metadata: {
-        ...getEmpleadoMetadata(currentEmployee),
-        employeeId,
-        action: 'fix_company_leave_hours',
-        originalHours,
-        currentHours: 0,
-        previousHours: currentEmployee.horas,
-        previousOriginalHours: currentEmployee.originalHours,
-      },
-    });
-    
-    return updatedEmployee;
-  }
-
-  /**
    * Verifica y corrige las horas de todos los empleados que podrían tener inconsistencias
    * en sus horas originales vs actuales
    */
