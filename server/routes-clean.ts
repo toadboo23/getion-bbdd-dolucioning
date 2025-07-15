@@ -1771,8 +1771,6 @@ export async function registerRoutes (app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to fix employee hours' });
     }
   });
-    }
-  });
 
   // Create HTTP server
   const server = createServer(app);
