@@ -136,14 +136,14 @@ function Test-VPSEnvironment {
         return
     }
     
-    $sshCommand = @"
-echo "🔍 DIAGNÓSTICO COMPLETO DEL VPS - \$(date)"
+    $sshCommand = @'
+echo "🔍 DIAGNÓSTICO COMPLETO DEL VPS - $(date)"
 echo "=========================================="
 
 echo ""
 echo "📦 1. Verificando Docker..."
 if command -v docker &> /dev/null; then
-    echo "✅ Docker instalado: \$(docker --version)"
+    echo "✅ Docker instalado: $(docker --version)"
     if docker info &> /dev/null; then
         echo "✅ Docker funcionando"
     else
@@ -173,8 +173,8 @@ echo "🌿 4. Estado del repositorio Git..."
 if [ -d "$VPS_DIR/.git" ]; then
     cd $VPS_DIR
     echo "✅ Repositorio Git encontrado"
-    echo "🌿 Rama actual: \$(git branch --show-current)"
-    echo "📋 Último commit: \$(git log -1 --oneline)"
+    echo "🌿 Rama actual: $(git branch --show-current)"
+    echo "📋 Último commit: $(git log -1 --oneline)"
     echo "🌐 Estado vs remoto:"
     git status --short --branch
 else
@@ -203,10 +203,10 @@ free -h
 
 echo ""
 echo "✅ Diagnóstico completado"
-"@
+'@
     
     try {
-        Write-Info "Ejecutando diagnóstico en el VPS..."
+        Write-Info "Ejecutando diagnostico en el VPS..."
         $sshPassCommand = "sshpass -p '$($Credentials.Password)' ssh -o StrictHostKeyChecking=no $($Credentials.User)@$VPS_IP '$sshCommand'"
         Invoke-Expression $sshPassCommand
     }
@@ -279,7 +279,7 @@ function Show-Summary {
     Write-Info "🔧 Flujo de trabajo recomendado:"
     Write-Info "   1. .\develop-feature.ps1 start"
     Write-Info "   2. Hacer cambios en el código"
-    Write-Info "   3. .\develop-feature.ps1 commit 'mensaje'"
+    Write-Info "   3. .\develop-feature.ps1 commit mensaje"
     Write-Info "   4. .\develop-feature.ps1 merge"
     Write-Info "   5. .\deploy-automatic.ps1"
 }
