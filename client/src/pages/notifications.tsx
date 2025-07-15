@@ -344,6 +344,14 @@ export default function Notifications () {
     };
   };
 
+  const getMotivoYFecha = (notification: Notification) => {
+    const metadata = notification.metadata as any;
+    return {
+      motivoCompleto: metadata?.motivoCompleto || '',
+      fechaBaja: metadata?.fechaBaja || '',
+    };
+  };
+
   if (notificationsLoading) {
     return (
       <div className="p-6">
@@ -596,6 +604,14 @@ export default function Notifications () {
                           <div className="max-w-xs">
                             <p className="font-medium text-gray-900">{notification.title}</p>
                             <p className="text-sm text-gray-500 truncate">{notification.message}</p>
+                            <p className="text-xs text-blue-700 font-semibold">
+                              {getMotivoYFecha(notification).motivoCompleto && (
+                                <>Motivo: {getMotivoYFecha(notification).motivoCompleto}<br/></>
+                              )}
+                              {getMotivoYFecha(notification).fechaBaja && (
+                                <>Fecha de baja: {getMotivoYFecha(notification).fechaBaja}</>
+                              )}
+                            </p>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -713,6 +729,15 @@ export default function Notifications () {
                       );
                     })()}
                   </div>
+                  {(() => {
+                    const { motivoCompleto, fechaBaja } = getMotivoYFecha(tramitationModal.notification!);
+                    return (
+                      <div className="mt-2 text-xs text-blue-700">
+                        {motivoCompleto && <p><strong>Motivo:</strong> {motivoCompleto}</p>}
+                        {fechaBaja && <p><strong>Fecha de baja:</strong> {fechaBaja}</p>}
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </div>
