@@ -936,13 +936,29 @@ export async function registerRoutes (app: Express): Promise<Server> {
             // Si es rechazo, restaurar las horas originales
             if (action === 'reject') {
               const empleado = await storage.getEmployee(employeeId);
+              let horasRestaurar = null;
+              // 1. Si el empleado tiene originalHours, usarlo
               if (empleado && empleado.originalHours !== null) {
+                horasRestaurar = empleado.originalHours;
+              } else {
+                // 2. Buscar en metadata de la notificación
+                if (metadata && metadata.originalHours !== undefined && metadata.originalHours !== null) {
+                  horasRestaurar = metadata.originalHours;
+                } else {
+                  // 3. Buscar en el registro de company_leaves
+                  const companyLeaves = await storage.getAllCompanyLeaves();
+                  const leave = companyLeaves.find(l => l.employeeId === employeeId && l.status === 'approved');
+                  if (leave && leave.employeeData && leave.employeeData.horas !== undefined && leave.employeeData.horas !== null) {
+                    horasRestaurar = leave.employeeData.horas;
+                  }
+                }
+              }
+              if (horasRestaurar !== null && empleado) {
                 await storage.updateEmployee(employeeId, { 
                   status: newEmployeeStatus as any,
-                  horas: empleado.originalHours,
+                  horas: horasRestaurar,
                   originalHours: null // Limpiar las horas originales ya que se restauraron
                 });
-                
                 // Log de auditoría para la restauración de horas
                 await AuditService.logAction({
                   userId: user.email || '',
@@ -951,7 +967,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
                   entityType: 'employee',
                   entityId: employeeId,
                   entityName: `${empleado.nombre} ${empleado.apellido || ''}`,
-                  description: `Horas restauradas al rechazar baja empresa: ${empleado.nombre} ${empleado.apellido || ''} (${employeeId}) - Horas restauradas: ${empleado.originalHours}`,
+                  description: `Horas restauradas al rechazar baja empresa: ${empleado.nombre} ${empleado.apellido || ''} (${employeeId}) - Horas restauradas: ${horasRestaurar}`,
                   oldData: {
                     status: empleado.status,
                     horas: empleado.horas,
@@ -959,7 +975,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
                   },
                   newData: {
                     status: newEmployeeStatus,
-                    horas: empleado.originalHours,
+                    horas: horasRestaurar,
                     originalHours: null,
                     processedBy: user.email,
                     action: 'reject',
@@ -968,8 +984,33 @@ export async function registerRoutes (app: Express): Promise<Server> {
                   },
                 });
               } else {
-                // Si no tiene horas originales, solo cambiar el estado
+                // Si no se encuentra valor, solo cambiar el estado y dejar horas en 0
                 await storage.updateEmployee(employeeId, { status: newEmployeeStatus as any });
+                if (empleado) {
+                  await AuditService.logAction({
+                    userId: user.email || '',
+                    userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+                    action: 'restore_employee_hours_on_reject_failed',
+                    entityType: 'employee',
+                    entityId: employeeId,
+                    entityName: `${empleado.nombre} ${empleado.apellido || ''}`,
+                    description: `No se pudo restaurar horas originales al rechazar baja empresa: ${empleado.nombre} ${empleado.apellido || ''} (${employeeId}) - Horas actuales: 0`,
+                    oldData: {
+                      status: empleado.status,
+                      horas: empleado.horas,
+                      originalHours: empleado.originalHours
+                    },
+                    newData: {
+                      status: newEmployeeStatus,
+                      horas: 0,
+                      originalHours: null,
+                      processedBy: user.email,
+                      action: 'reject',
+                      employeeId,
+                      processingDate
+                    },
+                  });
+                }
               }
             } else {
               // Para otras acciones, solo cambiar el estado
