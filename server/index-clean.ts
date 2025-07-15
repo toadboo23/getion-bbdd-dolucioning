@@ -114,6 +114,17 @@ async function startServer () {
     // Check expired penalizations on startup
     await checkExpiredPenalizationsOnStartup();
 
+    // Initialize scheduler
+    try {
+      console.log('⏰ Initializing scheduler...');
+      const { scheduler } = await import('./scheduler.js');
+      scheduler.startScheduler();
+      console.log('✅ Scheduler initialized successfully');
+    } catch (error) {
+      console.error('❌ Error initializing scheduler:', error);
+      console.log('⚠️ Continuing server startup...');
+    }
+
     httpServer.listen(PORT, () => {
       console.log('\n🚀 Server running on http://localhost:' + PORT);
       console.log('📊 Users available in system_users table:');

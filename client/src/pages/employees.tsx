@@ -16,7 +16,7 @@ import ImportEmployeesModal from '@/components/modals/import-employees-modal';
 import EmployeeDetailModal from '@/components/modals/employee-detail-modal';
 import PenalizationModal from '@/components/modals/penalization-modal';
 import PenalizationAlert from '@/components/penalization-alert';
-import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight, Users, AlertTriangle, Trash2 } from 'lucide-react';
+import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight, Users, AlertTriangle, Trash2, RefreshCw } from 'lucide-react';
 import type { Employee } from '@shared/schema';
 import { CIUDADES_DISPONIBLES } from '@shared/schema';
 // XLSX import removed as it's not used in this file
@@ -289,6 +289,46 @@ export default function Employees () {
     }
   };
 
+  // Mutación para ejecutar limpieza automática manualmente
+  const executeAutomaticCleanupMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/employees/execute-automatic-cleanup');
+      return response;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
+      toast({
+        title: 'Limpieza automática ejecutada',
+        description: `Se ejecutó la limpieza automática. ${data.total || 0} empleados eliminados.`,
+      });
+    },
+    onError: (_error) => {
+      if (isUnauthorizedError(_error)) {
+        toast({
+          title: 'Error de autorización',
+          description: 'Tu sesión ha expirado. Redirigiendo al login...',
+          variant: 'destructive',
+        });
+        setTimeout(() => {
+          window.location.href = '/api/login';
+        }, 500);
+        return;
+      }
+      toast({
+        title: 'Error al ejecutar limpieza automática',
+        description: _error instanceof Error ? _error.message : 'Error desconocido',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleExecuteAutomaticCleanup = () => {
+    if (window.confirm('¿Estás seguro de que deseas ejecutar la limpieza automática manualmente? Esta acción ejecutará el mismo proceso que se ejecuta automáticamente todos los días a las 7 AM.')) {
+      executeAutomaticCleanupMutation.mutate();
+    }
+  };
+
   // Función para exportar empleados a Excel
   const handleExportEmployees = () => {
     if (!employees || employees.length === 0) {
@@ -502,6 +542,21 @@ export default function Employees () {
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 {cleanLeavesMutation.isPending ? 'Limpiando...' : 'Limpiar empleados dados de baja'}
+              </Button>
+            )}
+
+            {/* Botón Limpieza Automática - Solo Super Admin */}
+            {user?.role === 'super_admin' && (
+              <Button
+                variant="outline"
+                onClick={handleExecuteAutomaticCleanup}
+                disabled={executeAutomaticCleanupMutation.isPending}
+                className="border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+                aria-label="Ejecutar limpieza automática"
+                tabIndex={0}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                {executeAutomaticCleanupMutation.isPending ? 'Ejecutando...' : 'Ejecutar Limpieza Automática'}
               </Button>
             )}
 

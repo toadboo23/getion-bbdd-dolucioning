@@ -664,11 +664,9 @@ export async function registerRoutes (app: Express): Promise<Server> {
       // Asegurar que leaveRequestedAt y leaveRequestedBy estén presentes
       const processedLeaveData = {
         ...leaveData,
-        comments,
+        comments: leaveData.otherReasonText || comments,
         leaveRequestedAt: leaveData.leaveRequestedAt || new Date(),
         leaveRequestedBy: leaveData.leaveRequestedBy || leaveData.requestedBy || user.email || '',
-        // Si hay otherReasonText, guardarlo en comments
-        comments: leaveData.otherReasonText || null,
       };
       
       const leave = await storage.createCompanyLeave(processedLeaveData);
@@ -784,13 +782,13 @@ export async function registerRoutes (app: Express): Promise<Server> {
         motivoAnterior,
         motivoNuevo,
         comentarios: motivoNuevo === 'otras_causas' ? comentarios : null,
-        cambiadoPor: user.email,
-        rolUsuario: user.role,
+        cambiadoPor: user.email || '',
+        rolUsuario: user.role || '',
       });
       // Registrar en logs
       await AuditService.logAction({
-        userId: user.email,
-        userRole: user.role,
+        userId: user.email || '',
+        userRole: user.role || '',
         action: 'change_company_leave_reason',
         entityType: 'company_leave',
         entityId: leave.employeeId,
@@ -1014,8 +1012,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
                   // 3. Buscar en el registro de company_leaves
                   const companyLeaves = await storage.getAllCompanyLeaves();
                   const leave = companyLeaves.find(l => l.employeeId === employeeId && l.status === 'approved');
-                  if (leave && leave.employeeData && leave.employeeData.horas !== undefined && leave.employeeData.horas !== null) {
-                    horasRestaurar = leave.employeeData.horas;
+                  if (leave && leave.employeeData && typeof leave.employeeData === 'object' && leave.employeeData !== null && 'horas' in leave.employeeData && (leave.employeeData as any).horas !== undefined && (leave.employeeData as any).horas !== null) {
+                    horasRestaurar = (leave.employeeData as any).horas;
                   }
                 }
               }
@@ -1646,6 +1644,37 @@ export async function registerRoutes (app: Express): Promise<Server> {
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') console.error('❌ Error en limpieza de empleados dados de baja:', error);
       res.status(500).json({ message: 'Error al limpiar empleados dados de baja' });
+    }
+  });
+
+  // Ejecutar limpieza automática manualmente (solo superadmin)
+  app.post('/api/employees/execute-automatic-cleanup', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede ejecutar la limpieza automática' });
+      }
+
+      // Importar el scheduler dinámicamente para evitar dependencias circulares
+      const { scheduler } = await import('./scheduler.js');
+      const result = await scheduler.executeManualCleanup();
+
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: 'Limpieza automática ejecutada manualmente',
+          ...result.result 
+        });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          message: 'Error ejecutando limpieza automática',
+          error: result.error 
+        });
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error ejecutando limpieza automática:', error);
+      res.status(500).json({ message: 'Error al ejecutar limpieza automática' });
     }
   });
 
