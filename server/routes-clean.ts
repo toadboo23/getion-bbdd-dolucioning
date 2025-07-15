@@ -667,6 +667,9 @@ export async function registerRoutes (app: Express): Promise<Server> {
                             leaveData.leaveType === 'voluntaria' ? 'Baja Empresa - Baja Voluntaria' :
                             leaveData.leaveType === 'nspp' ? 'Baja Empresa - NSPP' :
                             leaveData.leaveType === 'anulacion' ? 'Baja Empresa - Anulación' :
+                            leaveData.leaveType === 'fin_contrato_temporal' ? 'Baja Empresa - Fin de Contrato Temporal' :
+                            leaveData.leaveType === 'agotamiento_it' ? 'Baja Empresa - Agotamiento IT' :
+                            leaveData.leaveType === 'otras_causas' ? 'Baja Empresa - Otras Causas' :
                             `Baja Empresa - ${leaveData.leaveType}`;
       
       // Formatear la fecha

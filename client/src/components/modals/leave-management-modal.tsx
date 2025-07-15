@@ -30,7 +30,7 @@ export default function LeaveManagementModal ({
   const { toast } = useToast();
   const [leaveType, setLeaveType] = useState<'it' | 'company' | ''>('');
   const [itReason, setItReason] = useState<'enfermedad' | 'accidente' | ''>('');
-  const [companyReason, setCompanyReason] = useState<'despido' | 'voluntaria' | 'nspp' | 'anulacion' | ''>('');
+  const [companyReason, setCompanyReason] = useState<'despido' | 'voluntaria' | 'nspp' | 'anulacion' | 'fin_contrato_temporal' | 'agotamiento_it' | 'otras_causas' | ''>('');
   const [leaveDate, setLeaveDate] = useState('');
 
   const itLeaveMutation = useMutation({
@@ -233,7 +233,7 @@ export default function LeaveManagementModal ({
               <Label className="text-sm font-medium text-gray-700 mb-3 block">
                 Motivo Baja Empresa
               </Label>
-              <RadioGroup value={companyReason} onValueChange={(value: 'despido' | 'voluntaria' | 'nspp' | 'anulacion') => setCompanyReason(value)}>
+              <RadioGroup value={companyReason} onValueChange={(value: 'despido' | 'voluntaria' | 'nspp' | 'anulacion' | 'fin_contrato_temporal' | 'agotamiento_it' | 'otras_causas') => setCompanyReason(value)}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="despido" id="despido" />
                   <Label htmlFor="despido">Despido</Label>
@@ -249,6 +249,18 @@ export default function LeaveManagementModal ({
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="anulacion" id="anulacion" />
                   <Label htmlFor="anulacion">Anulación</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="fin_contrato_temporal" id="fin_contrato_temporal" />
+                  <Label htmlFor="fin_contrato_temporal">Fin de Contrato Temporal</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="agotamiento_it" id="agotamiento_it" />
+                  <Label htmlFor="agotamiento_it">Agotamiento de IT</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="otras_causas" id="otras_causas" />
+                  <Label htmlFor="otras_causas">Otras Causas</Label>
                 </div>
               </RadioGroup>
             </div>
