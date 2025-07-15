@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq, and, sql, desc, isNotNull, lt } from 'drizzle-orm';
+import { eq, and, sql, desc, isNotNull, lt, inArray } from 'drizzle-orm';
 import {
   systemUsers,
   auditLogs,
@@ -740,5 +740,33 @@ export class PostgresStorage {
       console.error('❌ [PENALIZATION] Error getting expiring penalizations:', error);
       throw error;
     }
+  }
+
+  /**
+   * Elimina empleados con status 'company_leave_approved' que ya existen en company_leaves.
+   * Retorna un resumen de los empleados eliminados.
+   */
+  async cleanCompanyLeaveApprovedEmployees(): Promise<{ deleted: string[]; total: number }> {
+    // Obtener todos los empleados con status 'company_leave_approved'
+    const empleados = await db.select().from(employees).where(eq(employees.status, 'company_leave_approved'));
+    if (!empleados.length) return { deleted: [], total: 0 };
+
+    // Obtener todos los employee_id de company_leaves
+    const leaves = await db.select({ employeeId: companyLeaves.employeeId }).from(companyLeaves);
+    const leavesIds = new Set(leaves.map(l => l.employeeId));
+
+    // Filtrar empleados que existen en company_leaves
+    const empleadosAEliminar = empleados.filter(emp => leavesIds.has(emp.idGlovo));
+    if (!empleadosAEliminar.length) return { deleted: [], total: 0 };
+
+    // Eliminar empleados
+    await db.delete(employees).where(
+      and(
+        eq(employees.status, 'company_leave_approved'),
+        inArray(employees.idGlovo, empleadosAEliminar.map(e => e.idGlovo))
+      )
+    );
+
+    return { deleted: empleadosAEliminar.map(e => e.idGlovo), total: empleadosAEliminar.length };
   }
 }

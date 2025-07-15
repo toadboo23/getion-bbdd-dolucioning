@@ -844,6 +844,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
         if (employeeId) {
           let newEmployeeStatus: string;
           let newCompanyLeaveStatus: string;
+          let shouldDeleteEmployee = false;
 
           switch (action) {
             case 'approve':
@@ -858,13 +859,46 @@ export async function registerRoutes (app: Express): Promise<Server> {
               newEmployeeStatus = 'pending_laboral';
               newCompanyLeaveStatus = 'pending';
               break;
+            case 'processed':
+              // Cuando se procesa una notificación de pending_laboral como "tramitado",
+              // el empleado debe ser eliminado de la tabla employees
+              newEmployeeStatus = 'deleted'; // Para el audit log, aunque no se use
+              newCompanyLeaveStatus = 'approved';
+              shouldDeleteEmployee = true;
+              break;
             default:
               newEmployeeStatus = 'company_leave_pending';
               newCompanyLeaveStatus = 'pending';
           }
 
-          // Update employee status
-          await storage.updateEmployee(employeeId, { status: newEmployeeStatus as any });
+          // Si la acción es 'processed', eliminar el empleado de employees sin actualizar status
+          if (shouldDeleteEmployee) {
+            // Obtener datos del empleado antes de eliminarlo para el audit log
+            const empleado = await storage.getEmployee(employeeId);
+            if (empleado) {
+              await storage.deleteEmployee(employeeId);
+              await AuditService.logAction({
+                userId: user.email || '',
+                userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+                action: 'delete_employee_pending_laboral_processed',
+                entityType: 'employee',
+                entityId: employeeId,
+                entityName: `${empleado.nombre} ${empleado.apellido || ''}`,
+                description: `Empleado eliminado de tabla employees tras tramitación de pendiente laboral: ${empleado.nombre} ${empleado.apellido || ''} (${employeeId})`,
+                oldData: empleado,
+                newData: {
+                  processedBy: user.email,
+                  action,
+                  employeeId,
+                  processingDate,
+                  originalRequestedBy: notification.requestedBy,
+                  reason: 'pending_laboral_processed',
+                },
+              });
+            }
+          } else {
+            await storage.updateEmployee(employeeId, { status: newEmployeeStatus as any });
+          }
 
           // Update company leave status if it exists
           if (companyLeaveId) {
@@ -894,24 +928,26 @@ export async function registerRoutes (app: Express): Promise<Server> {
             });
           }
 
-          // Log audit for employee status change
-          await AuditService.logAction({
-            userId: user.email || '',
-            userRole: (user.role as 'super_admin' | 'admin') || 'normal',
-            action: 'process_company_leave_notification',
-            entityType: 'employee',
-            entityId: employeeId,
-            description: `Usuario ${user.email} ${action === 'approve' ? 'APROBÓ' : action === 'reject' ? 'RECHAZÓ' : 'MOVIÓ A PENDIENTE LABORAL'} la baja empresa del empleado ${employeeId} - Estado final: ${newEmployeeStatus}`,
-            newData: {
-              processedBy: user.email,
-              action,
-              employeeId,
-              newEmployeeStatus,
-              newCompanyLeaveStatus,
-              processingDate,
-              originalRequestedBy: notification.requestedBy,
-            },
-          });
+          // Log audit for employee status change (solo si no se eliminó)
+          if (!shouldDeleteEmployee) {
+            await AuditService.logAction({
+              userId: user.email || '',
+              userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+              action: 'process_company_leave_notification',
+              entityType: 'employee',
+              entityId: employeeId,
+              description: `Usuario ${user.email} ${action === 'approve' ? 'APROBÓ' : action === 'reject' ? 'RECHAZÓ' : 'MOVIÓ A PENDIENTE LABORAL'} la baja empresa del empleado ${employeeId} - Estado final: ${newEmployeeStatus}`,
+              newData: {
+                processedBy: user.email,
+                action,
+                employeeId,
+                newEmployeeStatus,
+                newCompanyLeaveStatus,
+                processingDate,
+                originalRequestedBy: notification.requestedBy,
+              },
+            });
+          }
         }
       }
 
@@ -1368,6 +1404,30 @@ export async function registerRoutes (app: Express): Promise<Server> {
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') console.error('❌ Error logging page access:', error);
       res.status(500).json({ message: 'Failed to log page access' });
+    }
+  });
+
+  // Limpieza de empleados dados de baja aprobada (solo superadmin)
+  app.post('/api/employees/clean-leaves', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede limpiar empleados dados de baja' });
+      }
+      const result = await storage.cleanCompanyLeaveApprovedEmployees();
+      // Log audit
+      await AuditService.logAction({
+        userId: user?.email || '',
+        userRole: 'super_admin',
+        action: 'clean_company_leave_approved_employees',
+        entityType: 'employee',
+        description: `Limpieza masiva de empleados dados de baja aprobada (${result.total} eliminados)`,
+        newData: result,
+      });
+      res.json({ success: true, ...result });
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error en limpieza de empleados dados de baja:', error);
+      res.status(500).json({ message: 'Error al limpiar empleados dados de baja' });
     }
   });
 
