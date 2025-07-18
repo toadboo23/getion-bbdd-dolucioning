@@ -27,7 +27,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend API
+  # Backend API - Modo Desarrollo
   backend:
     build:
       context: .
@@ -35,10 +35,15 @@ services:
     container_name: solucioning_backend
     restart: unless-stopped
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       DATABASE_URL: postgresql://postgres:SolucioningSecurePass2024!@postgres:5432/employee_management
       SESSION_SECRET: SolucioningSecretKey2024!
       PORT: 5173
+    volumes:
+      - ./server:/app/server
+      - ./shared:/app/shared
+      - ./drizzle.config.ts:/app/drizzle.config.ts
+      - /app/node_modules
     ports:
       - "5173:5173"
     depends_on:
@@ -46,22 +51,32 @@ services:
         condition: service_healthy
     networks:
       - solucioning_network
+    command: npm run dev:backend
 
-  # Frontend
+  # Frontend - Modo Desarrollo
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend
+      dockerfile: Dockerfile.frontend.dev
     container_name: solucioning_frontend
     restart: unless-stopped
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
+    volumes:
+      - ./client:/app/client
+      - ./shared:/app/shared
+      - ./tailwind.config.ts:/app/tailwind.config.ts
+      - ./postcss.config.js:/app/postcss.config.js
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./vite.config.ts:/app/vite.config.ts
+      - /app/node_modules
     ports:
       - "3000:3000"
     depends_on:
       - backend
     networks:
       - solucioning_network
+    command: npm run dev:frontend
 
   # pgAdmin
   pgadmin:

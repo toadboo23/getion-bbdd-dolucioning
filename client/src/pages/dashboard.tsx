@@ -5,7 +5,8 @@ import { useEffect } from 'react';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import DashboardMetrics from '@/components/dashboard-metrics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, UserX } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Users, UserX, Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // Definir el tipo de métricas
@@ -103,6 +104,10 @@ export default function Dashboard () {
 
   if (user?.role === 'normal') return null;
 
+  const handleCreateTicket = () => {
+    window.open('http://69.62.107.86:8080/open.php', '_blank', 'noopener,noreferrer');
+  };
+
   if (metricsLoading) {
     return (
       <div className="p-6 bg-white min-h-screen">
@@ -124,9 +129,19 @@ export default function Dashboard () {
 
   return (
     <div className="p-6 bg-white min-h-screen">
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">Dashboard</h2>
-        <p className="mt-1 text-sm text-gray-600">Resumen general del sistema</p>
+      <div className="mb-6 flex justify-between items-start">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900">Dashboard</h2>
+          <p className="mt-1 text-sm text-gray-600">Resumen general del sistema</p>
+        </div>
+        <Button
+          onClick={handleCreateTicket}
+          variant="outline"
+          className="flex items-center gap-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+        >
+          <Ticket className="h-4 w-4" />
+          Crear ticket de incidencia
+        </Button>
       </div>
 
       {/* Dashboard avanzado con gráficos */}

@@ -23,7 +23,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: process.env.NODE_ENV === 'production' ? 'http://backend:5173' : 'http://localhost:5173',
+        target: 'http://backend:5173',
         changeOrigin: true,
         secure: false,
       },
