@@ -1,42 +1,21 @@
-# ========================================
-# DOCKERFILE FRONTEND - DESARROLLO
-# ========================================
-
 FROM node:20-alpine
-
-# Instalar dependencias del sistema
-RUN apk add --no-cache git
-
-# Configurar usuario no-root para seguridad
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
 
 WORKDIR /app
 
-# Copiar archivos de configuración primero para mejor cache
+# Copy package files and lock from root directory
 COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy configuration files
 COPY tailwind.config.ts ./
 COPY postcss.config.js ./
 COPY tsconfig.json ./
 COPY vite.config.ts ./
 
-# Instalar dependencias
-RUN npm ci --only=production && npm cache clean --force
-
-# Cambiar al usuario no-root
-USER nextjs
-
-# Exponer puerto para servidor de desarrollo
+# Expose port for development server
 EXPOSE 3000
 
-# Health check para desarrollo
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
-
-# Variables de entorno para desarrollo
-ENV NODE_ENV=development
-ENV CHOKIDAR_USEPOLLING=true
-ENV WATCHPACK_POLLING=true
-
-# Comando para iniciar servidor de desarrollo
-CMD ["npm", "run", "dev:frontend"] 
+# Start development server
+CMD ["npm", "run", "dev"] 

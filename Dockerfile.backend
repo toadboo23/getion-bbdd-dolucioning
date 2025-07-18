@@ -1,42 +1,24 @@
-# ========================================
-# DOCKERFILE BACKEND - DESARROLLO
-# ========================================
-
 FROM node:20-alpine
-
-# Instalar dependencias del sistema
-RUN apk add --no-cache git curl
-
-# Configurar usuario no-root para seguridad
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
 
 WORKDIR /app
 
-# Copiar archivos de configuración primero para mejor cache
+# Copy package files from root directory
 COPY package*.json ./
-COPY drizzle.config.ts ./
 
-# Instalar dependencias
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies
+RUN npm install
 
-# Copiar código fuente
+# Copy server source code
 COPY server/ ./server/
+
+# Copy shared directory
 COPY shared/ ./shared/
 
-# Cambiar al usuario no-root
-USER nodejs
+# Copy drizzle config
+COPY drizzle.config.ts ./
 
-# Exponer puerto
+# Expose port
 EXPOSE 5173
 
-# Health check para desarrollo
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:5173/api/health || exit 1
-
-# Variables de entorno para desarrollo
-ENV NODE_ENV=development
-ENV PORT=5173
-
-# Comando para iniciar servidor de desarrollo
+# Start backend
 CMD ["npm", "run", "dev:backend"]

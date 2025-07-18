@@ -1,4 +1,4 @@
-# Versión de PRODUCCIÓN con PostgreSQL en Docker
+# Versión de DESARROLLO con PostgreSQL en Docker
 # Todos los servicios en contenedores Docker
 
 version: '3.8'
@@ -10,10 +10,10 @@ services:
     container_name: solucioning_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: employee_management
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: SolucioningSecurePass2024!
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: ${POSTGRES_DB:-employee_management}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-trust}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -35,10 +35,10 @@ services:
     container_name: solucioning_backend
     restart: unless-stopped
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:SolucioningSecurePass2024!@postgres:5432/employee_management
-      SESSION_SECRET: SolucioningSecretKey2024!
-      PORT: 5173
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:dev_password@postgres:5432/employee_management}
+      SESSION_SECRET: ${SESSION_SECRET:-dev_session_secret}
+      PORT: ${PORT:-5173}
     volumes:
       - ./server:/app/server
       - ./shared:/app/shared
@@ -61,7 +61,7 @@ services:
     container_name: solucioning_frontend
     restart: unless-stopped
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV:-development}
     volumes:
       - ./client:/app/client
       - ./shared:/app/shared
@@ -84,9 +84,9 @@ services:
     container_name: solucioning_pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@solucioning.local
-      PGADMIN_DEFAULT_PASSWORD: admin2024
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@solucioning.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin2024}
+      PGADMIN_CONFIG_SERVER_MODE: ${PGADMIN_CONFIG_SERVER_MODE:-False}
     ports:
       - "5050:80"
     networks:
