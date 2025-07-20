@@ -299,30 +299,29 @@ export class AuditService {
     });
   }
 
-  // FUNCIÓN DE AUDITORÍA PARA ELIMINAR USUARIOS DESHABILITADA POR SEGURIDAD
-  // static async logUserDelete (
-  //   userId: string,
-  //   userRole: 'super_admin',
-  //   deletedUserData: Record<string, unknown>,
-  //   req?: { headers?: Record<string, string> },
-  // ) {
-  //   await this.logAction({
-  //     userId,
-  //     userRole,
-  //     action: 'delete_user',
-  //     entityType: 'user',
-  //     entityId: deletedUserData.email as string,
-  //     entityName: `${deletedUserData.firstName as string} ${deletedUserData.lastName as string}`,
-  //     description: `Usuario eliminado: ${deletedUserData.firstName as string} ${deletedUserData.lastName as string} (${deletedUserData.email as string}) - Rol: ${deletedUserData.role as string}`,
-  //     oldData: {
-  //       email: deletedUserData.email as string,
-  //       firstName: deletedUserData.firstName as string,
-  //       lastName: deletedUserData.lastName as string,
-  //       role: deletedUserData.role as string,
-  //     },
-  //     req,
-  //   });
-  // }
+  static async logUserDelete (
+    userId: string,
+    userRole: 'super_admin',
+    deletedUserData: Record<string, unknown>,
+    req?: { headers?: Record<string, string> },
+  ) {
+    await this.logAction({
+      userId,
+      userRole,
+      action: 'delete_user',
+      entityType: 'user',
+      entityId: deletedUserData.email as string,
+      entityName: `${deletedUserData.firstName as string} ${deletedUserData.lastName as string}`,
+      description: `Usuario eliminado: ${deletedUserData.firstName as string} ${deletedUserData.lastName as string} (${deletedUserData.email as string}) - Rol: ${deletedUserData.role as string}`,
+      oldData: {
+        email: deletedUserData.email as string,
+        firstName: deletedUserData.firstName as string,
+        lastName: deletedUserData.lastName as string,
+        role: deletedUserData.role as string,
+      },
+      req,
+    });
+  }
 
   static async logPasswordChange (userId: string, userRole: 'super_admin', targetUserEmail: string, req?: { headers?: Record<string, string> }) {
     await this.logAction({

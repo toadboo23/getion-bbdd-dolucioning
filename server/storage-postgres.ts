@@ -502,10 +502,9 @@ export class PostgresStorage {
     return user;
   }
 
-  // FUNCIÓN DE ELIMINAR USUARIOS DESHABILITADA POR SEGURIDAD
-  // async deleteSystemUser (id: number): Promise<void> {
-  //   await db.delete(systemUsers).where(eq(systemUsers.id, id));
-  // }
+  async deleteSystemUser (id: number): Promise<void> {
+    await db.delete(systemUsers).where(eq(systemUsers.id, id));
+  }
 
   async updateSystemUserLastLogin (id: number): Promise<void> {
     await db

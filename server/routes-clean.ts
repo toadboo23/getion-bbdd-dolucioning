@@ -1274,48 +1274,47 @@ export async function registerRoutes (app: Express): Promise<Server> {
     }
   });
 
-  // RUTA DE ELIMINAR USUARIOS DESHABILITADA POR SEGURIDAD
-  // app.delete('/api/system-users/:id', isAuthenticated, async (req: any, res) => {
-  //   if (process.env.NODE_ENV !== 'production') console.log('🗑️ Delete system user request');
-  //   try {
-  //     const user = req.user as { role?: string };
-  //     if (user?.role !== 'super_admin') {
-  //       return res.status(403).json({ message: 'Solo el super admin puede eliminar usuarios del sistema' });
-  //     }
+  app.delete('/api/system-users/:id', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🗑️ Delete system user request');
+    try {
+      const user = req.user as { role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede eliminar usuarios del sistema' });
+      }
 
-  //     const { id } = req.params;
+      const { id } = req.params;
 
-  //     // Get user data for audit
-  //     const systemUser = await storage.getSystemUser(parseInt(id));
-  //     if (!systemUser) {
-  //       return res.status(404).json({ message: 'System user not found' });
-  //     }
+      // Get user data for audit
+      const systemUser = await storage.getSystemUser(parseInt(id));
+      if (!systemUser) {
+        return res.status(404).json({ message: 'System user not found' });
+      }
 
-  //     // Prevent deletion of super admin
-  //     if (systemUser.email === 'superadmin@glovo.com') {
-  //       return res.status(403).json({ message: 'No se puede eliminar el super administrador' });
-  //     }
+      // Prevent deletion of super admin
+      if (systemUser.email === 'superadmin@glovo.com') {
+        return res.status(403).json({ message: 'No se puede eliminar el super administrador' });
+      }
 
-  //     await storage.deleteSystemUser(parseInt(id));
+      await storage.deleteSystemUser(parseInt(id));
 
-  //     // Log audit
-  //     await AuditService.logAction({
-  //       userId: (user as { email?: string }).email || '',
-  //       userRole: (user.role as 'super_admin' | 'admin') || 'normal',
-  //       action: 'delete_system_user',
-  //       entityType: 'system_user',
-  //       entityId: systemUser.id.toString(),
-  //       entityName: `${systemUser.firstName} ${systemUser.lastName}`,
-  //       description: `Usuario del sistema eliminado: ${systemUser.firstName} ${systemUser.lastName} (${systemUser.email})`,
-  //       oldData: systemUser,
-  //     });
+      // Log audit
+      await AuditService.logAction({
+        userId: (user as { email?: string }).email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+        action: 'delete_system_user',
+        entityType: 'system_user',
+        entityId: systemUser.id.toString(),
+        entityName: `${systemUser.firstName} ${systemUser.lastName}`,
+        description: `Usuario del sistema eliminado: ${systemUser.firstName} ${systemUser.lastName} (${systemUser.email})`,
+        oldData: systemUser,
+      });
 
-  //     res.status(204).send();
-  //   } catch (error) {
-  //     if (process.env.NODE_ENV !== 'production') console.error('❌ Error deleting system user:', error);
-  //     res.status(500).json({ message: 'Failed to delete system user' });
-  //   }
-  // });
+      res.status(204).send();
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error deleting system user:', error);
+      res.status(500).json({ message: 'Failed to delete system user' });
+    }
+  });
 
   // Change system user password (protected - super_admin only)
   app.put('/api/system-users/:id/password', isAuthenticated, async (req: any, res) => {
