@@ -310,9 +310,7 @@ export default function ImportEmployeesModal ({
           if (!employee.nombre) {
             errors.push({ row: i + 1, field: 'Nombre', message: 'Nombre es requerido' });
           }
-          if (!employee.telefono) {
-            errors.push({ row: i + 1, field: 'Teléfono', message: 'Teléfono es requerido' });
-          }
+          // Teléfono es opcional, no se valida como requerido
 
           processedEmployees.push(employee);
         }

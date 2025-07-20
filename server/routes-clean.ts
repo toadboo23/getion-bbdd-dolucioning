@@ -414,9 +414,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
         if (!emp.nombre || emp.nombre === 'Sin Nombre') {
           errors.push(`Fila ${index + 2}: Nombre es requerido`);
         }
-        if (!emp.telefono || emp.telefono === 'Sin Teléfono') {
-          errors.push(`Fila ${index + 2}: Teléfono es requerido`);
-        }
+        // Teléfono es opcional, no se valida como requerido
       });
 
       if (errors.length > 0) {
