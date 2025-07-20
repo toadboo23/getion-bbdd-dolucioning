@@ -48,7 +48,7 @@ db_local/
 - Node.js 18+ (para desarrollo local)
 - Git
 
-### Desarrollo Local
+### Desarrollo Local (Recomendado)
 
 1. **Clonar el repositorio**
    ```bash
@@ -56,26 +56,25 @@ db_local/
    cd db_local
    ```
 
-2. **Iniciar con Docker (Recomendado)**
-   ```bash
-   # Iniciar todos los servicios
-   docker-compose up -d
+2. **Iniciar servicios locales (SIN variables de entorno)**
+   ```powershell
+   # Iniciar todos los servicios locales
+   .\scripts\dev-local.ps1 up
    
    # Ver logs
-   docker-compose logs -f
+   .\scripts\dev-local.ps1 logs
+   
+   # Detener servicios
+   .\scripts\dev-local.ps1 down
    ```
 
-3. **Desarrollo sin Docker**
+3. **Desarrollo tradicional (No recomendado)**
    ```bash
-   # Instalar dependencias
-   npm install
-   
-   # Iniciar backend
-   cd server && npm run dev:backend
-   
-   # Iniciar frontend (en otra terminal)
-   cd client && npm run dev
+   # Solo si necesitas usar variables de entorno
+   docker-compose up -d
    ```
+
+**⚠️ IMPORTANTE**: Usa siempre `.\scripts\dev-local.ps1` para evitar conflictos de variables de entorno.
 
 ### Acceso a la Aplicación
 - **Frontend**: http://localhost:3000

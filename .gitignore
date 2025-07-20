@@ -9,7 +9,7 @@ build/
 */build/
 *.tsbuildinfo
 
-# Environment files
+# Environment files - NO SUBIR NUNCA
 .env
 .env.local
 .env.production
@@ -19,6 +19,18 @@ build/
 .env.test.local
 .env.production.local
 env.production.secure
+.env.vps
+.env.production.vps
+
+# Docker compose files with environment variables
+docker-compose.override.yml
+docker-compose.local.yml
+docker-compose.prod.yml
+
+# Local configuration files
+config.local.js
+config.local.json
+*.local.*
 
 # Logs
 *.log
