@@ -34,14 +34,14 @@ export default function Landing () {
 
       if (response.ok) {
         const data = await response.json();
-
+        
         if (data.success) {
           // Actualizar el estado local de autenticación
           setUser(data.user);
-
+          
           // Invalidar la query de autenticación para que se actualice
           queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-
+          
           // Limpiar el formulario
           setLoginData({
             email: '',

@@ -52,7 +52,7 @@ export default function SystemLogsPage () {
     'CREATE_EMPLOYEE', 'UPDATE_EMPLOYEE', 'DELETE_EMPLOYEE', 'BULK_IMPORT', 'REACTIVATE_EMPLOYEE',
     'CREATE_IT_LEAVE', 'APPROVE_IT_LEAVE', 'REJECT_IT_LEAVE',
     'CREATE_COMPANY_LEAVE', 'APPROVE_COMPANY_LEAVE', 'REJECT_COMPANY_LEAVE',
-    'PROCESS_NOTIFICATION', 'CREATE_USER', 'UPDATE_USER', 'DELETE_USER',
+    'PROCESS_NOTIFICATION', 'CREATE_USER', 'UPDATE_USER',
     'LOGIN', 'LOGOUT',
   ];
 
@@ -75,7 +75,7 @@ export default function SystemLogsPage () {
     'PROCESS_NOTIFICATION': 'bg-yellow-100 text-yellow-800',
     'CREATE_USER': 'bg-emerald-100 text-emerald-800',
     'UPDATE_USER': 'bg-cyan-100 text-cyan-800',
-    'DELETE_USER': 'bg-red-100 text-red-800',
+    
     'LOGIN': 'bg-slate-100 text-slate-800',
     'LOGOUT': 'bg-gray-100 text-gray-800',
   };

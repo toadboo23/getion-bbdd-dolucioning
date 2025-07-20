@@ -11,8 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, UserPlus, Edit2, Trash2, Shield, Mail, Calendar, CheckCircle, XCircle, Key } from 'lucide-react';
+
+import { Users, UserPlus, Edit2, Shield, Mail, Calendar, CheckCircle, XCircle, Key } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CIUDADES_DISPONIBLES } from '@shared/schema';
@@ -164,26 +164,7 @@ export default function UserManagement () {
     },
   });
 
-  // Delete user mutation
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId: number) => {
-      await apiRequest('DELETE', `/api/system-users/${userId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/system-users'] });
-      toast({
-        title: 'Usuario eliminado',
-        description: 'El usuario ha sido eliminado exitosamente',
-      });
-    },
-    onError: () => {
-      toast({
-        title: 'Error',
-        description: 'No se pudo eliminar el usuario',
-        variant: 'destructive',
-      });
-    },
-  });
+
 
   // Verificar permisos después de todos los hooks
   if (user?.role !== 'super_admin') {
@@ -317,9 +298,7 @@ export default function UserManagement () {
     });
   };
 
-  const handleDeleteUser = (userId: number) => {
-    deleteUserMutation.mutate(userId);
-  };
+
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -637,40 +616,7 @@ export default function UserManagement () {
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          {userRow.email !== 'superadmin@glovo.com' && ( // No permitir borrar super admin
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent aria-describedby="delete-user-description">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Esta acción no se puede deshacer. Se eliminará permanentemente
-                                    el usuario <strong>{userRow.firstName} {userRow.lastName}</strong> del sistema.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <div id="delete-user-description" className="sr-only">
-                                  Modal de confirmación para eliminar usuario. Permite confirmar o cancelar la eliminación permanente del usuario.
-                                </div>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteUser(userRow.id)}
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    Eliminar
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
+
                         </div>
                       </TableCell>
                     </TableRow>

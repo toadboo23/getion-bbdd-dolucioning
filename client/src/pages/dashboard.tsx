@@ -131,8 +131,8 @@ export default function Dashboard () {
     <div className="p-6 bg-white min-h-screen">
       <div className="mb-6 flex justify-between items-start">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Dashboard</h2>
-          <p className="mt-1 text-sm text-gray-600">Resumen general del sistema</p>
+        <h2 className="text-2xl font-semibold text-gray-900">Dashboard</h2>
+        <p className="mt-1 text-sm text-gray-600">Resumen general del sistema</p>
         </div>
         <Button
           onClick={handleCreateTicket}
