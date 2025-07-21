@@ -696,6 +696,51 @@ export default function EditEmployeeModal ({
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="vacacionesDisfrutadas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Vacaciones Disfrutadas</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          {...field}
+                          value={field.value ?? 0}
+                          onChange={e => field.onChange(Number(Number(e.target.value).toFixed(2)))}
+                          placeholder="0.00"
+                          disabled={user?.role !== 'super_admin'}
+                        />
+                      </FormControl>
+                      <FormDescription>Días de vacaciones ya disfrutados este año.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="vacacionesPendientes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Vacaciones Pendientes</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          {...field}
+                          value={field.value ?? 0}
+                          disabled
+                        />
+                      </FormControl>
+                      <FormDescription>Días de vacaciones pendientes de disfrutar (calculado automáticamente).</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
 
               </div>
 

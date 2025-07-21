@@ -86,6 +86,8 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
     'Estado',
     'Fecha Creación',
     'Última Actualización',
+    'Vacaciones Disfrutadas',
+    'Vacaciones Pendientes',
   ];
 
   // Datos de ejemplo con todos los campos
@@ -125,6 +127,8 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
       'Activo', // Estado
       '01/01/2024', // Fecha Creación
       '01/01/2024', // Última Actualización
+      '2.00', // Vacaciones Disfrutadas
+      '10.00', // Vacaciones Pendientes
     ],
     [
       'EMP002', // ID Glovo
@@ -160,6 +164,8 @@ export function createEmployeeTemplate (fileName: string = 'plantilla_empleados'
       'Activo', // Estado
       '15/01/2024', // Fecha Creación
       '15/01/2024', // Última Actualización
+      '1.00', // Vacaciones Disfrutadas
+      '8.00', // Vacaciones Pendientes
     ],
     new Array(headers.length).fill(''), // Fila vacía para ejemplo
   ];

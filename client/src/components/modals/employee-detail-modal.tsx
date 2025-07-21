@@ -323,6 +323,16 @@ export default function EmployeeDetailModal ({
                   label="Informado Horario"
                   value={employee.informadoHorario ? 'Sí' : 'No'}
                 />
+                <InfoItem
+                  icon={Calendar}
+                  label="Vacaciones Disfrutadas"
+                  value={typeof employee.vacacionesDisfrutadas !== 'undefined' ? Number(employee.vacacionesDisfrutadas).toFixed(2) + ' días' : '0.00 días'}
+                />
+                <InfoItem
+                  icon={Calendar}
+                  label="Vacaciones Pendientes"
+                  value={typeof employee.vacacionesPendientes !== 'undefined' ? Number(employee.vacacionesPendientes).toFixed(2) + ' días' : '0.00 días'}
+                />
               </div>
             </CardContent>
           </Card>

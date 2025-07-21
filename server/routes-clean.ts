@@ -135,7 +135,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
           emp.nombre?.toLowerCase().includes(searchTerm) ||
           emp.apellido?.toLowerCase().includes(searchTerm) ||
           emp.telefono?.includes(searchTerm) ||
-          emp.email?.toLowerCase().includes(searchTerm),
+          emp.email?.toLowerCase().includes(searchTerm) ||
+          emp.idGlovo?.toLowerCase().includes(searchTerm) // <-- Añadido filtro por idGlovo
         );
       }
 
@@ -1499,6 +1500,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
         'Fecha Inicio Penalización',
         'Fecha Fin Penalización',
         'Horas Originales',
+        'Vacaciones Disfrutadas',
+        'Vacaciones Pendientes',
       ].join(',');
 
       const csvRows = employees.map(emp => [
@@ -1535,6 +1538,8 @@ export async function registerRoutes (app: Express): Promise<Server> {
         emp.penalizationStartDate || '',
         emp.penalizationEndDate || '',
         emp.originalHours || '',
+        typeof emp.vacacionesDisfrutadas !== 'undefined' ? Number(emp.vacacionesDisfrutadas).toFixed(2) : '',
+        typeof emp.vacacionesPendientes !== 'undefined' ? Number(emp.vacacionesPendientes).toFixed(2) : '',
       ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','));
 
       const csvContent = [csvHeaders, ...csvRows].join('\n');

@@ -113,38 +113,47 @@ export class PostgresStorage {
     if (!currentEmployee) {
       throw new Error(`Employee with ID ${id} not found`);
     }
-    
+
+    // No permitir modificar vacaciones_pendientes manualmente
+    if ('vacacionesPendientes' in employeeData) {
+      delete (employeeData as any).vacacionesPendientes;
+    }
+
+    // Calcular vacaciones_pendientes automáticamente
+    let fechaAlta = employeeData.fechaAltaSegSoc || currentEmployee.fechaAltaSegSoc;
+    let vacacionesDisfrutadas =
+      typeof employeeData.vacacionesDisfrutadas !== 'undefined'
+        ? Number(employeeData.vacacionesDisfrutadas)
+        : Number(currentEmployee.vacacionesDisfrutadas) || 0;
+    let vacacionesPendientes = 0;
+    if (fechaAlta) {
+      const fechaInicio = new Date(fechaAlta);
+      const hoy = new Date();
+      const diasTranscurridos = Math.floor((hoy.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24));
+      vacacionesPendientes = (diasTranscurridos * 0.0833333333333333) - vacacionesDisfrutadas;
+      if (vacacionesPendientes < 0) vacacionesPendientes = 0;
+      vacacionesPendientes = Number(vacacionesPendientes.toFixed(2));
+    }
+    // Si no hay fecha de alta, dejar en 0
+    else {
+      vacacionesPendientes = 0;
+    }
+
     // Verificar si se está cambiando de it_leave a active
     const isReactivatingFromItLeave = currentEmployee.status === 'it_leave' && 
                                      employeeData.status === 'active';
-    
     // Verificar si se está cambiando a company_leave_approved (baja empresa)
     const isGoingToCompanyLeave = employeeData.status === 'company_leave_approved';
-    
     // Si se está reactivando desde baja IT, restaurar las horas originales
     if (isReactivatingFromItLeave && currentEmployee.originalHours !== null) {
-      console.log(`🔄 Reactivating employee ${id} from IT leave. Restoring hours from ${currentEmployee.horas} to ${currentEmployee.originalHours}`);
-      
-      // Restaurar las horas originales
       employeeData.horas = currentEmployee.originalHours;
-      
-      // Limpiar las horas originales ya que ya no son necesarias
       employeeData.originalHours = null;
     }
-    
     // Si se está cambiando a baja empresa, guardar las horas originales y poner las actuales a 0
     if (isGoingToCompanyLeave) {
-      // Siempre guardar las horas actuales como originales si no están ya guardadas
       const originalHours = currentEmployee.originalHours !== null ? currentEmployee.originalHours : currentEmployee.horas || 0;
-      console.log(`🏢 Employee ${id} going to company leave. Saving original hours: ${originalHours}, setting current hours to 0`);
-      
-      // Guardar las horas originales
       employeeData.originalHours = originalHours;
-      
-      // Poner las horas actuales a 0
       employeeData.horas = 0;
-      
-      // Crear notificación de auditoría para el cambio de horas
       await this.createNotification({
         type: 'employee_update',
         title: 'Empleado en Baja Empresa - Horas Guardadas',
@@ -162,11 +171,9 @@ export class PostgresStorage {
         },
       });
     }
-    
     // Calcular CDP automáticamente si se actualizan las horas
     const cdp = calculateCDP(employeeData.horas);
-    const employeeDataWithCDP = { ...employeeData, cdp };
-
+    const employeeDataWithCDP = { ...employeeData, cdp, vacacionesPendientes };
     const [employee] = await db
       .update(employees)
       .set(employeeDataWithCDP as UpdateEmployee)
