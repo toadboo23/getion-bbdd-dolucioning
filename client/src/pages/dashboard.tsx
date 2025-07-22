@@ -6,8 +6,9 @@ import { isUnauthorizedError } from '@/lib/authUtils';
 import DashboardMetrics from '@/components/dashboard-metrics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, UserX, Ticket } from 'lucide-react';
+import { Users, UserX, Ticket, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // Definir el tipo de métricas
 interface MetricsData {
@@ -127,6 +128,13 @@ export default function Dashboard () {
     );
   }
 
+  const safeEmployeesByCity = metrics?.employeesByCity || [];
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A020F0', '#FF6666'];
+
+  // Log de depuración para métricas y empleados por ciudad
+  console.log('Métricas:', metrics);
+  console.log('Empleados por ciudad:', safeEmployeesByCity);
+
   return (
     <div className="p-6 bg-white min-h-screen">
       <div className="mb-6 flex justify-between items-start">
@@ -182,6 +190,65 @@ export default function Dashboard () {
                 No hay actividad reciente disponible
               </p>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* GRÁFICO DE EMPLEADOS POR CIUDAD */}
+      <Card className="bg-white shadow-lg border border-gray-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-blue-600" />
+            Empleados por Ciudad
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-96 flex flex-col justify-center items-center relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={safeEmployeesByCity}
+                margin={{ top: 50, right: 30, left: 20, bottom: 80 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="city" angle={-45} textAnchor="end" interval={0} height={80} tick={{ fontSize: 12 }} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count">
+                  {safeEmployeesByCity.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            {safeEmployeesByCity.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-gray-400 text-lg">No hay datos de empleados por ciudad</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* --- BLOQUE POWER BI --- */}
+      <Card className="bg-white shadow-lg border border-gray-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span className="text-gray-700">KPIs Horarios</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-gray-600 text-sm">Visualización interactiva de KPIs de horarios. Puedes navegar, filtrar y ampliar el informe según tus necesidades.</p>
+          <div className="w-full flex justify-center">
+            <iframe
+              src="https://consultingsallent-my.sharepoint.com/personal/cartiel_solucioning_net/_layouts/15/embed.aspx?UniqueId=b85ad2ae-4810-4b8e-99e6-a59fe471b67b"
+              title="KPIS horarios"
+              width="100%"
+              height="480"
+              className="rounded-lg border border-gray-200 shadow-sm min-h-[360px] max-w-4xl"
+              frameBorder="0"
+              scrolling="no"
+              allowFullScreen
+            ></iframe>
           </div>
         </CardContent>
       </Card>
