@@ -194,41 +194,6 @@ export default function Dashboard () {
         </CardContent>
       </Card>
 
-      {/* GRÁFICO DE EMPLEADOS POR CIUDAD */}
-      <Card className="bg-white shadow-lg border border-gray-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-blue-600" />
-            Empleados por Ciudad
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-96 flex flex-col justify-center items-center relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={safeEmployeesByCity}
-                margin={{ top: 50, right: 30, left: 20, bottom: 80 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="city" angle={-45} textAnchor="end" interval={0} height={80} tick={{ fontSize: 12 }} />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count">
-                  {safeEmployeesByCity.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            {safeEmployeesByCity.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-gray-400 text-lg">No hay datos de empleados por ciudad</span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* --- BLOQUE POWER BI --- */}
       <Card className="bg-white shadow-lg border border-gray-200">
         <CardHeader>
