@@ -207,11 +207,11 @@ export default function UserManagement () {
     console.log('📝 createForm:', createForm);
     
     // Validaciones
-    if (!createForm.email || !createForm.firstName || !createForm.lastName || !createForm.password) {
+    if (!createForm.email || !createForm.password) {
       console.log('❌ Validation failed: missing required fields');
       toast({
         title: 'Campos requeridos',
-        description: 'Por favor complete todos los campos obligatorios',
+        description: 'Por favor complete los campos obligatorios: Email y Contraseña',
         variant: 'destructive',
       });
       return;
@@ -432,25 +432,6 @@ export default function UserManagement () {
                       <SelectItem value="admin">Administrador</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="assigned_city">Ciudad Asignada</Label>
-                  <Select value={createForm.assigned_city || 'none'} onValueChange={(value: string) => setCreateForm(prev => ({ ...prev, assigned_city: value === 'none' ? '' : value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar ciudad" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin ciudad asignada</SelectItem>
-                      {CIUDADES_DISPONIBLES.map((ciudad) => (
-                        <SelectItem key={ciudad} value={ciudad}>
-                          {ciudad}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-gray-500">
-                    La ciudad asignada determina qué empleados podrá ver el usuario
-                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Contraseña *</Label>
