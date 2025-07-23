@@ -16,7 +16,7 @@ import ImportEmployeesModal from '@/components/modals/import-employees-modal';
 import EmployeeDetailModal from '@/components/modals/employee-detail-modal';
 import PenalizationModal from '@/components/modals/penalization-modal';
 import PenalizationAlert from '@/components/penalization-alert';
-import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight, Users, AlertTriangle, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight, Users, AlertTriangle, Trash2, RefreshCw, Settings, Clock } from 'lucide-react';
 import type { Employee } from '@shared/schema';
 import { CIUDADES_DISPONIBLES } from '@shared/schema';
 // XLSX import removed as it's not used in this file
@@ -444,6 +444,8 @@ export default function Employees () {
     setCurrentPage(1);
   };
 
+
+
   if (employeesLoading) {
     return (
       <div className="p-6">
@@ -559,6 +561,8 @@ export default function Employees () {
                 {executeAutomaticCleanupMutation.isPending ? 'Ejecutando...' : 'Ejecutar Limpieza Automática'}
               </Button>
             )}
+
+
 
             {/* Botón Agregar Empleado - Solo Admin y Super Admin */}
             {canEditEmployees && (

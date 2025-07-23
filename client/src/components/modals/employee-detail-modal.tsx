@@ -285,6 +285,11 @@ export default function EmployeeDetailModal ({
                 />
                 <InfoItem
                   icon={Clock}
+                  label="Horas Complementarias"
+                  value={employee.status === 'penalizado' ? '0 horas (penalizado)' : `${typeof employee.complementaries === 'number' ? employee.complementaries : (employee.complementaries || '0')} horas`}
+                />
+                <InfoItem
+                  icon={Clock}
                   label="CDP%"
                   value={employee.horas ? `${((employee.horas / 38) * 100).toFixed(2)}%` : undefined}
                 />

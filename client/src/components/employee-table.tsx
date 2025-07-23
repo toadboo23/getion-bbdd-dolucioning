@@ -81,6 +81,7 @@ export default function EmployeeTable ({
                 <TableHead>Estado</TableHead>
                 <TableHead>Horas</TableHead>
                 <TableHead>CDP%</TableHead>
+                <TableHead>Complementarias</TableHead>
                 <TableHead>Turno</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
@@ -147,6 +148,23 @@ export default function EmployeeTable ({
                         }`}
                       >
                         {(employee.cdp ?? 0).toFixed(2)}%
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {employee.status === 'penalizado' ? (
+                      <span className="inline-block px-2 py-1 rounded bg-red-100 text-red-700 font-semibold text-xs">
+                        0 horas
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
+                          (employee.complementaries ?? 0) > 0
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {typeof employee.complementaries === 'number' ? `${employee.complementaries} horas` : `${employee.complementaries || '0'} horas`}
                       </span>
                     )}
                   </TableCell>
