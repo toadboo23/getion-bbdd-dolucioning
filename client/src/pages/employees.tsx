@@ -618,7 +618,7 @@ export default function Employees () {
                 <div className="relative">
                   <Input
                     id="search"
-                    placeholder="Nombre, apellido, teléfono, email personal o email Glovo..."
+                    placeholder="Nombre, apellido, teléfono, email personal, email Glovo o dni/NIE..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
