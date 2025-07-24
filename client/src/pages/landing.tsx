@@ -161,6 +161,22 @@ export default function Landing () {
               <Ticket className="h-4 w-4 mr-2" />
               Crear ticket de incidencia
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => window.open('http://69.62.107.86:8080/scp/login.php', '_blank', 'noopener,noreferrer')}
+              className="w-full h-11 mt-2 text-base font-medium border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+              aria-label="Tickets - Admin"
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  window.open('http://69.62.107.86:8080/scp/login.php', '_blank', 'noopener,noreferrer');
+                }
+              }}
+            >
+              <Shield className="h-4 w-4 mr-2" />
+              Tickets - Admin
+            </Button>
           </CardContent>
         </Card>
       </div>

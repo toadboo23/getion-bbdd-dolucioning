@@ -6,7 +6,7 @@ import { isUnauthorizedError } from '@/lib/authUtils';
 import DashboardMetrics from '@/components/dashboard-metrics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, UserX, Ticket, MapPin } from 'lucide-react';
+import { Users, UserX, Ticket, MapPin, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
