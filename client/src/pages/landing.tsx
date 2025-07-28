@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, Shield, Ticket } from 'lucide-react';
+import { Building2, Shield, Ticket, FileText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Landing () {
@@ -176,6 +176,22 @@ export default function Landing () {
             >
               <Shield className="h-4 w-4 mr-2" />
               Tickets - Admin
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => window.open('http://69.62.107.86:8082/', '_blank', 'noopener,noreferrer')}
+              className="w-full h-11 mt-2 text-base font-medium border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+              aria-label="Formularios Diarios e Incidencias"
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  window.open('http://69.62.107.86:8082/', '_blank', 'noopener,noreferrer');
+                }
+              }}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Formularios Diarios e Incidencias
             </Button>
           </CardContent>
         </Card>
