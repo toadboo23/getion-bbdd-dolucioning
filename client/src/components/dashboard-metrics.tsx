@@ -106,7 +106,7 @@ export default function DashboardMetrics ({ metrics }: DashboardMetricsProps) {
                 <Shield className="w-8 h-8 text-red-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-red-700">Empleados Penalizados</p>
+                <p className="text-sm font-medium text-red-700">Empleados Penalizados/Vacaciones</p>
                 <p className="text-3xl font-bold text-red-900">
                   {metrics.penalizedEmployees.toLocaleString()}
                 </p>

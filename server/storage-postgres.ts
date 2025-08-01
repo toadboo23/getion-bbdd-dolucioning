@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq, and, sql, desc, isNotNull, lt, inArray, or } from 'drizzle-orm';
+import { eq, and, sql, desc, isNotNull, lt, inArray, or, ne } from 'drizzle-orm';
 import {
   systemUsers,
   auditLogs,
@@ -619,25 +619,49 @@ export class PostgresStorage {
       // Store original hours if not already stored
       const originalHours = employee.originalHours || employee.horas || 0;
 
+      // Parse dates for comparison
+      const startDateObj = new Date(startDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      startDateObj.setHours(0, 0, 0, 0);
+
+      // Determine if penalization should be applied immediately or scheduled
+      const shouldApplyImmediately = startDateObj <= today;
+
       // Update employee with penalization data
+      const updateData: Record<string, unknown> = {
+        penalizationStartDate: startDate,
+        penalizationEndDate: endDate,
+        originalHours: originalHours,
+        updatedAt: new Date(),
+      };
+
+      if (shouldApplyImmediately) {
+        // Apply penalization immediately if start date is today or in the past
+        updateData.status = 'penalizado';
+        updateData.horas = employee.horas; // Keep current hours instead of setting to 0
+      } else {
+        // Schedule penalization for future date - keep current status and hours
+        updateData.status = employee.status; // Keep current status
+        updateData.horas = employee.horas; // Keep current hours
+      }
+
       const [updatedEmployee] = await db
         .update(employees)
-        .set({
-          status: 'penalizado',
-          penalizationStartDate: startDate,
-          penalizationEndDate: endDate,
-          originalHours: originalHours,
-          horas: 0, // Set hours to 0 during penalization
-          updatedAt: new Date(),
-        } as Record<string, unknown>)
+        .set(updateData)
         .where(eq(employees.idGlovo, employeeId))
         .returning();
 
       // Create notification for the penalization
+      const notificationTitle = shouldApplyImmediately ? 'Empleado Penalizado/Vacaciones' : 'Penalización Programada';
+      const notificationMessage = shouldApplyImmediately 
+        ? `El empleado ${employee.nombre} ${employee.apellido || ''} (${employeeId}) ha sido penalizado/vacaciones desde ${startDate} hasta ${endDate}. Observaciones: ${observations}`
+        : `El empleado ${employee.nombre} ${employee.apellido || ''} (${employeeId}) será penalizado/vacaciones desde ${startDate} hasta ${endDate}. Observaciones: ${observations}`;
+
       await this.createNotification({
         type: 'employee_update',
-        title: 'Empleado Penalizado',
-        message: `El empleado ${employee.nombre} ${employee.apellido || ''} (${employeeId}) ha sido penalizado desde ${startDate} hasta ${endDate}. Observaciones: ${observations}`,
+        title: notificationTitle,
+        message: notificationMessage,
         requestedBy: 'SYSTEM',
         status: 'processed',
         metadata: {
@@ -647,6 +671,8 @@ export class PostgresStorage {
           endDate,
           observations,
           originalHours,
+          scheduled: !shouldApplyImmediately,
+          appliedImmediately: shouldApplyImmediately,
         },
       });
 
@@ -741,6 +767,87 @@ export class PostgresStorage {
   }
 
   // Check and auto-restore expired penalizations
+  async activateScheduledPenalizations (): Promise<{
+    checked: number;
+    activated: number;
+    activatedEmployees: Employee[];
+  }> {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day for date comparison
+
+      // Get all employees with scheduled penalizations that should start today
+      const scheduledPenalizations = await db
+        .select()
+        .from(employees)
+        .where(
+          and(
+            ne(employees.status, 'penalizado'), // Not already penalized
+            isNotNull(employees.penalizationStartDate),
+            isNotNull(employees.penalizationEndDate),
+            sql`${employees.penalizationStartDate} <= ${today}`,
+            sql`${employees.penalizationEndDate} >= ${today}`
+          )
+        );
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`🔍 [PENALIZATION] Checking ${scheduledPenalizations.length} scheduled penalizations to activate`);
+      }
+
+      const activatedEmployees: Employee[] = [];
+
+      // Activate each scheduled penalization
+      for (const employee of scheduledPenalizations) {
+        try {
+          const [activatedEmployee] = await db
+            .update(employees)
+            .set({
+              status: 'penalizado',
+              horas: employee.horas, // Keep current hours instead of setting to 0
+              updatedAt: new Date(),
+            } as Record<string, unknown>)
+            .where(eq(employees.idGlovo, employee.idGlovo))
+            .returning();
+
+          activatedEmployees.push(activatedEmployee);
+
+          // Create notification for the activation
+          await this.createNotification({
+            type: 'employee_update',
+            title: 'Penalización/Vacaciones Activada',
+            message: `La penalización/vacaciones del empleado ${employee.nombre} ${employee.apellido || ''} (${employee.idGlovo}) ha sido activada automáticamente.`,
+            requestedBy: 'SYSTEM',
+            status: 'processed',
+            metadata: {
+              ...getEmpleadoMetadata(employee),
+              employeeId: employee.idGlovo,
+              startDate: employee.penalizationStartDate,
+              endDate: employee.penalizationEndDate,
+              originalHours: employee.originalHours,
+              activated: true,
+              automatic: true,
+            },
+          });
+
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`✅ [PENALIZATION] Auto-activated penalization for ${employee.nombre} ${employee.apellido || ''} (${employee.idGlovo})`);
+          }
+        } catch (error) {
+          console.error(`❌ [PENALIZATION] Error auto-activating penalization for ${employee.idGlovo}:`, error);
+        }
+      }
+
+      return {
+        checked: scheduledPenalizations.length,
+        activated: activatedEmployees.length,
+        activatedEmployees,
+      };
+    } catch (error) {
+      console.error('❌ [PENALIZATION] Error activating scheduled penalizations:', error);
+      throw error;
+    }
+  }
+
   async checkAndRestoreExpiredPenalizations (): Promise<{
     checked: number;
     restored: number;

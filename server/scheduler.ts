@@ -6,6 +6,7 @@ class SchedulerService {
   private hourlyInterval: ReturnType<typeof setInterval> | null = null;
   private dailyInterval: ReturnType<typeof setInterval> | null = null;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private penalizationInterval: ReturnType<typeof setInterval> | null = null;
   private storage: PostgresStorage;
 
   constructor () {
@@ -61,7 +62,75 @@ class SchedulerService {
       }
     }, 60 * 1000); // Verificar cada minuto
 
+    // Verificación de penalizaciones programadas (cada día a las 6:00 AM)
+    this.penalizationInterval = setInterval(async () => {
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+
+      // Solo ejecutar a las 6:00 AM (con tolerancia de 1 minuto)
+      if (hour === 6 && minute === 0) {
+        try {
+          console.log('⏰ Ejecutando verificación de penalizaciones programadas...');
+          await this.executePenalizationChecks();
+        } catch (error) {
+          console.error('❌ Error en verificación de penalizaciones:', error);
+        }
+      }
+    }, 60 * 1000); // Verificar cada minuto
+
     console.log('✅ Programador de tareas iniciado');
+  }
+
+  /**
+   * Ejecutar verificaciones de penalizaciones programadas
+   */
+  private async executePenalizationChecks (): Promise<void> {
+    try {
+      console.log('🔄 Iniciando proceso de verificación de penalizaciones...');
+
+      // 1. Activar penalizaciones programadas que deben empezar hoy
+      const activationResult = await this.storage.activateScheduledPenalizations();
+      
+      // 2. Verificar y restaurar penalizaciones expiradas
+      const restorationResult = await this.storage.checkAndRestoreExpiredPenalizations();
+
+      // Registrar en auditoría
+      await AuditService.logAction({
+        userId: 'SYSTEM',
+        userRole: 'super_admin',
+        action: 'automatic_penalization_checks',
+        entityType: 'employee',
+        description: `Verificación automática de penalizaciones: ${activationResult.activated} activadas, ${restorationResult.restored} restauradas`,
+        newData: {
+          activationResult,
+          restorationResult,
+          executionTime: new Date().toISOString(),
+          automatic: true,
+        },
+      });
+
+      console.log(`✅ Verificación de penalizaciones completada: ${activationResult.activated} activadas, ${restorationResult.restored} restauradas`);
+
+      // Enviar notificación por Telegram si hay cambios
+      if (activationResult.activated > 0 || restorationResult.restored > 0) {
+        try {
+          await telegramBot.sendMessage(
+            '⏰ *Verificación de Penalizaciones Completada*\n\n' +
+            `Penalizaciones activadas: *${activationResult.activated}*\n` +
+            `Penalizaciones restauradas: *${restorationResult.restored}*\n` +
+            `Fecha: ${new Date().toLocaleString('es-ES')}\n` +
+            'Proceso: Automático (6:00 AM)',
+            'HTML'
+          );
+        } catch (telegramError) {
+          console.error('❌ Error enviando notificación de penalizaciones por Telegram:', telegramError);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error en verificación automática de penalizaciones:', error);
+      throw error;
+    }
   }
 
   /**
@@ -156,6 +225,11 @@ class SchedulerService {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
+    }
+
+    if (this.penalizationInterval) {
+      clearInterval(this.penalizationInterval);
+      this.penalizationInterval = null;
     }
 
     console.log('⏹️ Programador de tareas detenido');

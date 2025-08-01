@@ -101,7 +101,7 @@ export default function EmployeeDetailModal ({
       case 'pending_laboral':
         return <Badge className="bg-purple-100 text-purple-800">Pendiente Laboral</Badge>;
       case 'penalizado':
-        return <Badge className="bg-orange-100 text-orange-800">Penalizado</Badge>;
+        return <Badge className="bg-orange-100 text-orange-800">Penalizado/Vacaciones</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -281,12 +281,12 @@ export default function EmployeeDetailModal ({
                 <InfoItem
                   icon={Clock}
                   label="Horas de Trabajo"
-                  value={employee.status === 'penalizado' ? '0 (penalizado)' : `${employee.horas ?? 0} horas`}
+                  value={employee.status === 'penalizado' ? `${employee.horas ?? 0} horas (penalizado/vacaciones)` : `${employee.horas ?? 0} horas`}
                 />
                 <InfoItem
                   icon={Clock}
                   label="Horas Complementarias"
-                  value={employee.status === 'penalizado' ? '0 horas (penalizado)' : `${typeof employee.complementaries === 'number' ? employee.complementaries : (employee.complementaries || '0')} horas`}
+                  value={employee.status === 'penalizado' ? `${typeof employee.complementaries === 'number' ? employee.complementaries : (employee.complementaries || '0')} horas (penalizado/vacaciones)` : `${typeof employee.complementaries === 'number' ? employee.complementaries : (employee.complementaries || '0')} horas`}
                 />
                 <InfoItem
                   icon={Clock}
@@ -469,18 +469,34 @@ export default function EmployeeDetailModal ({
             </CardContent>
           </Card>
 
-          {/* Sección especial para empleados penalizados */}
-          {employee.status === 'penalizado' && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          {/* Sección especial para empleados penalizados o con penalización programada */}
+          {(employee.status === 'penalizado' || employee.penalizationStartDate) && (
+            <div className={`border rounded-lg p-4 mb-6 ${
+              employee.status === 'penalizado' 
+                ? 'bg-red-50 border-red-200' 
+                : 'bg-blue-50 border-blue-200'
+            }`}>
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-6 h-6 text-red-600 mt-0.5 flex-shrink-0" />
+                <AlertTriangle className={`w-6 h-6 mt-0.5 flex-shrink-0 ${
+                  employee.status === 'penalizado' ? 'text-red-600' : 'text-blue-600'
+                }`} />
                 <div>
-                  <h4 className="font-bold text-red-800 mb-1">Empleado penalizado</h4>
-                  <p className="text-red-700 text-sm mb-2">
-                    Este empleado está penalizado. Sus horas actuales están en <b>0</b> y no podrá
-                    trabajar hasta que finalice la penalización o se reactive manualmente.
+                  <h4 className={`font-bold mb-1 ${
+                    employee.status === 'penalizado' ? 'text-red-800' : 'text-blue-800'
+                  }`}>
+                    {employee.status === 'penalizado' ? 'Empleado penalizado/vacaciones' : 'Penalización programada'}
+                  </h4>
+                  <p className={`text-sm mb-2 ${
+                    employee.status === 'penalizado' ? 'text-red-700' : 'text-blue-700'
+                  }`}>
+                    {employee.status === 'penalizado' 
+                      ? 'Este empleado está penalizado/vacaciones. Mantiene sus horas actuales durante el período de penalización/vacaciones.'
+                      : 'Este empleado tiene una penalización programada. Sus horas se mantendrán hasta que llegue la fecha de inicio de la penalización.'
+                    }
                   </p>
-                  <ul className="text-sm text-red-700 space-y-1">
+                  <ul className={`text-sm space-y-1 ${
+                    employee.status === 'penalizado' ? 'text-red-700' : 'text-blue-700'
+                  }`}>
                     <li><b>Horas originales:</b> {employee.originalHours ?? 'No registradas'}</li>
                     <li>
                       <b>Fecha inicio penalización:</b> {
@@ -496,6 +512,14 @@ export default function EmployeeDetailModal ({
                           : 'No especificada'
                       }
                     </li>
+                    {employee.status !== 'penalizado' && employee.penalizationStartDate && (
+                      <li>
+                        <b>Estado:</b> 
+                        <span className="ml-1 inline-block px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs">
+                          Programado para {new Date(employee.penalizationStartDate).toLocaleDateString('es-ES')}
+                        </span>
+                      </li>
+                    )}
                   </ul>
                 </div>
               </div>

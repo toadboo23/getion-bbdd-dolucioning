@@ -603,6 +603,40 @@ export async function registerRoutes (app: Express): Promise<Server> {
     }
   });
 
+  // Check and activate scheduled penalizations (protected - admin/super_admin only)
+  app.post('/api/employees/check-scheduled-penalizations', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('⏰ Check scheduled penalizations request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para verificar penalizaciones programadas' });
+      }
+
+      const result = await storage.activateScheduledPenalizations();
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+        action: 'check_scheduled_penalizations',
+        entityType: 'system',
+        entityId: 'penalizations',
+        entityName: 'Sistema de Penalizaciones',
+        description: `Verificación manual de penalizaciones programadas: ${result.checked} verificadas, ${result.activated} activadas`,
+        oldData: { checked: result.checked },
+        newData: { activated: result.activated, activatedEmployees: result.activatedEmployees },
+      });
+
+      res.json({
+        message: 'Verificación de penalizaciones programadas completada',
+        ...result,
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error checking scheduled penalizations:', error);
+      res.status(500).json({ message: 'Failed to check scheduled penalizations' });
+    }
+  });
+
   // Get penalizations expiring soon (protected - admin/super_admin only)
   app.get('/api/employees/penalizations/expiring-soon', isAuthenticated, async (req: any, res) => {
     if (process.env.NODE_ENV !== 'production') console.log('⏳ Get expiring penalizations request');

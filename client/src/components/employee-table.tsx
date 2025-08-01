@@ -33,7 +33,17 @@ export default function EmployeeTable ({
   canEdit,
   isReadOnlyUser = false,
 }: EmployeeTableProps) {
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, employee: Employee) => {
+    // Check if employee has scheduled penalization
+    const hasScheduledPenalization = employee.penalizationStartDate && 
+      employee.penalizationEndDate && 
+      status !== 'penalizado' &&
+      new Date(employee.penalizationStartDate) > new Date();
+
+    if (hasScheduledPenalization) {
+      return <Badge className="bg-blue-100 text-blue-800">Penalización Programada</Badge>;
+    }
+
     switch (status) {
       case 'active':
         return <Badge className="bg-green-100 text-green-800">Activo</Badge>;
@@ -46,7 +56,7 @@ export default function EmployeeTable ({
       case 'pending_laboral':
         return <Badge className="bg-purple-100 text-purple-800">Pendiente Laboral</Badge>;
       case 'penalizado':
-        return <Badge className="bg-orange-100 text-orange-800">Penalizado</Badge>;
+        return <Badge className="bg-orange-100 text-orange-800">Penalizado/Vacaciones</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -114,23 +124,40 @@ export default function EmployeeTable ({
                   <TableCell className="text-sm text-gray-900">
                     {employee.dniNie || 'N/A'}
                   </TableCell>
-                  <TableCell>{getStatusBadge(employee.status)}</TableCell>
+                  <TableCell>{getStatusBadge(employee.status, employee)}</TableCell>
                   <TableCell>
-                    {employee.status === 'penalizado' ? (
-                      <span className="inline-block px-2 py-1 rounded bg-red-100 text-red-700 font-semibold text-xs">
-                        0 <span className="ml-1">(penalizado)</span>
-                      </span>
-                    ) : (
-                      <span
-                        className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
-                          (employee.horas ?? 0) > 0
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {employee.horas ?? 0}
-                      </span>
-                    )}
+                    {(() => {
+                      const hasScheduledPenalization = employee.penalizationStartDate && 
+                        employee.penalizationEndDate && 
+                        employee.status !== 'penalizado' &&
+                        new Date(employee.penalizationStartDate) > new Date();
+
+                      if (employee.status === 'penalizado') {
+                        return (
+                          <span className="inline-block px-2 py-1 rounded bg-red-100 text-red-700 font-semibold text-xs">
+                            {employee.horas ?? 0} <span className="ml-1">(penalizado/vacaciones)</span>
+                          </span>
+                        );
+                      } else if (hasScheduledPenalization) {
+                        return (
+                          <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-700 font-semibold text-xs">
+                            {employee.horas ?? 0} <span className="ml-1">(programado)</span>
+                          </span>
+                        );
+                      } else {
+                        return (
+                          <span
+                            className={`inline-block px-2 py-1 rounded font-semibold text-xs ${
+                              (employee.horas ?? 0) > 0
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {employee.horas ?? 0}
+                          </span>
+                        );
+                      }
+                    })()}
                   </TableCell>
                   <TableCell>
                     {employee.status === 'penalizado' ? (
@@ -204,7 +231,7 @@ export default function EmployeeTable ({
                           </Button>
 
                           {/* Botón de penalización */}
-                          {employee.status !== 'penalizado' && (
+                          {employee.status !== 'penalizado' && !employee.penalizationStartDate && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -217,7 +244,7 @@ export default function EmployeeTable ({
                           )}
 
                           {/* Botón para remover penalización */}
-                          {employee.status === 'penalizado' && (
+                          {(employee.status === 'penalizado' || employee.penalizationStartDate) && (
                             <Button
                               variant="ghost"
                               size="sm"

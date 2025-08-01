@@ -47,7 +47,7 @@ export default function PenalizationModal ({ isOpen, onClose, employee, action }
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
       toast({
         title: 'Empleado penalizado',
-        description: 'El empleado ha sido penalizado correctamente',
+        description: 'El empleado ha sido penalizado/vacaciones correctamente',
       });
       onClose();
       setStartDate('');
@@ -217,9 +217,9 @@ export default function PenalizationModal ({ isOpen, onClose, employee, action }
                     <div>
                       <h5 className="font-medium text-orange-800">Efectos de la penalización:</h5>
                       <ul className="text-sm text-orange-700 mt-2 space-y-1">
-                        <li>• El estado del empleado cambiará a &quot;Penalizado&quot;</li>
-                        <li>• Las horas se pondrán a 0 durante la penalización</li>
-                        <li>• Las horas originales se guardarán para restaurarlas después</li>
+                        <li>• El estado del empleado cambiará a &quot;Penalizado/Vacaciones&quot;</li>
+                        <li>• Las horas se mantendrán durante la penalización</li>
+                        <li>• Las horas originales se guardarán para referencia</li>
                         <li>• La penalización se puede remover manualmente en cualquier momento</li>
                       </ul>
                     </div>
