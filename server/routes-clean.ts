@@ -3,7 +3,7 @@ import { createServer, type Server } from 'http';
 import { PostgresStorage, getEmpleadoMetadata } from './storage-postgres.js';
 import { setupAuth, isAuthenticated } from './auth-local.js';
 import { AuditService } from './audit-service.js';
-// XLSX import removed as it's not used in this file
+import * as XLSX from 'xlsx';
 
 // Extender la interfaz Request para incluir el usuario
 declare global {
@@ -1582,6 +1582,191 @@ export async function registerRoutes (app: Express): Promise<Server> {
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') console.error('❌ Error exporting employees to CSV:', error);
       res.status(500).json({ message: 'Failed to export employees' });
+    }
+  });
+
+  // Export employees to Excel (protected - admin/super_admin only)
+  app.get('/api/employees/export/excel', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('📤 Export employees to Excel request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role === 'normal') {
+        return res.status(403).json({ message: 'No tienes permisos para exportar empleados' });
+      }
+
+      // Obtener parámetros de filtro
+      const { city, status, search } = req.query;
+      
+      let employees = await storage.getAllEmployees();
+      
+      // Aplicar filtros si se proporcionan
+      if (city && city !== 'all') {
+        employees = employees.filter(emp => emp.ciudad === city);
+      }
+      
+      if (status && status !== 'all') {
+        employees = employees.filter(emp => emp.status === status);
+      }
+      
+      if (search) {
+        const searchLower = search.toLowerCase();
+        employees = employees.filter(emp => 
+          emp.nombre?.toLowerCase().includes(searchLower) ||
+          emp.apellido?.toLowerCase().includes(searchLower) ||
+          emp.idGlovo?.toLowerCase().includes(searchLower) ||
+          emp.emailGlovo?.toLowerCase().includes(searchLower) ||
+          emp.email?.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // Log export action
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+        action: 'export_employees_excel',
+        entityType: 'employee',
+        description: `Exportación de empleados a Excel - Usuario: ${user.email} - Total: ${employees.length} empleados`,
+        newData: { exportType: 'excel', employeeCount: employees.length },
+      });
+
+      // Prepare data for Excel export with Spanish column names
+      const excelData = employees.map(emp => {
+        const isGlovoEmail = emp.emailGlovo?.includes('@solucioning.net');
+        const isPersonalEmail = emp.email && !emp.email.includes('@solucioning.net');
+        return {
+          'ID Glovo': emp.idGlovo,
+          'Email Glovo': isGlovoEmail ? emp.emailGlovo : '',
+          'Turno': emp.turno,
+          'Nombre': emp.nombre,
+          'Apellido': emp.apellido,
+          'Teléfono': emp.telefono,
+          'Email Personal': isPersonalEmail ? emp.email : '',
+          'Horas': emp.horas,
+          'CDP%': emp.horas ? ((emp.horas / 38) * 100).toFixed(2) : null,
+          'Complementarios': emp.complementaries,
+          'Ciudad': emp.ciudad,
+          'Código Ciudad': emp.cityCode,
+          'DNI/NIE': emp.dniNie,
+          'IBAN': emp.iban,
+          'Dirección': emp.direccion,
+          'Vehículo': emp.vehiculo,
+          'NAF': emp.naf,
+          'Fecha Alta Seg. Social': emp.fechaAltaSegSoc ? new Date(emp.fechaAltaSegSoc).toLocaleDateString('es-ES') : '',
+          'Status Baja': emp.statusBaja,
+          'Estado SS': emp.estadoSs,
+          'Informado Horario': emp.informadoHorario ? 'Sí' : 'No',
+          'Cuenta Divilo': emp.cuentaDivilo,
+          'Próxima Asignación Slots': emp.proximaAsignacionSlots ? new Date(emp.proximaAsignacionSlots).toLocaleDateString('es-ES') : '',
+          'Jefe de Tráfico': emp.jefeTrafico,
+          'Flota': emp.flota || '',
+          'Comentarios Jefe Tráfico': emp.comentsJefeDeTrafico,
+          'Incidencias': emp.incidencias,
+          'Fecha Incidencia': emp.fechaIncidencia ? new Date(emp.fechaIncidencia).toLocaleDateString('es-ES') : '',
+          'Faltas No Check-in (días)': emp.faltasNoCheckInEnDias,
+          'Cruce': emp.cruce,
+          'Estado': emp.status === 'active' ? 'Activo' :
+            emp.status === 'it_leave' ? 'Baja IT' :
+              emp.status === 'company_leave_pending' ? 'Baja Empresa Pendiente' :
+                emp.status === 'company_leave_approved' ? 'Baja Empresa Aprobada' : emp.status,
+          'Fecha Inicio Penalización': emp.penalizationStartDate ? new Date(emp.penalizationStartDate).toLocaleDateString('es-ES') : '',
+          'Fecha Fin Penalización': emp.penalizationEndDate ? new Date(emp.penalizationEndDate).toLocaleDateString('es-ES') : '',
+          'Horas Originales': emp.originalHours,
+          'Vacaciones Disfrutadas': typeof emp.vacacionesDisfrutadas !== 'undefined' ? Number(emp.vacacionesDisfrutadas).toFixed(2) : '',
+          'Vacaciones Pendientes': typeof emp.vacacionesPendientes !== 'undefined' ? Number(emp.vacacionesPendientes).toFixed(2) : '',
+          'Fecha Creación': emp.createdAt ? new Date(emp.createdAt).toLocaleDateString('es-ES') : '',
+          'Última Actualización': emp.updatedAt ? new Date(emp.updatedAt).toLocaleDateString('es-ES') : '',
+        };
+      });
+
+      // Create Excel workbook
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(excelData);
+
+      // Set column widths for better readability
+      const columnWidths = [
+        { wch: 12 }, // ID Glovo
+        { wch: 25 }, // Email Glovo
+        { wch: 10 }, // Turno
+        { wch: 15 }, // Nombre
+        { wch: 15 }, // Apellido
+        { wch: 15 }, // Teléfono
+        { wch: 25 }, // Email Personal
+        { wch: 8 },  // Horas
+        { wch: 10 }, // CDP%
+        { wch: 15 }, // Complementarios
+        { wch: 15 }, // Ciudad
+        { wch: 12 }, // Código Ciudad
+        { wch: 15 }, // DNI/NIE
+        { wch: 25 }, // IBAN
+        { wch: 30 }, // Dirección
+        { wch: 12 }, // Vehículo
+        { wch: 15 }, // NAF
+        { wch: 20 }, // Fecha Alta Seg. Social
+        { wch: 15 }, // Status Baja
+        { wch: 12 }, // Estado SS
+        { wch: 15 }, // Informado Horario
+        { wch: 20 }, // Cuenta Divilo
+        { wch: 25 }, // Próxima Asignación Slots
+        { wch: 20 }, // Jefe de Tráfico
+        { wch: 10 }, // Flota
+        { wch: 30 }, // Comentarios Jefe Tráfico
+        { wch: 20 }, // Incidencias
+        { wch: 20 }, // Fecha Incidencia
+        { wch: 20 }, // Faltas No Check-in
+        { wch: 10 }, // Cruce
+        { wch: 15 }, // Estado
+        { wch: 20 }, // Fecha Inicio Penalización
+        { wch: 20 }, // Fecha Fin Penalización
+        { wch: 15 }, // Horas Originales
+        { wch: 20 }, // Vacaciones Disfrutadas
+        { wch: 20 }, // Vacaciones Pendientes
+        { wch: 15 }, // Fecha Creación
+        { wch: 20 }, // Última Actualización
+      ];
+      ws['!cols'] = columnWidths;
+
+      // Aplicar estilos a los headers
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+        if (!ws[cellAddress]) ws[cellAddress] = { t: 's', v: '' };
+        ws[cellAddress].s = {
+          font: { bold: true, color: { rgb: 'FFFFFF' } },
+          fill: { fgColor: { rgb: '4472C4' } },
+          alignment: { horizontal: 'center', vertical: 'center' },
+        };
+      }
+
+      // Aplicar estilos a las filas de datos (alternando colores)
+      for (let row = 1; row <= range.e.r; row++) {
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+          if (ws[cellAddress]) {
+            ws[cellAddress].s = {
+              fill: { fgColor: { rgb: row % 2 === 0 ? 'F2F2F2' : 'FFFFFF' } },
+              alignment: { vertical: 'center' },
+            };
+          }
+        }
+      }
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Empleados');
+
+      // Generate filename with current date
+      const fileName = `empleados_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Set headers for Excel download
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      // Write Excel file to response
+      const excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.send(excelBuffer);
+
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error exporting employees to Excel:', error);
+      res.status(500).json({ message: 'Failed to export employees to Excel' });
     }
   });
 

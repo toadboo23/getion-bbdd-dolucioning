@@ -175,8 +175,8 @@ export default function Employees () {
   // Definir permisos específicos por rol
   const canEditEmployees = user?.role === 'admin' || user?.role === 'super_admin';
   const canImportEmployees = user?.role === 'super_admin'; // Solo super admin puede importar
-  const canExportEmployees = user?.role === 'super_admin'; // Solo super admin puede exportar
-  const canDownloadTemplate = user?.role === 'super_admin'; // Solo super admin puede descargar plantillas
+  const canExportEmployees = user?.role === 'admin' || user?.role === 'super_admin'; // Admin y super admin pueden exportar
+  const canDownloadTemplate = user?.role === 'admin' || user?.role === 'super_admin'; // Admin y super admin pueden descargar plantillas
   const isReadOnlyUser = user?.role === 'normal'; // Usuario normal solo puede consultar
 
   const handleEditEmployee = (employee: Employee) => {
@@ -239,6 +239,76 @@ export default function Employees () {
       }
       toast({
         title: 'Error al verificar penalizaciones',
+        description: _error instanceof Error ? _error.message : 'Error desconocido',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Mutación para exportar empleados a Excel
+  const exportEmployeesMutation = useMutation({
+    mutationFn: async () => {
+      // Construir URL con filtros actuales
+      const params = new URLSearchParams();
+      if (cityFilter && cityFilter !== 'all') params.append('city', cityFilter);
+      if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
+      if (searchTerm) params.append('search', searchTerm);
+      
+      const url = `/api/employees/export/excel${params.toString() ? `?${params.toString()}` : ''}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Error al exportar empleados');
+      }
+      
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `empleados_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+      
+      return response;
+    },
+    onSuccess: () => {
+      // Construir mensaje con información de filtros
+      let description = 'Se han exportado todos los empleados a Excel';
+      const filters = [];
+      if (cityFilter && cityFilter !== 'all') filters.push(`ciudad: ${cityFilter}`);
+      if (statusFilter && statusFilter !== 'all') filters.push(`estado: ${statusFilter}`);
+      if (searchTerm) filters.push(`búsqueda: "${searchTerm}"`);
+      
+      if (filters.length > 0) {
+        description = `Se han exportado empleados a Excel (filtros aplicados: ${filters.join(', ')})`;
+      }
+      
+      toast({
+        title: 'Exportación completada',
+        description,
+      });
+    },
+    onError: (_error) => {
+      if (isUnauthorizedError(_error)) {
+        toast({
+          title: 'Error de autorización',
+          description: 'Tu sesión ha expirado. Redirigiendo al login...',
+          variant: 'destructive',
+        });
+        setTimeout(() => {
+          window.location.href = '/api/login';
+        }, 500);
+        return;
+      }
+      toast({
+        title: 'Error al exportar empleados',
         description: _error instanceof Error ? _error.message : 'Error desconocido',
         variant: 'destructive',
       });
@@ -331,66 +401,8 @@ export default function Employees () {
 
   // Función para exportar empleados a Excel
   const handleExportEmployees = () => {
-    if (!employees || employees.length === 0) {
-      toast({
-        title: 'Sin datos',
-        description: 'No hay empleados para exportar',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Preparar datos para export (con nombres de columnas en español)
-    const exportData = employees.map(emp => {
-      const isGlovoEmail = emp.emailGlovo?.includes('@solucioning.net');
-      const isPersonalEmail = emp.email && !emp.email.includes('@solucioning.net');
-      return {
-        'ID Glovo': emp.idGlovo,
-        'Email Glovo': isGlovoEmail ? emp.emailGlovo : '',
-        'Turno': emp.turno,
-        'Nombre': emp.nombre,
-        'Apellido': emp.apellido,
-        'Teléfono': emp.telefono,
-        'Email Personal': isPersonalEmail ? emp.email : '',
-        'Horas': emp.horas,
-        'CDP%': emp.horas ? ((emp.horas / 38) * 100).toFixed(2) : null,
-        'Complementarios': emp.complementaries,
-        'Ciudad': emp.ciudad,
-        'Código Ciudad': emp.cityCode,
-        'DNI/NIE': emp.dniNie,
-        'IBAN': emp.iban,
-        'Dirección': emp.direccion,
-        'Vehículo': emp.vehiculo,
-        'NAF': emp.naf,
-        'Fecha Alta Seg. Social': emp.fechaAltaSegSoc ? new Date(emp.fechaAltaSegSoc).toLocaleDateString('es-ES') : '',
-        'Status Baja': emp.statusBaja,
-        'Estado SS': emp.estadoSs,
-        'Informado Horario': emp.informadoHorario ? 'Sí' : 'No',
-        'Cuenta Divilo': emp.cuentaDivilo,
-        'Próxima Asignación Slots': emp.proximaAsignacionSlots ? new Date(emp.proximaAsignacionSlots).toLocaleDateString('es-ES') : '',
-        'Jefe de Tráfico': emp.jefeTrafico,
-        'Flota': emp.flota || '',
-        'Comentarios Jefe Tráfico': emp.comentsJefeDeTrafico,
-        'Incidencias': emp.incidencias,
-        'Fecha Incidencia': emp.fechaIncidencia ? new Date(emp.fechaIncidencia).toLocaleDateString('es-ES') : '',
-        'Faltas No Check-in (días)': emp.faltasNoCheckInEnDias,
-        'Cruce': emp.cruce,
-        'Estado': emp.status === 'active' ? 'Activo' :
-          emp.status === 'it_leave' ? 'Baja IT' :
-            emp.status === 'company_leave_pending' ? 'Baja Empresa Pendiente' :
-              emp.status === 'company_leave_approved' ? 'Baja Empresa Aprobada' : emp.status,
-        'Fecha Creación': emp.createdAt ? new Date(emp.createdAt).toLocaleDateString('es-ES') : '',
-        'Última Actualización': emp.updatedAt ? new Date(emp.updatedAt).toLocaleDateString('es-ES') : '',
-      };
-    });
-
-    const fileName = `empleados_${new Date().toISOString().split('T')[0]}`;
-    exportToExcel(exportData, fileName, 'Empleados');
-
-    toast({
-      title: 'Exportación completada',
-      description: `Se han exportado ${employees.length} empleados a Excel`,
-    });
+    // Usar la nueva mutación que hace consulta completa al backend
+    exportEmployeesMutation.mutate();
   };
 
   // Función para descargar plantilla de carga masiva
@@ -512,10 +524,11 @@ export default function Employees () {
               <Button
                 variant="outline"
                 onClick={handleExportEmployees}
+                disabled={exportEmployeesMutation.isPending}
                 className="border-green-500 text-green-600 hover:bg-green-50"
               >
                 <Download className="w-4 h-4 mr-2" />
-                Exportar Excel
+                {exportEmployeesMutation.isPending ? 'Exportando...' : 'Exportar Excel'}
               </Button>
             )}
 

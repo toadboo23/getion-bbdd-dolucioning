@@ -62,21 +62,21 @@ export const employees = pgTable('employees', {
   turno: varchar('turno', { length: 50 }),
   nombre: varchar('nombre', { length: 100 }).notNull(),
   apellido: varchar('apellido', { length: 100 }),
-  telefono: varchar('telefono', { length: 30 }),
+  telefono: varchar('telefono', { length: 20 }),
   email: varchar('email', { length: 100 }),
   horas: integer('horas'),
   cdp: integer('cdp'), // Cumplimiento de Horas (porcentaje basado en 38h = 100%)
-  complementaries: text('complementaries'),
-  ciudad: varchar('ciudad', { length: 200 }), // Aumentado para acomodar nombres largos de ciudades
-  cityCode: varchar('citycode', { length: 30 }),
-  dniNie: varchar('dni_nie', { length: 30 }).unique(),
+  complementaries: text('complementaries'), // Cambiar a numeric(10,1) si es necesario
+  ciudad: varchar('ciudad', { length: 100 }),
+  cityCode: varchar('citycode', { length: 20 }),
+  dniNie: varchar('dni_nie', { length: 20 }).unique(),
   iban: varchar('iban', { length: 34 }),
   direccion: varchar('direccion', { length: 255 }),
-  vehiculo: varchar('vehiculo', { enum: ['Bicicleta', 'Patinete', 'Moto', 'Otro'] }),
-  naf: varchar('naf', { length: 30 }),
+  vehiculo: varchar('vehiculo', { length: 50 }),
+  naf: varchar('naf', { length: 20 }),
   fechaAltaSegSoc: date('fecha_alta_seg_soc'),
-  statusBaja: varchar('status_baja', { length: 100 }),
-  estadoSs: varchar('estado_ss', { length: 100 }),
+  statusBaja: varchar('status_baja', { length: 50 }),
+  estadoSs: varchar('estado_ss', { length: 50 }),
   informadoHorario: boolean('informado_horario').default(false),
   cuentaDivilo: varchar('cuenta_divilo', { length: 100 }),
   proximaAsignacionSlots: date('proxima_asignacion_slots'),
@@ -100,9 +100,11 @@ export const employees = pgTable('employees', {
   penalizationStartDate: date('penalization_start_date'),
   penalizationEndDate: date('penalization_end_date'),
   originalHours: integer('original_hours'),
-  flota: varchar('flota', { length: 10 }),
+  flota: varchar('flota', { length: 100 }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  vacacionesDisfrutadas: varchar('vacaciones_disfrutadas', { length: 10 }).default('0'),
+  vacacionesPendientes: varchar('vacaciones_pendientes', { length: 10 }).default('0'),
 });
 
 // Company leaves table (employees with approved company leaves) - BAJA EMPRESA
