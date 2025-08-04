@@ -6,9 +6,8 @@ import { isUnauthorizedError } from '@/lib/authUtils';
 import DashboardMetrics from '@/components/dashboard-metrics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, UserX, Ticket, MapPin, Shield } from 'lucide-react';
+import { Users, UserX, Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // Definir el tipo de métricas
 interface MetricsData {
@@ -129,7 +128,6 @@ export default function Dashboard () {
   }
 
   const safeEmployeesByCity = metrics?.employeesByCity || [];
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A020F0', '#FF6666'];
 
   // Log de depuración para métricas y empleados por ciudad
   console.log('Métricas:', metrics);
@@ -214,6 +212,40 @@ export default function Dashboard () {
               scrolling="no"
               allowFullScreen
             ></iframe>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* --- BLOQUE POWERPOINT --- */}
+      <Card className="bg-white shadow-lg border border-gray-200 mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span className="text-gray-700">JEFE DE TRÁFICO/FLOTA/ZONA: POLÍTICAS LABORALES</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-gray-600 text-sm">Documento de políticas laborales para jefes de tráfico, flota y zona. Haz clic en el botón para abrir la presentación en una nueva pestaña.</p>
+          <div className="w-full flex justify-center">
+            <div className="text-center space-y-4">
+              <div className="bg-gray-50 rounded-lg p-8 border-2 border-dashed border-gray-300">
+                <div className="text-gray-500 mb-4">
+                  <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Políticas Laborales</h3>
+                <p className="text-sm text-gray-500 mb-4">Documento de SharePoint - Jefes de Tráfico/Flota/Zona</p>
+                <Button
+                  onClick={() => window.open('https://consultingsallent.sharepoint.com/:p:/s/SOLUCIONINGDELIVERY/Eev0BX9iKWlMrBp-r-s1AmsBJUF-I6WNW7FG9sQ82nWbhA?e=YCY8ug', '_blank', 'noopener,noreferrer')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 mx-auto"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  Abrir Presentación
+                </Button>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
