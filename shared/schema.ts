@@ -30,7 +30,7 @@ export type CiudadType = typeof CIUDADES_DISPONIBLES[number];
 
 // Session storage table
 export const sessions = pgTable(
-  'sessions',
+  'session',
   {
     sid: varchar('sid').primaryKey(),
     sess: jsonb('sess').notNull(),

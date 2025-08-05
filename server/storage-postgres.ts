@@ -103,6 +103,22 @@ export class PostgresStorage {
       const tempId = `TEMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       finalEmployeeData.idGlovo = tempId;
       finalEmployeeData.status = 'pendiente_activacion';
+      
+      // Si hay emailGlovo duplicado, generar uno temporal
+      if (employeeData.emailGlovo && employeeData.emailGlovo.trim() !== '') {
+        // Verificar si el email ya existe
+        const existingEmployee = await db
+          .select()
+          .from(employees)
+          .where(eq(employees.emailGlovo, employeeData.emailGlovo))
+          .limit(1);
+        
+        if (existingEmployee.length > 0) {
+          // Generar email temporal único
+          const tempEmail = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}@temp.glovo.com`;
+          finalEmployeeData.emailGlovo = tempEmail;
+        }
+      }
     }
 
     // Calcular CDP automáticamente basado en las horas

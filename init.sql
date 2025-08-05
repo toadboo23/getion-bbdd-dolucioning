@@ -50,7 +50,9 @@ CREATE TABLE IF NOT EXISTS employees (
   original_hours integer,
   flota varchar(100),
   created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-  updated_at timestamp DEFAULT CURRENT_TIMESTAMP
+  updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
+  vacaciones_disfrutadas numeric(10,2) DEFAULT 0 NOT NULL,
+  vacaciones_pendientes numeric(10,2) DEFAULT 0 NOT NULL
 );
 
 -- Create company_leaves table for historical data
