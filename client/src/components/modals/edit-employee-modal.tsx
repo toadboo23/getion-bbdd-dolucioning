@@ -247,10 +247,21 @@ export default function EditEmployeeModal ({
                   name="idGlovo"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-red-500">ID Glovo *</FormLabel>
+                      <FormLabel className={user?.role === 'super_admin' ? 'text-gray-700' : 'text-red-500'}>
+                        ID Glovo {user?.role === 'super_admin' ? '' : '*'}
+                      </FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Ej: GLV001" disabled={isFieldDisabled('idGlovo')} />
+                        <Input 
+                          {...field} 
+                          placeholder={user?.role === 'super_admin' ? "Ej: GLV001 (opcional)" : "Ej: GLV001"} 
+                          disabled={isFieldDisabled('idGlovo')} 
+                        />
                       </FormControl>
+                      {user?.role === 'super_admin' && (
+                        <FormDescription className="text-sm text-gray-600">
+                          Dejar vacío para crear empleado en estado "Pendiente Activación"
+                        </FormDescription>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -684,6 +695,7 @@ export default function EditEmployeeModal ({
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="active">Activo</SelectItem>
+                          <SelectItem value="pendiente_activacion">Pendiente Activación</SelectItem>
                           <SelectItem value="it_leave">Baja IT</SelectItem>
                           <SelectItem value="company_leave_pending">Baja Empresa Pendiente</SelectItem>
                           <SelectItem value="company_leave_approved">Baja Empresa Aprobada</SelectItem>

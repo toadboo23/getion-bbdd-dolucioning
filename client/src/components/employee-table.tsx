@@ -47,6 +47,8 @@ export default function EmployeeTable ({
     switch (status) {
       case 'active':
         return <Badge className="bg-green-100 text-green-800">Activo</Badge>;
+      case 'pendiente_activacion':
+        return <Badge className="bg-blue-100 text-blue-800">Pendiente Activación</Badge>;
       case 'it_leave':
         return <Badge className="bg-orange-100 text-orange-800">Baja IT</Badge>;
       case 'company_leave_pending':
@@ -71,6 +73,9 @@ export default function EmployeeTable ({
     }
     if (status === 'pending_laboral') {
       return 'bg-purple-50 border-l-4 border-l-purple-400';
+    }
+    if (status === 'pendiente_activacion') {
+      return 'bg-blue-50 border-l-4 border-l-blue-400';
     }
     return '';
   };

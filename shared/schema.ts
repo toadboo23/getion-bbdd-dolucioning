@@ -95,6 +95,7 @@ export const employees = pgTable('employees', {
       'pending_laboral',
       'pendiente_laboral',
       'penalizado',
+      'pendiente_activacion',
     ],
   }).notNull().default('active'),
   penalizationStartDate: date('penalization_start_date'),
@@ -207,6 +208,18 @@ export const updateSystemUserSchema = insertSystemUserSchema.partial().omit({
 export const insertEmployeeSchema = createInsertSchema(employees).omit({
   createdAt: true,
   updatedAt: true,
+}).extend({
+  idGlovo: z.string().optional(),
+  status: z.enum([
+    'active',
+    'it_leave',
+    'company_leave_pending',
+    'company_leave_approved',
+    'pending_laboral',
+    'pendiente_laboral',
+    'penalizado',
+    'pendiente_activacion',
+  ]).optional(),
 });
 
 export const updateEmployeeSchema = insertEmployeeSchema.partial();
@@ -228,6 +241,9 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type Employee = typeof employees.$inferSelect;
 export type InsertEmployee = typeof employees.$inferInsert;
 export type UpdateEmployee = Partial<InsertEmployee>;
+
+// Employee status types
+export type EmployeeStatus = 'active' | 'it_leave' | 'company_leave_pending' | 'company_leave_approved' | 'pending_laboral' | 'pendiente_laboral' | 'penalizado' | 'pendiente_activacion';
 
 // Company leave types
 export type CompanyLeave = typeof companyLeaves.$inferSelect;

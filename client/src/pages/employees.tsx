@@ -19,6 +19,23 @@ import PenalizationAlert from '@/components/penalization-alert';
 import { Plus, Search, Download, FileSpreadsheet, Upload, ChevronLeft, ChevronRight, Users, AlertTriangle, Trash2, RefreshCw, Settings, Clock } from 'lucide-react';
 import type { Employee } from '@shared/schema';
 import { CIUDADES_DISPONIBLES } from '@shared/schema';
+
+// Tipos para las respuestas de la API
+interface CheckExpiredPenalizationsResponse {
+  checked: number;
+  restored: number;
+  restoredEmployees: Employee[];
+  pendingPenalizations: Employee[];
+}
+
+interface CleanLeavesResponse {
+  deleted: string[];
+  total: number;
+}
+
+interface ExecuteAutomaticCleanupResponse {
+  total: number;
+}
 // XLSX import removed as it's not used in this file
 
 export default function Employees () {
@@ -212,10 +229,10 @@ export default function Employees () {
   };
 
   // Mutación para verificar penalizaciones expiradas
-  const checkExpiredPenalizationsMutation = useMutation({
+  const checkExpiredPenalizationsMutation = useMutation<CheckExpiredPenalizationsResponse>({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/employees/check-expired-penalizations');
-      return response;
+      return response as unknown as CheckExpiredPenalizationsResponse;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
@@ -320,10 +337,10 @@ export default function Employees () {
   };
 
   // Mutación para limpieza masiva de empleados dados de baja aprobada
-  const cleanLeavesMutation = useMutation({
+  const cleanLeavesMutation = useMutation<CleanLeavesResponse>({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/employees/clean-leaves');
-      return response;
+      return response as unknown as CleanLeavesResponse;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
@@ -360,10 +377,10 @@ export default function Employees () {
   };
 
   // Mutación para ejecutar limpieza automática manualmente
-  const executeAutomaticCleanupMutation = useMutation({
+  const executeAutomaticCleanupMutation = useMutation<ExecuteAutomaticCleanupResponse>({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/employees/execute-automatic-cleanup');
-      return response;
+      return response as unknown as ExecuteAutomaticCleanupResponse;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
@@ -671,6 +688,7 @@ export default function Employees () {
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="active">Activo</SelectItem>
+                    <SelectItem value="pendiente_activacion">Pendiente Activación</SelectItem>
                     <SelectItem value="it_leave">Baja IT</SelectItem>
                     <SelectItem value="company_leave_pending">Baja Empresa Pendiente</SelectItem>
                     <SelectItem value="company_leave_approved">Baja Empresa Aprobada</SelectItem>

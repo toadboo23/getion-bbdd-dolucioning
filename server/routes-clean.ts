@@ -172,10 +172,19 @@ export async function registerRoutes (app: Express): Promise<Server> {
       }
 
       const employeeData = req.body as Record<string, unknown>;
+      
+      // Validar permisos para crear empleados sin ID Glovo
+      if ((!employeeData.idGlovo || employeeData.idGlovo === '') && user?.role !== 'super_admin') {
+        return res.status(403).json({ 
+          message: 'Solo los Super Administradores pueden crear empleados sin ID Glovo' 
+        });
+      }
+      
       // Capitalizar ciudad si existe
       if (employeeData.ciudad && typeof employeeData.ciudad === 'string') {
         employeeData.ciudad = employeeData.ciudad.charAt(0).toUpperCase() + employeeData.ciudad.slice(1).toLowerCase();
       }
+      
       const employee = await storage.createEmployee(employeeData as any);
 
       // Log audit
@@ -186,7 +195,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
         entityType: 'employee',
         entityId: employee.idGlovo,
         entityName: `${employee.nombre} ${employee.apellido}`,
-        description: `Empleado creado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo})`,
+        description: `Empleado creado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo})${employee.status === 'pendiente_activacion' ? ' - Pendiente Activación' : ''}`,
         newData: employee,
       });
 
@@ -220,6 +229,13 @@ export async function registerRoutes (app: Express): Promise<Server> {
       const isReactivatingFromItLeave = oldEmployee?.status === 'it_leave' && 
                                        employeeData.status === 'active';
       
+      // Determinar si se está activando un empleado pendiente
+      const isActivatingPendingEmployee = oldEmployee?.status === 'pendiente_activacion' && 
+                                         employeeData.status === 'active' &&
+                                         employeeData.idGlovo && 
+                                         employeeData.idGlovo !== oldEmployee.idGlovo &&
+                                         !employeeData.idGlovo.startsWith('TEMP_');
+      
       // Crear mensaje de auditoría más descriptivo
       let auditDescription = `Empleado actualizado: ${employee.nombre} ${employee.apellido} (${employee.idGlovo})`;
       
@@ -227,12 +243,17 @@ export async function registerRoutes (app: Express): Promise<Server> {
         const hoursRestored = oldEmployee?.originalHours || 0;
         auditDescription = `Empleado REACTIVADO desde baja IT: ${employee.nombre} ${employee.apellido} (${employee.idGlovo}) - Horas restauradas: ${hoursRestored}`;
       }
+      
+      if (isActivatingPendingEmployee) {
+        auditDescription = `Empleado ACTIVADO desde Pendiente Activación: ${employee.nombre} ${employee.apellido} (${employee.idGlovo}) - ID Glovo asignado: ${employeeData.idGlovo}`;
+      }
 
       // Log audit
       await AuditService.logAction({
         userId: user?.email || '',
         userRole: (user.role as 'super_admin' | 'admin') || 'normal',
-        action: isReactivatingFromItLeave ? 'reactivate_employee_from_it_leave' : 'update_employee',
+        action: isReactivatingFromItLeave ? 'reactivate_employee_from_it_leave' : 
+               isActivatingPendingEmployee ? 'activate_pending_employee' : 'update_employee',
         entityType: 'employee',
         entityId: employee.idGlovo,
         entityName: `${employee.nombre} ${employee.apellido}`,

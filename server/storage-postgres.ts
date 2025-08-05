@@ -95,9 +95,19 @@ export class PostgresStorage {
   }
 
   async createEmployee (employeeData: InsertEmployee): Promise<Employee> {
+    // Generar ID temporal si no se proporciona idGlovo
+    let finalEmployeeData = { ...employeeData };
+    
+    if (!employeeData.idGlovo || employeeData.idGlovo.trim() === '') {
+      // Generar ID temporal único para empleados sin ID Glovo
+      const tempId = `TEMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      finalEmployeeData.idGlovo = tempId;
+      finalEmployeeData.status = 'pendiente_activacion';
+    }
+
     // Calcular CDP automáticamente basado en las horas
-    const cdp = calculateCDP(employeeData.horas);
-    const employeeDataWithCDP = { ...employeeData, cdp };
+    const cdp = calculateCDP(finalEmployeeData.horas);
+    const employeeDataWithCDP = { ...finalEmployeeData, cdp };
 
     const [employee] = await db.insert(employees).values(employeeDataWithCDP as InsertEmployee).returning();
     return employee;
@@ -144,11 +154,46 @@ export class PostgresStorage {
                                      employeeData.status === 'active';
     // Verificar si se está cambiando a company_leave_approved (baja empresa)
     const isGoingToCompanyLeave = employeeData.status === 'company_leave_approved';
+    // Verificar si se está activando un empleado pendiente de activación
+    const isActivatingPendingEmployee = currentEmployee.status === 'pendiente_activacion' && 
+                                       employeeData.status === 'active' &&
+                                       employeeData.idGlovo && 
+                                       employeeData.idGlovo !== currentEmployee.idGlovo &&
+                                       !employeeData.idGlovo.startsWith('TEMP_');
+    
     // Si se está reactivando desde baja IT, restaurar las horas originales
     if (isReactivatingFromItLeave && currentEmployee.originalHours !== null) {
       employeeData.horas = currentEmployee.originalHours;
       employeeData.originalHours = null;
     }
+    
+    // Si se está activando un empleado pendiente, verificar que tenga ID Glovo válido
+    if (isActivatingPendingEmployee) {
+      // Verificar que el nuevo ID Glovo no esté en uso
+      const existingEmployee = await this.getEmployee(employeeData.idGlovo);
+      if (existingEmployee && existingEmployee.idGlovo !== currentEmployee.idGlovo) {
+        throw new Error(`El ID Glovo ${employeeData.idGlovo} ya está en uso por otro empleado`);
+      }
+      
+      // Crear notificación de activación
+      await this.createNotification({
+        type: 'employee_update',
+        title: 'Empleado Activado',
+        message: `El empleado ${currentEmployee.nombre} ${currentEmployee.apellido || ''} ha sido activado con ID Glovo: ${employeeData.idGlovo}`,
+        requestedBy: 'SYSTEM',
+        status: 'processed',
+        metadata: {
+          ...getEmpleadoMetadata(currentEmployee),
+          employeeId: employeeData.idGlovo,
+          action: 'employee_activated',
+          previousId: currentEmployee.idGlovo,
+          newId: employeeData.idGlovo,
+          previousStatus: currentEmployee.status,
+          newStatus: 'active',
+        },
+      });
+    }
+    
     // Si se está cambiando a baja empresa, guardar las horas originales y poner las actuales a 0
     if (isGoingToCompanyLeave) {
       const originalHours = currentEmployee.originalHours !== null ? currentEmployee.originalHours : currentEmployee.horas || 0;
@@ -174,12 +219,24 @@ export class PostgresStorage {
     // Calcular CDP automáticamente si se actualizan las horas
     const cdp = calculateCDP(employeeData.horas);
     const employeeDataWithCDP = { ...employeeData, cdp, vacacionesPendientes };
-    const [employee] = await db
-      .update(employees)
-      .set(employeeDataWithCDP as UpdateEmployee)
-      .where(eq(employees.idGlovo, id))
-      .returning();
-    return employee;
+    
+    // Si se está cambiando el ID Glovo de un empleado pendiente, necesitamos manejar esto de forma especial
+    if (isActivatingPendingEmployee && employeeData.idGlovo && employeeData.idGlovo !== id) {
+      // Primero eliminar el empleado con el ID temporal
+      await db.delete(employees).where(eq(employees.idGlovo, id));
+      
+      // Luego crear el nuevo empleado con el ID Glovo real
+      const [employee] = await db.insert(employees).values(employeeDataWithCDP as InsertEmployee).returning();
+      return employee;
+    } else {
+      // Actualización normal
+      const [employee] = await db
+        .update(employees)
+        .set(employeeDataWithCDP as UpdateEmployee)
+        .where(eq(employees.idGlovo, id))
+        .returning();
+      return employee;
+    }
   }
 
   async deleteEmployee (id: string): Promise<void> {
