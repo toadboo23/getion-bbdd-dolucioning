@@ -2045,6 +2045,153 @@ export async function registerRoutes (app: Express): Promise<Server> {
     }
   });
 
+  // ===== RUTAS DEL MÓDULO CAPTACIÓN/SALIDAS =====
+
+  // Obtener dashboard de captación (protegido)
+  app.get('/api/captation/dashboard', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('📊 Captation dashboard request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      
+      const dashboardData = await storage.getCaptationDashboard();
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user?.email || '',
+        userRole: (user.role as 'super_admin' | 'admin') || 'normal',
+        action: 'access_captation_dashboard',
+        entityType: 'captation_dashboard',
+        description: `Acceso al dashboard de captación - Usuario: ${user?.email}`,
+        newData: { dashboardData },
+      });
+
+      res.json(dashboardData);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching captation dashboard:', error);
+      res.status(500).json({ message: 'Failed to fetch captation dashboard' });
+    }
+  });
+
+  // Obtener requerimientos de horas por ciudad (protegido)
+  app.get('/api/captation/city-requirements', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🏙️ City hours requirements request');
+    try {
+      const requirements = await storage.getAllCityHoursRequirements();
+      res.json(requirements);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching city requirements:', error);
+      res.status(500).json({ message: 'Failed to fetch city requirements' });
+    }
+  });
+
+  // Obtener requerimiento específico de una ciudad (protegido)
+  app.get('/api/captation/city-requirements/:ciudad', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🏙️ Specific city requirement request');
+    try {
+      const { ciudad } = req.params;
+      const requirement = await storage.getCityHoursRequirement(ciudad);
+      
+      if (!requirement) {
+        return res.status(404).json({ message: 'City requirement not found' });
+      }
+      
+      res.json(requirement);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching city requirement:', error);
+      res.status(500).json({ message: 'Failed to fetch city requirement' });
+    }
+  });
+
+  // Actualizar requerimientos de horas por ciudad (solo super_admin)
+  app.put('/api/captation/city-requirements/:ciudad', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('✏️ Update city hours requirement request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede actualizar requerimientos de horas' });
+      }
+
+      const { ciudad } = req.params;
+      const { horasFijasRequeridas, motivoCambio } = req.body;
+
+      // Validar datos
+      if (typeof horasFijasRequeridas !== 'number') {
+        return res.status(400).json({ message: 'Las horas deben ser números válidos' });
+      }
+
+      if (horasFijasRequeridas < 0) {
+        return res.status(400).json({ message: 'Las horas no pueden ser negativas' });
+      }
+
+      const updatedRequirement = await storage.updateCityHoursRequirement(
+        ciudad,
+        { horasFijasRequeridas },
+        user.email || '',
+        motivoCambio
+      );
+
+      // Log audit
+      await AuditService.logAction({
+        userId: user.email || '',
+        userRole: 'super_admin',
+        action: 'update_city_hours_requirement',
+        entityType: 'city_hours_requirement',
+        entityId: ciudad,
+        entityName: ciudad,
+        description: `Actualización de requerimientos de horas para ${ciudad}: Fijas: ${horasFijasRequeridas}`,
+        oldData: { ciudad },
+        newData: updatedRequirement,
+      });
+
+      res.json(updatedRequirement);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error updating city requirement:', error);
+      res.status(500).json({ message: 'Failed to update city requirement' });
+    }
+  });
+
+  // Obtener historial de cambios de una ciudad (protegido)
+  app.get('/api/captation/city-requirements/:ciudad/history', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('📜 City requirement history request');
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede ver el historial de cambios' });
+      }
+
+      const { ciudad } = req.params;
+      const { limit = 50 } = req.query;
+      
+      const history = await storage.getCityHoursRequirementHistory(
+        ciudad, 
+        parseInt(limit as string) || 50
+      );
+      
+      res.json(history);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching city requirement history:', error);
+      res.status(500).json({ message: 'Failed to fetch city requirement history' });
+    }
+  });
+
+  // Obtener horas actuales de una ciudad específica (protegido)
+  app.get('/api/captation/city-current-hours/:ciudad', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('⏰ City current hours request');
+    try {
+      const { ciudad } = req.params;
+      const currentHours = await storage.getCityCurrentHours(ciudad);
+      
+      if (!currentHours) {
+        return res.status(404).json({ message: 'No se encontraron datos para esta ciudad' });
+      }
+      
+      res.json(currentHours);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching city current hours:', error);
+      res.status(500).json({ message: 'Failed to fetch city current hours' });
+    }
+  });
+
   // Create HTTP server
   const server = createServer(app);
 

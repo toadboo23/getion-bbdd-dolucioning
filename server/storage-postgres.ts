@@ -9,6 +9,8 @@ import {
   itLeaves,
   notifications,
   CIUDADES_DISPONIBLES,
+  cityHoursRequirements,
+  cityHoursRequirementsHistory,
   type SystemUser,
   type AuditLog,
   type InsertSystemUser,
@@ -24,6 +26,11 @@ import {
   type Notification,
   type InsertNotification,
   employeeLeaveHistory,
+  type CityHoursRequirement,
+  type InsertCityHoursRequirement,
+  type UpdateCityHoursRequirement,
+  type CityHoursRequirementHistory,
+  type CaptationDashboardData,
 } from '../shared/schema.js';
 // import { IStorage } from "./storage.js";
 
@@ -1230,6 +1237,160 @@ export class PostgresStorage {
       }
       return results;
     } catch (error) {
+      throw error;
+    }
+  }
+
+  // ===== MÉTODOS DEL MÓDULO CAPTACIÓN/SALIDAS =====
+
+  async getCaptationDashboard(): Promise<CaptationDashboardData[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM get_captation_dashboard()
+      `);
+      
+      return result.rows.map((row: any) => ({
+        ciudad: row.ciudad,
+        horasFijasRequeridas: parseInt(String(row.horas_fijas_requeridas)) || 0,
+        horasFijasActuales: parseInt(String(row.horas_fijas_actuales)) || 0,
+        horasFijasPendientes: parseInt(String(row.horas_fijas_pendientes)) || 0,
+        deficitHorasFijas: parseInt(String(row.deficit_horas_fijas)) || 0,
+        totalEmpleadosActivos: parseInt(String(row.total_empleados_activos)) || 0,
+        empleadosActivos: parseInt(String(row.empleados_activos)) || 0,
+        empleadosBajaIt: parseInt(String(row.empleados_baja_it)) || 0,
+        porcentajeCoberturaFijas: parseFloat(String(row.porcentaje_cobertura_fijas)) || 0,
+      }));
+    } catch (error) {
+      console.error('Error getting captation dashboard:', error);
+      throw error;
+    }
+  }
+
+  async getCityHoursRequirement(ciudad: string): Promise<CityHoursRequirement | undefined> {
+    try {
+      const [requirement] = await db
+        .select()
+        .from(cityHoursRequirements)
+        .where(eq(cityHoursRequirements.ciudad, ciudad));
+      
+      return requirement;
+    } catch (error) {
+      console.error('Error getting city hours requirement:', error);
+      throw error;
+    }
+  }
+
+  async getAllCityHoursRequirements(): Promise<CityHoursRequirement[]> {
+    try {
+      return await db
+        .select()
+        .from(cityHoursRequirements)
+        .orderBy(cityHoursRequirements.ciudad);
+    } catch (error) {
+      console.error('Error getting all city hours requirements:', error);
+      throw error;
+    }
+  }
+
+  async createCityHoursRequirement(data: InsertCityHoursRequirement): Promise<CityHoursRequirement> {
+    try {
+      const [requirement] = await db
+        .insert(cityHoursRequirements)
+        .values(data)
+        .returning();
+      
+      return requirement;
+    } catch (error) {
+      console.error('Error creating city hours requirement:', error);
+      throw error;
+    }
+  }
+
+  async updateCityHoursRequirement(
+    ciudad: string, 
+    data: UpdateCityHoursRequirement, 
+    updatedBy: string,
+    motivoCambio?: string
+  ): Promise<CityHoursRequirement> {
+    try {
+      // Obtener el requerimiento actual para el historial
+      const currentRequirement = await this.getCityHoursRequirement(ciudad);
+      if (!currentRequirement) {
+        throw new Error(`City hours requirement for ${ciudad} not found`);
+      }
+
+      // Actualizar el requerimiento
+      const [updatedRequirement] = await db
+        .update(cityHoursRequirements)
+        .set({
+          ...data,
+          updatedAt: new Date(),
+          updatedBy,
+        })
+        .where(eq(cityHoursRequirements.ciudad, ciudad))
+        .returning();
+
+      // Crear entrada en el historial
+      await db.insert(cityHoursRequirementsHistory).values({
+        cityRequirementId: currentRequirement.id,
+        ciudad,
+        horasFijasAnterior: currentRequirement.horasFijasRequeridas,
+        horasFijasNuevo: data.horasFijasRequeridas || currentRequirement.horasFijasRequeridas,
+        horasComplementariasAnterior: currentRequirement.horasComplementariasRequeridas,
+        horasComplementariasNuevo: data.horasComplementariasRequeridas || currentRequirement.horasComplementariasRequeridas,
+        changedBy: updatedBy,
+        motivoCambio,
+      });
+
+      return updatedRequirement;
+    } catch (error) {
+      console.error('Error updating city hours requirement:', error);
+      throw error;
+    }
+  }
+
+  async getCityHoursRequirementHistory(ciudad: string, limit: number = 50): Promise<CityHoursRequirementHistory[]> {
+    try {
+      return await db
+        .select()
+        .from(cityHoursRequirementsHistory)
+        .where(eq(cityHoursRequirementsHistory.ciudad, ciudad))
+        .orderBy(desc(cityHoursRequirementsHistory.changedAt))
+        .limit(limit);
+    } catch (error) {
+      console.error('Error getting city hours requirement history:', error);
+      throw error;
+    }
+  }
+
+  async getCityCurrentHours(ciudad: string): Promise<{
+    ciudad: string;
+    horasFijasActuales: number;
+    horasComplementariasActuales: number;
+    totalEmpleadosActivos: number;
+    empleadosActivos: number;
+    empleadosBajaIt: number;
+  } | null> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM get_city_current_hours(${ciudad})
+      `);
+      
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        ciudad: String(row.ciudad),
+        horasFijasActuales: parseInt(String(row.horas_fijas_actuales)) || 0,
+        horasComplementariasActuales: parseInt(String(row.horas_complementarias_actuales)) || 0,
+        totalEmpleadosActivos: parseInt(String(row.total_empleados_activos)) || 0,
+        empleadosActivos: parseInt(String(row.empleados_activos)) || 0,
+        empleadosBajaIt: parseInt(String(row.empleados_baja_it)) || 0,
+      };
+    } catch (error) {
+      console.error('Error getting city current hours:', error);
       throw error;
     }
   }

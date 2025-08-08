@@ -9,6 +9,7 @@ import {
   integer,
   boolean,
   date,
+  numeric,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
@@ -104,8 +105,8 @@ export const employees = pgTable('employees', {
   flota: varchar('flota', { length: 100 }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  vacacionesDisfrutadas: varchar('vacaciones_disfrutadas', { length: 10 }).default('0'),
-  vacacionesPendientes: varchar('vacaciones_pendientes', { length: 10 }).default('0'),
+  vacacionesDisfrutadas: numeric('vacaciones_disfrutadas', { precision: 6, scale: 2 }).default('0.00'),
+  vacacionesPendientes: numeric('vacaciones_pendientes', { precision: 6, scale: 2 }).default('0.00'),
 });
 
 // Company leaves table (employees with approved company leaves) - BAJA EMPRESA
@@ -192,6 +193,37 @@ export const employeeLeaveHistory = pgTable('employee_leave_history', {
   index('idx_employee_leave_history_employee_id').on(table.employeeId),
 ]);
 
+// Tabla para requerimientos de horas por ciudad (Captación/Salidas)
+export const cityHoursRequirements = pgTable('city_hours_requirements', {
+  id: serial('id').primaryKey(),
+  ciudad: varchar('ciudad', { length: 100 }).unique().notNull(),
+  horasFijasRequeridas: integer('horas_fijas_requeridas').notNull().default(0),
+  horasComplementariasRequeridas: integer('horas_complementarias_requeridas').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  createdBy: varchar('created_by', { length: 255 }).notNull(),
+  updatedBy: varchar('updated_by', { length: 255 }),
+}, (table) => [
+  index('idx_city_hours_requirements_ciudad').on(table.ciudad),
+]);
+
+// Tabla para historial de cambios en requerimientos de horas
+export const cityHoursRequirementsHistory = pgTable('city_hours_requirements_history', {
+  id: serial('id').primaryKey(),
+  cityRequirementId: integer('city_requirement_id').references(() => cityHoursRequirements.id, { onDelete: 'cascade' }),
+  ciudad: varchar('ciudad', { length: 100 }).notNull(),
+  horasFijasAnterior: integer('horas_fijas_anterior'),
+  horasFijasNuevo: integer('horas_fijas_nuevo'),
+  horasComplementariasAnterior: integer('horas_complementarias_anterior'),
+  horasComplementariasNuevo: integer('horas_complementarias_nuevo'),
+  changedBy: varchar('changed_by', { length: 255 }).notNull(),
+  changedAt: timestamp('changed_at').defaultNow(),
+  motivoCambio: text('motivo_cambio'),
+}, (table) => [
+  index('idx_city_hours_history_ciudad').on(table.ciudad),
+  index('idx_city_hours_history_changed_at').on(table.changedAt),
+]);
+
 // Schema exports for validation
 export const insertSystemUserSchema = createInsertSchema(systemUsers).omit({
   id: true,
@@ -230,6 +262,17 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   createdAt: true,
 });
 
+// City hours requirements schema
+export const insertCityHoursRequirementSchema = createInsertSchema(cityHoursRequirements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateCityHoursRequirementSchema = insertCityHoursRequirementSchema.partial().omit({
+  createdBy: true,
+});
+
 // Type exports
 export type SystemUser = typeof systemUsers.$inferSelect;
 export type InsertSystemUser = z.infer<typeof insertSystemUserSchema>;
@@ -262,3 +305,25 @@ export type InsertNotification = typeof notifications.$inferInsert;
 
 export type EmployeeLeaveHistory = typeof employeeLeaveHistory.$inferSelect;
 export type InsertEmployeeLeaveHistory = typeof employeeLeaveHistory.$inferInsert;
+
+// City hours requirements types
+export type CityHoursRequirement = typeof cityHoursRequirements.$inferSelect;
+export type InsertCityHoursRequirement = typeof cityHoursRequirements.$inferInsert;
+export type UpdateCityHoursRequirement = Partial<InsertCityHoursRequirement>;
+
+// City hours requirements history types
+export type CityHoursRequirementHistory = typeof cityHoursRequirementsHistory.$inferSelect;
+export type InsertCityHoursRequirementHistory = typeof cityHoursRequirementsHistory.$inferInsert;
+
+// Captation dashboard types
+export interface CaptationDashboardData {
+  ciudad: string;
+  horasFijasRequeridas: number;
+  horasFijasActuales: number;
+  horasFijasPendientes: number;
+  deficitHorasFijas: number;
+  totalEmpleadosActivos: number;
+  empleadosActivos: number;
+  empleadosBajaIt: number;
+  porcentajeCoberturaFijas: number;
+}
