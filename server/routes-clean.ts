@@ -79,6 +79,18 @@ export async function registerRoutes (app: Express): Promise<Server> {
     }
   });
 
+  // Get unique fleets for filters (protected)
+  app.get('/api/fleets', isAuthenticated, async (req, res) => {
+    if (process.env.NODE_ENV !== 'production') console.log('🚛 Unique fleets request');
+    try {
+      const fleets = await storage.getUniqueFleets();
+      res.json(fleets);
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error fetching fleets:', error);
+      res.status(500).json({ message: 'Failed to fetch fleets' });
+    }
+  });
+
   // Get unique fleets for filters (protected) - REMOVED as fleets are no longer used
   // app.get('/api/fleets', isAuthenticated, async (req, res) => {
   //   if (process.env.NODE_ENV !== 'production') console.log('🛳️ Unique fleets request');
@@ -121,8 +133,13 @@ export async function registerRoutes (app: Express): Promise<Server> {
 
       // Apply filters (case-insensitive)
       if (typeof city === 'string' && city !== 'all') {
-        const cityLower = city.toLowerCase();
-        employees = employees.filter(emp => (emp.ciudad || '').toLowerCase() === cityLower);
+        if (city === 'N/A') {
+          // Filtrar empleados que no tienen cityCode (null, undefined, o vacío)
+          employees = employees.filter(emp => !emp.cityCode || emp.cityCode.trim() === '');
+        } else {
+          const cityLower = city.toLowerCase();
+          employees = employees.filter(emp => (emp.cityCode || '').toLowerCase() === cityLower);
+        }
       }
 
       if (status && status !== 'all') {

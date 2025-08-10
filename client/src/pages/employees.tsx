@@ -44,7 +44,7 @@ export default function Employees () {
   const [searchTerm, setSearchTerm] = useState('');
   const [cityFilter, setCityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [flotaFilter, setFlotaFilter] = useState('');
+  const [flotaFilter, setFlotaFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -88,16 +88,24 @@ export default function Employees () {
       search: searchTerm,
       city: cityFilter === 'all' ? '' : cityFilter,
       status: statusFilter === 'all' ? '' : statusFilter,
-      flota: flotaFilter === '' ? '' : flotaFilter,
+      flota: flotaFilter === 'all' ? '' : flotaFilter,
       userCity: user?.ciudad || '',
     }],
     enabled: employeesLoaded, // Solo se ejecuta cuando employeesLoaded es true
     retry: false,
   });
 
-  // Obtener ciudades únicas para el filtro
-  const { data: cities } = useQuery<string[]>({
+  // Obtener códigos de ciudad únicos para el filtro - solo cuando se cargan empleados
+  const { data: cities, isLoading: citiesLoading } = useQuery<string[]>({
     queryKey: ['/api/cities'],
+    enabled: employeesLoaded, // Solo se ejecuta cuando se cargan empleados
+    retry: false,
+  });
+
+  // Obtener flotas únicas para el filtro - solo cuando se cargan empleados
+  const { data: fleets, isLoading: fleetsLoading } = useQuery<string[]>({
+    queryKey: ['/api/fleets'],
+    enabled: employeesLoaded, // Solo se ejecuta cuando se cargan empleados
     retry: false,
   });
 
@@ -109,7 +117,7 @@ export default function Employees () {
     setEmployeesLoaded(true);
     toast({
       title: 'Cargando empleados',
-      description: `Cargando empleados de ${user?.ciudad || 'tu ciudad asignada'}...`,
+      description: `Cargando empleados, códigos de ciudad y flotas...`,
     });
   };
 
@@ -435,7 +443,7 @@ export default function Employees () {
   // Lógica de paginación
   // Filtrar empleados por flota además de los otros filtros
   const filteredEmployees = (employees ?? []).filter(emp => {
-    const flotaMatch = flotaFilter.trim() === '' || (emp.flota ?? '').toLowerCase().includes(flotaFilter.trim().toLowerCase());
+    const flotaMatch = flotaFilter === 'all' || (emp.flota ?? '') === flotaFilter;
     // Aquí puedes agregar más condiciones de filtrado si lo deseas
     return flotaMatch;
   });
@@ -469,7 +477,7 @@ export default function Employees () {
     setSearchTerm('');
     setCityFilter('all');
     setStatusFilter('all');
-    setFlotaFilter('');
+    setFlotaFilter('all');
     setCurrentPage(1);
   };
 
@@ -622,9 +630,9 @@ export default function Employees () {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
               No se han cargado empleados
             </h3>
-            <p className="text-gray-600 mb-4">
-              Haz clic en "Cargar Empleados" para ver los empleados de {user?.ciudad || 'tu ciudad asignada'}
-            </p>
+                         <p className="text-gray-600 mb-4">
+               Haz clic en "Cargar Empleados" para ver los empleados, códigos de ciudad y flotas disponibles
+             </p>
             <Button
               onClick={handleLoadEmployees}
               className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -660,20 +668,38 @@ export default function Employees () {
 
               <div>
                 <label htmlFor="city-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                  Ciudad
+                  Código Ciudad
                 </label>
                 <Select value={cityFilter} onValueChange={setCityFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Todas las ciudades" />
+                    <SelectValue placeholder={
+                      citiesLoading ? "Cargando códigos..." : 
+                      cities && cities.length > 0 ? "Todos los códigos" : 
+                      "Todos los códigos"
+                    } />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las ciudades</SelectItem>
-                    {CIUDADES_DISPONIBLES.map((ciudad) => (
-                      <SelectItem key={ciudad} value={ciudad}>
-                        {ciudad}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                                     <SelectContent>
+                     <SelectItem value="all">Todos los códigos</SelectItem>
+                     <SelectItem value="N/A">N/A (Sin código ciudad)</SelectItem>
+                     {citiesLoading ? (
+                       <SelectItem value="loading" disabled>
+                         Cargando códigos...
+                       </SelectItem>
+                     ) : cities && cities.length > 0 ? (
+                       cities.map((cityCode) => (
+                         <SelectItem key={cityCode} value={cityCode}>
+                           {cityCode}
+                         </SelectItem>
+                       ))
+                     ) : (
+                       // Fallback a ciudades predefinidas si no hay datos dinámicos
+                       CIUDADES_DISPONIBLES.map((ciudad) => (
+                         <SelectItem key={ciudad} value={ciudad}>
+                           {ciudad}
+                         </SelectItem>
+                       ))
+                     )}
+                   </SelectContent>
                 </Select>
               </div>
 
@@ -702,13 +728,33 @@ export default function Employees () {
                 <label htmlFor="flota-filter" className="block text-sm font-medium text-gray-700 mb-2">
                   Flota
                 </label>
-                <Input
-                  id="flota-filter"
-                  placeholder="Ej: MAD1, BCN1..."
-                  value={flotaFilter}
-                  onChange={e => setFlotaFilter(e.target.value)}
-                  className="pl-4"
-                />
+                <Select value={flotaFilter} onValueChange={setFlotaFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      fleetsLoading ? "Cargando flotas..." : 
+                      fleets && fleets.length > 0 ? "Todas las flotas" : 
+                      "Todas las flotas"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las flotas</SelectItem>
+                    {fleetsLoading ? (
+                      <SelectItem value="loading" disabled>
+                        Cargando flotas...
+                      </SelectItem>
+                    ) : fleets && fleets.length > 0 ? (
+                      fleets.map((flota) => (
+                        <SelectItem key={flota} value={flota}>
+                          {flota}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-data" disabled>
+                        No hay flotas disponibles
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

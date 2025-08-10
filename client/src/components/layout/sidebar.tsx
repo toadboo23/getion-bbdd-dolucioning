@@ -12,7 +12,6 @@ import {
   FileTextIcon,
   ActivityIcon,
   TargetIcon,
-  TargetIcon,
   LogOutIcon,
 } from 'lucide-react';
 

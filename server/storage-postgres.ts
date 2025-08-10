@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq, and, sql, desc, isNotNull, lt, inArray, or, ne } from 'drizzle-orm';
+import { eq, and, sql, desc, isNotNull, lt, inArray, or, ne, selectDistinct } from 'drizzle-orm';
 import {
   systemUsers,
   auditLogs,
@@ -557,7 +557,56 @@ export class PostgresStorage {
 
   // City and fleet operations
   async getUniqueCities (): Promise<string[]> {
-    return [...CIUDADES_DISPONIBLES];
+    try {
+      // Consultar códigos de ciudad únicos de la tabla employees
+      const result = await db
+        .selectDistinct({ cityCode: employees.cityCode })
+        .from(employees)
+        .where(isNotNull(employees.cityCode))
+        .orderBy(employees.cityCode);
+
+      // Extraer los códigos de ciudad y filtrar valores nulos/vacíos
+      const cityCodes = result
+        .map(row => row.cityCode)
+        .filter(cityCode => cityCode && cityCode.trim() !== '')
+        .sort();
+
+      // Si no hay códigos de ciudad en la base de datos, devolver las ciudades predefinidas
+      if (cityCodes.length === 0) {
+        console.log('⚠️ No se encontraron códigos de ciudad en la base de datos, usando ciudades predefinidas');
+        return [...CIUDADES_DISPONIBLES];
+      }
+
+      console.log(`✅ Se encontraron ${cityCodes.length} códigos de ciudad únicos en la base de datos:`, cityCodes);
+      return cityCodes;
+    } catch (error) {
+      console.error('❌ Error obteniendo códigos de ciudad únicos:', error);
+      // En caso de error, devolver las ciudades predefinidas
+      return [...CIUDADES_DISPONIBLES];
+    }
+  }
+
+  async getUniqueFleets (): Promise<string[]> {
+    try {
+      // Consultar flotas únicas de la tabla employees
+      const result = await db
+        .selectDistinct({ flota: employees.flota })
+        .from(employees)
+        .where(isNotNull(employees.flota))
+        .orderBy(employees.flota);
+
+      // Extraer las flotas y filtrar valores nulos/vacíos
+      const fleets = result
+        .map(row => row.flota)
+        .filter(flota => flota && flota.trim() !== '')
+        .sort();
+
+      console.log(`✅ Se encontraron ${fleets.length} flotas únicas en la base de datos:`, fleets);
+      return fleets;
+    } catch (error) {
+      console.error('❌ Error obteniendo flotas únicas:', error);
+      return [];
+    }
   }
 
   // System user operations
