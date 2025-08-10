@@ -11,6 +11,8 @@ import {
   SettingsIcon,
   FileTextIcon,
   ActivityIcon,
+  TargetIcon,
+  TargetIcon,
   LogOutIcon,
 } from 'lucide-react';
 
@@ -26,6 +28,7 @@ interface NavigationItem {
 const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Empleados', href: '/employees', icon: UsersIcon },
+  { name: 'Captación/Salidas', href: '/captation', icon: TargetIcon },
   { name: 'Baja Empresa', href: '/company-leaves', icon: BuildingIcon },
   { name: 'Notificaciones', href: '/notifications', icon: BellIcon, adminOnly: true }, // Admin y Super Admin
   { name: 'System Logs', href: '/system-logs', icon: FileTextIcon, superAdminOnly: true }, // Solo Super Admin

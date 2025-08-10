@@ -11,6 +11,7 @@ import Dashboard from '@/pages/dashboard';
 import Employees from '@/pages/employees';
 
 import CompanyLeaves from '@/pages/company-leaves';
+import Captation from '@/pages/captation';
 import Notifications from '@/pages/notifications';
 import SystemLogs from '@/pages/system-logs';
 import UserManagement from '@/pages/user-management';
@@ -59,6 +60,7 @@ function Router () {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/employees" component={Employees} />
+            <Route path="/captation" component={Captation} />
 
             <Route path="/company-leaves" component={CompanyLeaves} />
             <Route path="/notifications" component={Notifications} />
