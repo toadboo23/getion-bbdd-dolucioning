@@ -133,3 +133,13 @@ backup_*.sql
 *Backup*.sql
 backup_db_daily.sh
 backups/backup_*.sql
+
+# Development and documentation files (NO SUBIR A MAIN)
+README-DEVELOPMENT.md
+docs/PENDING_ACTIVATION_IMPLEMENTATION.md
+docs/VARIABLES_ENTORNO_SEGURAS.md
+develop-feature.ps1
+reset-db-local.sh
+*-development.*
+*-local.*
+
