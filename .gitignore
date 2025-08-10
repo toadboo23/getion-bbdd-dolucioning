@@ -125,3 +125,11 @@ public
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Database backup files (NO SUBIR NUNCA)
+backup_*.sql
+*backup*.sql
+*BACKUP*.sql
+*Backup*.sql
+backup_db_daily.sh
+backups/backup_*.sql
