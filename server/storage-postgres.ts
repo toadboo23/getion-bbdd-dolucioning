@@ -466,17 +466,17 @@ export class PostgresStorage {
       }
     });
 
-    // Agrupar por ciudad
-    const cityGroups = allEmployeesForCities.reduce((acc, emp) => {
-      const city = emp.ciudad || 'Sin ciudad';
-      if (!acc[city]) acc[city] = 0;
-      acc[city]++;
+    // Agrupar por código de ciudad
+    const cityCodeGroups = allEmployeesForCities.reduce((acc, emp) => {
+      const cityCode = emp.cityCode || 'N/A';
+      if (!acc[cityCode]) acc[cityCode] = 0;
+      acc[cityCode]++;
       return acc;
     }, {} as Record<string, number>);
 
     // Convertir a array y ordenar por cantidad (mayor a menor)
-    const employeesByCity = Object.entries(cityGroups)
-      .map(([city, count]) => ({ city, count }))
+    const employeesByCityCode = Object.entries(cityCodeGroups)
+      .map(([cityCode, count]) => ({ cityCode, count }))
       .sort((a, b) => (b.count as number) - (a.count as number));
 
     const metrics = {
@@ -486,7 +486,7 @@ export class PostgresStorage {
       pendingLaboral: pendingLaboralEmployees.length, // EMPLEADOS EN PENDIENTE LABORAL
       penalizedEmployees: penalizedEmployees.length, // EMPLEADOS PENALIZADOS
       pendingActions: pendingNotifications.length, // NOTIFICACIONES PENDIENTES
-      employeesByCity, // POR CIUDAD (TODOS)
+      employeesByCityCode, // POR CÓDIGO DE CIUDAD (TODOS)
     };
 
     if (process.env.NODE_ENV !== 'production') console.log('📊 [METRICS] Métricas calculadas:', {
@@ -496,7 +496,7 @@ export class PostgresStorage {
       pendingLaboral: metrics.pendingLaboral,
       penalized: metrics.penalizedEmployees,
       pendingActions: metrics.pendingActions,
-      topCities: metrics.employeesByCity.slice(0, 5),
+      topCityCodes: metrics.employeesByCityCode.slice(0, 5),
     });
 
     return metrics;

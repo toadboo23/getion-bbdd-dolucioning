@@ -9,7 +9,7 @@ interface MetricsData {
   pendingLaboral: number;
   penalizedEmployees: number;
   pendingActions: number;
-  employeesByCity: { city: string; count: number }[];
+  employeesByCityCode: { cityCode: string; count: number }[];
 }
 
 interface DashboardMetricsProps {
@@ -25,7 +25,7 @@ const COLORS = [
 
 export default function DashboardMetrics ({ metrics }: DashboardMetricsProps) {
   // Validar que los datos estén en el formato correcto
-  if (!metrics || !Array.isArray(metrics.employeesByCity)) {
+  if (!metrics || !Array.isArray(metrics.employeesByCityCode)) {
     return (
       <div className="p-6 text-center bg-white border border-gray-200 rounded-lg shadow-sm">
         <p className="text-gray-500">No hay datos disponibles para mostrar los gráficos</p>
@@ -33,10 +33,10 @@ export default function DashboardMetrics ({ metrics }: DashboardMetricsProps) {
     );
   }
 
-  // Asegurar que employeesByCity tenga al menos un elemento
-  const safeEmployeesByCity = metrics.employeesByCity.length > 0
-    ? metrics.employeesByCity
-    : [{ city: 'Sin datos', count: 0 }];
+  // Asegurar que employeesByCityCode tenga al menos un elemento
+  const safeEmployeesByCityCode = metrics.employeesByCityCode.length > 0
+    ? metrics.employeesByCityCode
+    : [{ cityCode: 'Sin datos', count: 0 }];
 
   return (
     <div className="space-y-6">
@@ -159,27 +159,27 @@ export default function DashboardMetrics ({ metrics }: DashboardMetricsProps) {
 
       {/* GRÁFICOS */}
       <div className="grid grid-cols-1 gap-6">
-        {/* GRÁFICO DE EMPLEADOS POR CIUDAD */}
+        {/* GRÁFICO DE EMPLEADOS POR CÓDIGO DE CIUDAD */}
         <Card className="bg-white shadow-lg border border-gray-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPin className="w-5 h-5 text-blue-600" />
-              Empleados por Ciudad
+              Empleados por Código de Ciudad
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-96">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={safeEmployeesByCity}
+                  data={safeEmployeesByCityCode}
                   margin={{ top: 50, right: 30, left: 20, bottom: 80 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="city" angle={-45} textAnchor="end" interval={0} height={80} tick={{ fontSize: 12 }} />
+                  <XAxis dataKey="cityCode" angle={-45} textAnchor="end" interval={0} height={80} tick={{ fontSize: 12 }} />
                   <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Bar dataKey="count">
-                    {safeEmployeesByCity.map((entry, index) => (
+                    {safeEmployeesByCityCode.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Bar>

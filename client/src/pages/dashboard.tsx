@@ -17,7 +17,7 @@ interface MetricsData {
   pendingLaboral: number;
   penalizedEmployees: number;
   pendingActions: number;
-  employeesByCity: { city: string; count: number }[];
+  employeesByCityCode: { cityCode: string; count: number }[];
   debug?: Record<string, unknown>;
 }
 
