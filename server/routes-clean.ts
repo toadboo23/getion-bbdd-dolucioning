@@ -140,6 +140,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
           const cityLower = city.toLowerCase();
           employees = employees.filter(emp => (emp.cityCode || '').toLowerCase() === cityLower);
         }
+
       }
 
       if (status && status !== 'all') {
