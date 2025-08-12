@@ -147,30 +147,34 @@ export class PostgresStorage {
       throw new Error(`Employee with ID ${id} not found`);
     }
 
+    // CÁLCULO DE VACACIONES_PENDIENTES DESHABILITADO
     // No permitir modificar vacaciones_pendientes manualmente
     if ('vacacionesPendientes' in employeeData) {
       delete (employeeData as any).vacacionesPendientes;
     }
 
-    // Calcular vacaciones_pendientes automáticamente
-    let fechaAlta = employeeData.fechaAltaSegSoc || currentEmployee.fechaAltaSegSoc;
-    let vacacionesDisfrutadas =
-      typeof employeeData.vacacionesDisfrutadas !== 'undefined'
-        ? Number(employeeData.vacacionesDisfrutadas)
-        : Number(currentEmployee.vacacionesDisfrutadas) || 0;
-    let vacacionesPendientes = 0;
-    if (fechaAlta) {
-      const fechaInicio = new Date(fechaAlta);
-      const hoy = new Date();
-      const diasTranscurridos = Math.floor((hoy.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24));
-      vacacionesPendientes = (diasTranscurridos * 0.0833333333333333) - vacacionesDisfrutadas;
-      if (vacacionesPendientes < 0) vacacionesPendientes = 0;
-      vacacionesPendientes = Number(vacacionesPendientes.toFixed(2));
-    }
-    // Si no hay fecha de alta, dejar en 0
-    else {
-      vacacionesPendientes = 0;
-    }
+    // Calcular vacaciones_pendientes automáticamente - DESHABILITADO
+    // let fechaAlta = employeeData.fechaAltaSegSoc || currentEmployee.fechaAltaSegSoc;
+    // let vacacionesDisfrutadas =
+    //   typeof employeeData.vacacionesDisfrutadas !== 'undefined'
+    //     ? Number(employeeData.vacacionesDisfrutadas)
+    //     : Number(currentEmployee.vacacionesDisfrutadas) || 0;
+    // let vacacionesPendientes = 0;
+    // if (fechaAlta) {
+    //   const fechaInicio = new Date(fechaAlta);
+    //   const hoy = new Date();
+    //   const diasTranscurridos = Math.floor((hoy.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24));
+    //   vacacionesPendientes = (diasTranscurridos * 0.0833333333333333) - vacacionesDisfrutadas;
+    //   if (vacacionesPendientes < 0) vacacionesPendientes = 0;
+    //   vacacionesPendientes = Number(vacacionesPendientes.toFixed(2));
+    // }
+    // // Si no hay fecha de alta, dejar en 0
+    // else {
+    //   vacacionesPendientes = 0;
+    // }
+    
+    // Mantener el valor actual de vacaciones_pendientes sin calcular
+    let vacacionesPendientes = Number(currentEmployee.vacacionesPendientes || 0);
 
     // Verificar si se está cambiando de it_leave a active
     const isReactivatingFromItLeave = currentEmployee.status === 'it_leave' && 
