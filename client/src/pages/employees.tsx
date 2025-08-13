@@ -344,6 +344,52 @@ export default function Employees () {
     checkExpiredPenalizationsMutation.mutate();
   };
 
+  // Mutación para obtener vista previa de limpieza
+  const previewCleanLeavesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('GET', '/api/employees/clean-leaves-preview');
+      return response;
+    },
+    onSuccess: (data) => {
+      if (data.total === 0) {
+        toast({
+          title: 'No hay empleados para limpiar',
+          description: 'No se encontraron empleados con estado "Baja Empresa Aprobada" que cumplan los criterios de limpieza.',
+        });
+        return;
+      }
+
+      const confirmMessage = 
+        `Se encontraron ${data.total} empleados que serían eliminados:\n\n` +
+        data.employees.map((emp: any) => 
+          `• ${emp.nombre} ${emp.apellido} (${emp.idGlovo}) - Estado: ${emp.status}`
+        ).join('\n') +
+        '\n\n¿Estás seguro de que deseas proceder con la eliminación?';
+
+      if (window.confirm(confirmMessage)) {
+        cleanLeavesMutation.mutate();
+      }
+    },
+    onError: (_error) => {
+      if (isUnauthorizedError(_error)) {
+        toast({
+          title: 'Error de autorización',
+          description: 'Tu sesión ha expirado. Redirigiendo al login...',
+          variant: 'destructive',
+        });
+        setTimeout(() => {
+          window.location.href = '/api/login';
+        }, 500);
+        return;
+      }
+      toast({
+        title: 'Error al obtener vista previa',
+        description: _error instanceof Error ? _error.message : 'Error desconocido',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Mutación para limpieza masiva de empleados dados de baja aprobada
   const cleanLeavesMutation = useMutation<CleanLeavesResponse>({
     mutationFn: async () => {
@@ -355,7 +401,7 @@ export default function Employees () {
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/metrics'] });
       toast({
         title: 'Limpieza completada',
-        description: `Se eliminaron ${data.total} empleados dados de baja aprobada.`,
+        description: `Se eliminaron ${data.total} empleados con estado "Baja Empresa Aprobada" que tenían registro en company_leaves.`,
       });
     },
     onError: (_error) => {
@@ -379,9 +425,8 @@ export default function Employees () {
   });
 
   const handleCleanLeaves = () => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar todos los empleados con baja aprobada que ya existen en company leaves? Esta acción no se puede deshacer.')) {
-      cleanLeavesMutation.mutate();
-    }
+    // Primero obtener vista previa de los empleados que serían eliminados
+    previewCleanLeavesMutation.mutate();
   };
 
   // Mutación para ejecutar limpieza automática manualmente
@@ -575,13 +620,15 @@ export default function Employees () {
               <Button
                 variant="destructive"
                 onClick={handleCleanLeaves}
-                disabled={cleanLeavesMutation.isPending}
+                disabled={cleanLeavesMutation.isPending || previewCleanLeavesMutation.isPending}
                 className="border-red-500 text-red-600 hover:bg-red-50"
                 aria-label="Limpiar empleados dados de baja"
                 tabIndex={0}
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                {cleanLeavesMutation.isPending ? 'Limpiando...' : 'Limpiar empleados dados de baja'}
+                {cleanLeavesMutation.isPending ? 'Limpiando...' : 
+                 previewCleanLeavesMutation.isPending ? 'Verificando...' : 
+                 'Limpiar empleados dados de baja'}
               </Button>
             )}
 

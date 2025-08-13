@@ -1885,6 +1885,33 @@ export async function registerRoutes (app: Express): Promise<Server> {
     }
   });
 
+  // Obtener lista de empleados que serían eliminados (solo superadmin)
+  app.get('/api/employees/clean-leaves-preview', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as { email?: string; role?: string };
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ message: 'Solo el super admin puede ver la vista previa de limpieza' });
+      }
+      
+      const result = await storage.getEmployeesToClean();
+      
+      // Log audit
+      await AuditService.logAction({
+        userId: user?.email || '',
+        userRole: 'super_admin',
+        action: 'preview_clean_company_leave_approved_employees',
+        entityType: 'employee',
+        description: `Vista previa de limpieza de empleados dados de baja aprobada (${result.total} encontrados)`,
+        newData: result,
+      });
+      
+      res.json({ success: true, ...result });
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error obteniendo vista previa de limpieza:', error);
+      res.status(500).json({ message: 'Error al obtener vista previa de limpieza' });
+    }
+  });
+
   // Limpieza de empleados dados de baja aprobada (solo superadmin)
   app.post('/api/employees/clean-leaves', isAuthenticated, async (req, res) => {
     try {

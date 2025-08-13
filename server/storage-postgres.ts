@@ -1157,20 +1157,81 @@ export class PostgresStorage {
    * Elimina empleados con status 'company_leave_approved' que ya existen en company_leaves.
    * Retorna un resumen de los empleados eliminados.
    */
-  async cleanCompanyLeaveApprovedEmployees(): Promise<{ deleted: string[]; total: number }> {
+  async getEmployeesToClean(): Promise<{ employees: any[]; total: number }> {
+    // Obtener SOLO empleados con estado 'company_leave_approved'
     const empleados = await db.select().from(employees).where(eq(employees.status, 'company_leave_approved'));
-    if (!empleados.length) return { deleted: [], total: 0 };
-    const leaves = await db.select({ employeeId: companyLeaves.employeeId }).from(companyLeaves);
-    const leavesIds = new Set(leaves.map(l => l.employeeId));
+    
+    if (!empleados.length) {
+      return { employees: [], total: 0 };
+    }
+
+    // Obtener registros de company_leaves para verificar que tienen baja aprobada
+    const leaves = await db.select({ 
+      employeeId: companyLeaves.employeeId,
+      status: companyLeaves.status 
+    }).from(companyLeaves);
+    
+    // Filtrar solo los que tienen estado 'approved' en company_leaves
+    const leavesAprobadas = leaves.filter(l => l.status === 'approved');
+    const leavesIds = new Set(leavesAprobadas.map(l => l.employeeId));
+    
+    // Filtrar empleados que tienen baja aprobada en company_leaves
     const empleadosAEliminar = empleados.filter(emp => leavesIds.has(emp.idGlovo));
-    if (!empleadosAEliminar.length) return { deleted: [], total: 0 };
+    
+    return { 
+      employees: empleadosAEliminar, 
+      total: empleadosAEliminar.length 
+    };
+  }
+
+  async cleanCompanyLeaveApprovedEmployees(): Promise<{ deleted: string[]; total: number }> {
+    // Obtener SOLO empleados con estado 'company_leave_approved'
+    const empleados = await db.select().from(employees).where(eq(employees.status, 'company_leave_approved'));
+    
+    if (!empleados.length) {
+      console.log('📋 No hay empleados con estado company_leave_approved para limpiar');
+      return { deleted: [], total: 0 };
+    }
+
+    console.log(`📋 Encontrados ${empleados.length} empleados con estado company_leave_approved`);
+
+    // Obtener registros de company_leaves para verificar que tienen baja aprobada
+    const leaves = await db.select({ 
+      employeeId: companyLeaves.employeeId,
+      status: companyLeaves.status 
+    }).from(companyLeaves);
+    
+    // Filtrar solo los que tienen estado 'approved' en company_leaves
+    const leavesAprobadas = leaves.filter(l => l.status === 'approved');
+    const leavesIds = new Set(leavesAprobadas.map(l => l.employeeId));
+    
+    // Filtrar empleados que tienen baja aprobada en company_leaves
+    const empleadosAEliminar = empleados.filter(emp => leavesIds.has(emp.idGlovo));
+    
+    if (!empleadosAEliminar.length) {
+      console.log('📋 No hay empleados con baja aprobada en company_leaves para eliminar');
+      return { deleted: [], total: 0 };
+    }
+
+    console.log(`🗑️ Eliminando ${empleadosAEliminar.length} empleados con baja empresa aprobada:`);
+    empleadosAEliminar.forEach(emp => {
+      console.log(`  - ${emp.nombre} ${emp.apellido} (${emp.idGlovo}) - Estado: ${emp.status}`);
+    });
+
+    // Eliminar empleados con doble verificación de estado
     await db.delete(employees).where(
       and(
         eq(employees.status, 'company_leave_approved'),
         inArray(employees.idGlovo, empleadosAEliminar.map(e => e.idGlovo))
       )
     );
-    return { deleted: empleadosAEliminar.map(e => e.idGlovo), total: empleadosAEliminar.length };
+
+    console.log(`✅ Eliminación completada: ${empleadosAEliminar.length} empleados`);
+    
+    return { 
+      deleted: empleadosAEliminar.map(e => e.idGlovo), 
+      total: empleadosAEliminar.length 
+    };
   }
 
   async fixItLeaveHours (employeeId: string): Promise<Employee> {
