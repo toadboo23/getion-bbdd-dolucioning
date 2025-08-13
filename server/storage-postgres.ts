@@ -861,7 +861,7 @@ export class PostgresStorage {
     }
   }
 
-  async reactivateEmployee (employeeId: string): Promise<Employee> {
+  async reactivateEmployee (employeeId: string, reactivatedBy?: string): Promise<Employee> {
     // Obtener el empleado actual antes de la reactivación
     const [currentEmployee] = await db
       .select()
@@ -891,12 +891,42 @@ export class PostgresStorage {
       updateData.originalHours = null; // Limpiar las horas originales
     }
     
+    // Actualizar el empleado
     const [employee] = await db
       .update(employees)
       .set(updateData)
       .where(eq(employees.idGlovo, employeeId))
       .returning();
+
+    // Log de reactivación (sin actualizar campos en company_leaves)
+    if (currentEmployee.status === 'company_leave_approved') {
+      console.log(`✅ Employee ${employeeId} reactivated from company leave`);
+    }
+    
     return employee;
+  }
+
+  // Obtener empleados ya reactivados desde bajas empresa
+  async getReactivatedEmployeesFromLeaves(): Promise<string[]> {
+    try {
+      // Buscar empleados que están en company_leaves con status 'approved' 
+      // pero que en employees tienen status 'active'
+      const reactivatedEmployees = await db
+        .select({ employeeId: companyLeaves.employeeId })
+        .from(companyLeaves)
+        .innerJoin(employees, eq(companyLeaves.employeeId, employees.idGlovo))
+        .where(
+          and(
+            eq(companyLeaves.status, 'approved'),
+            eq(employees.status, 'active')
+          )
+        );
+
+      return reactivatedEmployees.map(emp => emp.employeeId);
+    } catch (error) {
+      console.error('❌ Error getting reactivated employees from leaves:', error);
+      return [];
+    }
   }
 
   // Check and auto-restore expired penalizations

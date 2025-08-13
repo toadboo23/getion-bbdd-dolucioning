@@ -1826,7 +1826,7 @@ export async function registerRoutes (app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Employee not found' });
       }
 
-      const reactivatedEmployee = await storage.reactivateEmployee(id);
+      const reactivatedEmployee = await storage.reactivateEmployee(id, user.email);
 
       // Log audit
       await AuditService.logAction({
@@ -1845,6 +1845,17 @@ export async function registerRoutes (app: Express): Promise<Server> {
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') console.error('❌ Error reactivating employee:', error);
       res.status(500).json({ message: 'Failed to reactivate employee' });
+    }
+  });
+
+  // Get employees already reactivated from company leaves (protected)
+  app.get('/api/employees/reactivated-from-leaves', isAuthenticated, async (req: any, res) => {
+    try {
+      const reactivatedEmployees = await storage.getReactivatedEmployeesFromLeaves();
+      res.json({ reactivatedEmployees });
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('❌ Error getting reactivated employees:', error);
+      res.status(500).json({ message: 'Failed to get reactivated employees' });
     }
   });
 
