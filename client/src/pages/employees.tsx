@@ -469,6 +469,8 @@ export default function Employees () {
     }
   };
 
+
+
   // Función para exportar empleados a Excel
   const handleExportEmployees = () => {
     // Usar la nueva mutación que hace consulta completa al backend

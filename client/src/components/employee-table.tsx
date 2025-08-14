@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Eye, Edit, UserX, AlertTriangle } from 'lucide-react';
+import { Eye, Edit, UserX, AlertTriangle, RotateCcw } from 'lucide-react';
 import type { Employee } from '@shared/schema';
 
 interface EmployeeTableProps {
@@ -260,6 +260,8 @@ export default function EmployeeTable ({
                               <AlertTriangle className="w-4 h-4" />
                             </Button>
                           )}
+
+
                         </>
                       )}
 
