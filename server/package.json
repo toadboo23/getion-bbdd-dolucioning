@@ -5,7 +5,7 @@
   "main": "index-clean.ts",
   "type": "module",
   "scripts": {
-    "dev:backend": "tsconfig-paths -p ../tsconfig.json tsx watch index-clean.ts",
+    "dev:backend": "tsx watch index-clean.ts",
     "build": "tsc",
     "start": "node dist/index-clean.js",
     "check": "tsc --noEmit"
