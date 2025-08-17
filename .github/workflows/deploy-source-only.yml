@@ -1,0 +1,176 @@
+name: Deploy Source Code Only
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-source:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create source-only package
+        run: |
+          # Crear directorio temporal con solo código fuente
+          mkdir -p source-package
+          
+          # Copiar solo código fuente del frontend
+          cp -r client/src source-package/client-src
+          cp client/index.html source-package/
+          cp client/package.json source-package/client-package.json
+          cp client/vite.config.ts source-package/
+          cp client/tailwind.config.ts source-package/
+          cp client/postcss.config.js source-package/
+          cp client/tsconfig.json source-package/
+          
+          # Copiar solo código fuente del backend
+          cp -r server source-package/
+          rm -rf source-package/server/node_modules
+          
+          # Copiar archivos compartidos
+          cp -r shared source-package/
+          
+          # Copiar archivos de configuración de desarrollo (no producción)
+          cp package.json source-package/root-package.json
+          cp tsconfig.json source-package/root-tsconfig.json
+          cp drizzle.config.ts source-package/
+          
+          # Crear archivo de información del deployment
+          echo "Deployment realizado el $(date)" > source-package/DEPLOYMENT_INFO.txt
+          echo "Commit: ${{ github.sha }}" >> source-package/DEPLOYMENT_INFO.txt
+          echo "Branch: ${{ github.ref_name }}" >> source-package/DEPLOYMENT_INFO.txt
+
+      - name: Deploy source code via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          script: |
+            echo "=== DEPLOYMENT SEGURO - SOLO CÓDIGO FUENTE ==="
+            echo "Iniciando deployment seguro..."
+            
+            # Crear directorio de backup
+            BACKUP_DIR="/root/solucioning-deploy/backups/$(date +%Y%m%d_%H%M%S)"
+            mkdir -p $BACKUP_DIR
+            echo "Backup directory: $BACKUP_DIR"
+            
+            # Backup del código actual
+            cd /root/solucioning-deploy
+            if [ -d "client/src" ]; then
+              cp -r client/src $BACKUP_DIR/client-src-backup
+              echo "✓ Backup del frontend creado"
+            fi
+            if [ -d "server" ]; then
+              cp -r server $BACKUP_DIR/server-backup
+              echo "✓ Backup del backend creado"
+            fi
+            if [ -d "shared" ]; then
+              cp -r shared $BACKUP_DIR/shared-backup
+              echo "✓ Backup de archivos compartidos creado"
+            fi
+            
+            # Crear directorio temporal para el nuevo código
+            TEMP_DIR="/tmp/source-update-$(date +%s)"
+            mkdir -p $TEMP_DIR
+            echo "Directorio temporal: $TEMP_DIR"
+
+      - name: Upload source package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          source: "source-package/*"
+          target: "/tmp/source-update-$(date +%s)"
+
+      - name: Apply source updates
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          script: |
+            echo "=== APLICANDO ACTUALIZACIONES DE CÓDIGO ==="
+            
+            # Encontrar el directorio temporal más reciente
+            TEMP_DIR=$(ls -td /tmp/source-update-* | head -1)
+            echo "Directorio temporal encontrado: $TEMP_DIR"
+            
+            if [ -z "$TEMP_DIR" ]; then
+              echo "❌ Error: No se encontró el directorio temporal"
+              exit 1
+            fi
+            
+            cd /root/solucioning-deploy
+            
+            # Actualizar frontend (solo código fuente)
+            if [ -d "$TEMP_DIR/client-src" ]; then
+              echo "Actualizando código del frontend..."
+              rm -rf client/src
+              cp -r $TEMP_DIR/client-src client/src
+              echo "✓ Frontend actualizado"
+            fi
+            
+            # Actualizar backend (solo código fuente)
+            if [ -d "$TEMP_DIR/server" ]; then
+              echo "Actualizando código del backend..."
+              # Preservar node_modules y package-lock.json
+              if [ -d "server/node_modules" ]; then
+                cp -r server/node_modules $TEMP_DIR/server-node_modules-backup
+              fi
+              if [ -f "server/package-lock.json" ]; then
+                cp server/package-lock.json $TEMP_DIR/server-package-lock-backup
+              fi
+              
+              rm -rf server
+              cp -r $TEMP_DIR/server server
+              
+              # Restaurar node_modules y package-lock.json
+              if [ -d "$TEMP_DIR/server-node_modules-backup" ]; then
+                rm -rf server/node_modules
+                cp -r $TEMP_DIR/server-node_modules-backup server/node_modules
+              fi
+              if [ -f "$TEMP_DIR/server-package-lock-backup" ]; then
+                cp $TEMP_DIR/server-package-lock-backup server/package-lock.json
+              fi
+              
+              echo "✓ Backend actualizado"
+            fi
+            
+            # Actualizar archivos compartidos
+            if [ -d "$TEMP_DIR/shared" ]; then
+              echo "Actualizando archivos compartidos..."
+              rm -rf shared
+              cp -r $TEMP_DIR/shared shared
+              echo "✓ Archivos compartidos actualizados"
+            fi
+            
+            # Limpiar directorio temporal
+            rm -rf $TEMP_DIR
+            echo "✓ Directorio temporal limpiado"
+            
+            echo "=== REINICIANDO SERVICIOS ==="
+            
+            # Reiniciar solo los contenedores de aplicación (no base de datos)
+            echo "Reiniciando contenedores de aplicación..."
+            docker-compose restart backend frontend
+            
+            # Verificar estado
+            echo "Verificando estado de los contenedores..."
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            
+            # Verificar logs del backend
+            echo "Últimos logs del backend:"
+            docker logs --tail 10 solucioning_backend
+            
+            echo "=== DEPLOYMENT COMPLETADO ==="
+            echo "✓ Código fuente actualizado exitosamente"
+            echo "✓ Servicios reiniciados"
+            echo "✓ Configuración del servidor preservada"
