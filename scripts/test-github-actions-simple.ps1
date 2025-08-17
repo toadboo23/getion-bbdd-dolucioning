@@ -47,3 +47,4 @@ Write-Host "git push solucioning main" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "CONFIGURACION LISTA PARA PROBAR" -ForegroundColor Green
+Write-Host "TEST: GitHub Actions workflow activado - $(Get-Date)" -ForegroundColor Yellow
