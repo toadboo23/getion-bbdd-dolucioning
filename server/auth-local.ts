@@ -30,9 +30,9 @@ export function getSession () {
     saveUninitialized: true,
     cookie: {
       httpOnly: true,
-      secure: isProduction, // true en producción (HTTPS), false en desarrollo
+      secure: false, // true en producción (HTTPS), false en desarrollo
       maxAge: sessionTtl,
-      sameSite: isProduction ? 'none' : 'lax', // 'none' en producción, 'lax' en desarrollo
+      sameSite: 'lax', // 'none' en producción, 'lax' en desarrollo
     },
   });
 }
