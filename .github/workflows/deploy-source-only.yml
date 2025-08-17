@@ -20,11 +20,12 @@ jobs:
           # Copiar solo código fuente del frontend
           cp -r client/src source-package/client-src
           cp client/index.html source-package/
-          cp client/package.json source-package/client-package.json
-          cp client/vite.config.ts source-package/
-          cp client/tailwind.config.ts source-package/
-          cp client/postcss.config.js source-package/
-          cp client/tsconfig.json source-package/
+          
+          # Copiar archivos de configuración del frontend (están en raíz)
+          cp vite.config.ts source-package/
+          cp tailwind.config.ts source-package/
+          cp postcss.config.js source-package/
+          cp tsconfig.json source-package/
           
           # Copiar solo código fuente del backend
           cp -r server source-package/
@@ -35,7 +36,6 @@ jobs:
           
           # Copiar archivos de configuración de desarrollo (no producción)
           cp package.json source-package/root-package.json
-          cp tsconfig.json source-package/root-tsconfig.json
           cp drizzle.config.ts source-package/
           
           # Crear archivo de información del deployment
@@ -118,6 +118,24 @@ jobs:
               echo "✓ Frontend actualizado"
             fi
             
+            # Actualizar archivos de configuración del frontend
+            if [ -f "$TEMP_DIR/vite.config.ts" ]; then
+              cp $TEMP_DIR/vite.config.ts ./
+              echo "✓ vite.config.ts actualizado"
+            fi
+            if [ -f "$TEMP_DIR/tailwind.config.ts" ]; then
+              cp $TEMP_DIR/tailwind.config.ts ./
+              echo "✓ tailwind.config.ts actualizado"
+            fi
+            if [ -f "$TEMP_DIR/postcss.config.js" ]; then
+              cp $TEMP_DIR/postcss.config.js ./
+              echo "✓ postcss.config.js actualizado"
+            fi
+            if [ -f "$TEMP_DIR/tsconfig.json" ]; then
+              cp $TEMP_DIR/tsconfig.json ./
+              echo "✓ tsconfig.json actualizado"
+            fi
+            
             # Actualizar backend (solo código fuente)
             if [ -d "$TEMP_DIR/server" ]; then
               echo "Actualizando código del backend..."
@@ -150,6 +168,16 @@ jobs:
               rm -rf shared
               cp -r $TEMP_DIR/shared shared
               echo "✓ Archivos compartidos actualizados"
+            fi
+            
+            # Actualizar archivos de configuración raíz
+            if [ -f "$TEMP_DIR/root-package.json" ]; then
+              cp $TEMP_DIR/root-package.json ./package.json
+              echo "✓ package.json actualizado"
+            fi
+            if [ -f "$TEMP_DIR/drizzle.config.ts" ]; then
+              cp $TEMP_DIR/drizzle.config.ts ./
+              echo "✓ drizzle.config.ts actualizado"
             fi
             
             # Limpiar directorio temporal
