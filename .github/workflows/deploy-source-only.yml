@@ -75,7 +75,7 @@ jobs:
             fi
             
             # Crear directorio temporal para el nuevo código
-            TEMP_DIR="/tmp/source-update-$(date +%s)"
+            TEMP_DIR="/tmp/source-update"
             mkdir -p $TEMP_DIR
             echo "Directorio temporal: $TEMP_DIR"
 
@@ -87,7 +87,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           port: 22
           source: "source-package/*"
-          target: "/tmp/source-update-$(date +%s)"
+          target: "/tmp/source-update"
 
       - name: Apply source updates
         uses: appleboy/ssh-action@v1.0.3
@@ -99,11 +99,11 @@ jobs:
           script: |
             echo "=== APLICANDO ACTUALIZACIONES DE CÓDIGO ==="
             
-            # Encontrar el directorio temporal más reciente
-            TEMP_DIR=$(ls -td /tmp/source-update-* | head -1)
-            echo "Directorio temporal encontrado: $TEMP_DIR"
+            # Usar el directorio temporal fijo
+            TEMP_DIR="/tmp/source-update"
+            echo "Directorio temporal: $TEMP_DIR"
             
-            if [ -z "$TEMP_DIR" ]; then
+            if [ ! -d "$TEMP_DIR" ]; then
               echo "❌ Error: No se encontró el directorio temporal"
               exit 1
             fi
