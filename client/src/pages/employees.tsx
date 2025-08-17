@@ -617,8 +617,8 @@ export default function Employees () {
               </Button>
             )}
 
-            {/* Botón Limpieza Masiva - Solo Super Admin */}
-            {user?.role === 'super_admin' && (
+            {/* Botón Limpieza Masiva - Solo Super Admin - OCULTO TEMPORALMENTE */}
+            {/* {user?.role === 'super_admin' && (
               <Button
                 variant="destructive"
                 onClick={handleCleanLeaves}
@@ -632,7 +632,7 @@ export default function Employees () {
                  previewCleanLeavesMutation.isPending ? 'Verificando...' : 
                  'Limpiar empleados dados de baja'}
               </Button>
-            )}
+            )} */}
 
             {/* Botón Limpieza Automática - Solo Super Admin */}
             {user?.role === 'super_admin' && (
